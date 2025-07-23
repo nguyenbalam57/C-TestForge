@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\C-TestForge.Parser\C-TestForge.Parser.csproj" />
+    <ProjectReference Include="..\C-TestForge.Solver\C-TestForge.Solver.csproj" />
+    <ProjectReference Include="..\C-TestForge.TestCase\C-TestForge.TestCase.csproj" />
+    <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>C_TestForge.Core</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
