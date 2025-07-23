@@ -1,17 +1,5 @@
 ﻿using C_TestForge.UI.ViewModels;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace C_TestForge.UI.Dialogs
 {
@@ -21,10 +9,10 @@ namespace C_TestForge.UI.Dialogs
     public partial class EditTestCaseDialog : Window
     {
         public TestCaseViewModel ViewModel { get; private set; }
-
         public EditTestCaseDialog(TestCaseViewModel viewModel)
         {
             InitializeComponent();
+
             ViewModel = viewModel;
             DataContext = ViewModel;
         }

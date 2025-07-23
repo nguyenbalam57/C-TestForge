@@ -59,12 +59,12 @@ int main() {
             sourceFile.FilePath.Should().Be(filePath);
 
             // Check #define
-            sourceFile.Definitions.Should().HaveCountGreaterOrEqual(2);
+            sourceFile.Definitions.Should().HaveCountGreaterThanOrEqualTo(2);
             sourceFile.Definitions.Should().Contain(d => d.Name == "MAX_VALUE" && d.Value == "100");
             sourceFile.Definitions.Should().Contain(d => d.Name == "SQR" && d.Type == DefinitionType.FunctionLike);
 
             // Check functions
-            sourceFile.Functions.Should().HaveCountGreaterOrEqual(3);
+            sourceFile.Functions.Should().HaveCountGreaterThanOrEqualTo(3);
             sourceFile.Functions.Should().Contain(f => f.Name == "add" && f.ReturnType == "int" && f.Parameters.Count == 2);
             sourceFile.Functions.Should().Contain(f => f.Name == "printMessage" && f.ReturnType == "void" && f.Parameters.Count == 1);
             sourceFile.Functions.Should().Contain(f => f.Name == "main" && f.ReturnType == "int" && f.Parameters.Count == 0);
@@ -80,7 +80,7 @@ int main() {
 
             var mainFunction = sourceFile.Functions.Find(f => f.Name == "main");
             mainFunction.Should().NotBeNull();
-            mainFunction.LocalVariables.Should().HaveCountGreaterOrEqual(2);
+            mainFunction.LocalVariables.Should().HaveCountGreaterThanOrEqualTo(2);
             mainFunction.LocalVariables.Should().Contain(v => v.Name == "localVar" && v.Type == "int");
             mainFunction.LocalVariables.Should().Contain(v => v.Name == "result" && v.Type == "float");
 
@@ -131,13 +131,13 @@ int main() {
             sourceFile.Should().NotBeNull();
 
             // Check preprocessor directives
-            sourceFile.PreprocessorDirectives.Should().HaveCountGreaterOrEqual(6);
+            sourceFile.PreprocessorDirectives.Should().HaveCountGreaterThanOrEqualTo(6);
             sourceFile.PreprocessorDirectives.Should().Contain(d => d.Type == PreprocessorType.Include);
             sourceFile.PreprocessorDirectives.Should().Contain(d => d.Type == PreprocessorType.Ifdef && d.Condition == "DEBUG");
             sourceFile.PreprocessorDirectives.Should().Contain(d => d.Type == PreprocessorType.If);
 
             // Check definitions
-            sourceFile.Definitions.Should().HaveCountGreaterOrEqual(2);
+            sourceFile.Definitions.Should().HaveCountGreaterThanOrEqualTo(2);
             sourceFile.Definitions.Should().Contain(d => d.Name == "DEBUG" && d.Value == "1");
             sourceFile.Definitions.Should().Contain(d => d.Name == "LOG" && d.Type == DefinitionType.FunctionLike);
 
@@ -191,7 +191,7 @@ int main() {
             sourceFile.Should().NotBeNull();
 
             // Check variables
-            sourceFile.Variables.Should().HaveCountGreaterOrEqual(6);
+            sourceFile.Variables.Should().HaveCountGreaterThanOrEqualTo(6);
             sourceFile.Variables.Should().Contain(v => v.Name == "MAX_USERS" && v.IsConstant);
             sourceFile.Variables.Should().Contain(v => v.Name == "APP_NAME" && v.IsConstant && v.IsPointer);
             sourceFile.Variables.Should().Contain(v => v.Name == "g_userCount" && v.DefaultValue == "0");
