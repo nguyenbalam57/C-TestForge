@@ -4,6 +4,13 @@
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ClangSharp" Version="15.0.2" />
+    <PackageReference Include="ClangSharp.Interop" Version="15.0.2" />
+    <PackageReference Include="ClangSharp.PInvokeGenerator" Version="15.0.2" />
+    <PackageReference Include="libclang.runtime.win-x64" Version="15.0.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>C_TestForge.Parser</RootNamespace>
