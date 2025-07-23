@@ -1,0 +1,92 @@
+﻿<UserControl x:Class="C_TestForge.UI.Views.GenerateTestCaseDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="500">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" 
+                   Text="Generate Test Case" 
+                   Style="{StaticResource MaterialDesignHeadline6TextBlock}" 
+                   Margin="0,0,0,20"/>
+
+        <!-- Function Selection -->
+        <ComboBox Grid.Row="1"
+                  ItemsSource="{Binding Functions}"
+                  SelectedItem="{Binding SelectedFunction}"
+                  DisplayMemberPath="Name"
+                  materialDesign:HintAssist.Hint="Select Function"
+                  Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                  Margin="0,0,0,20"/>
+
+        <!-- Test Type Selection -->
+        <GroupBox Grid.Row="2" 
+                  Header="Test Type" 
+                  Margin="0,0,0,20">
+            <StackPanel>
+                <RadioButton Content="Unit Test" 
+                             IsChecked="{Binding IsUnitTest, Mode=TwoWay}"
+                             Margin="0,0,0,10"/>
+                <RadioButton Content="Integration Test" 
+                             IsChecked="{Binding IsIntegrationTest, Mode=TwoWay}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Options -->
+        <Expander Grid.Row="3" 
+                  Header="Advanced Options" 
+                  Margin="0,0,0,20">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" 
+                           Text="Test Case Name:" 
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <TextBox Grid.Row="0" Grid.Column="1" 
+                         Text="{Binding TestCaseName}"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" 
+                           Text="Coverage Level:" 
+                           VerticalAlignment="Center"
+                           Margin="0,10,10,0"/>
+                <ComboBox Grid.Row="1" Grid.Column="1" 
+                          ItemsSource="{Binding CoverageLevels}"
+                          SelectedItem="{Binding SelectedCoverageLevel}"
+                          Margin="0,10,0,0"/>
+            </Grid>
+        </Expander>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="5" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel" 
+                    Command="{Binding CancelCommand}" 
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Margin="0,0,10,0"/>
+
+            <Button Content="Generate" 
+                    Command="{Binding GenerateCommand}"
+                    Style="{StaticResource MaterialDesignRaisedButton}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

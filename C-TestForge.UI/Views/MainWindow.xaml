@@ -40,49 +40,6 @@
             </StatusBarItem>
         </StatusBar>
 
-        <!-- Main Content with AvalonDock -->
-        <xcad:DockingManager x:Name="dockManager">
-            <xcad:DockingManager.LayoutUpdateStrategy>
-                <local:LayoutUpdateStrategy/>
-            </xcad:DockingManager.LayoutUpdateStrategy>
-
-            <xcad:LayoutRoot>
-                <xcad:LayoutPanel Orientation="Horizontal">
-                    <!-- Project Explorer Pane -->
-                    <xcad:LayoutAnchorablePane DockWidth="250">
-                        <xcad:LayoutAnchorable Title="Project Explorer" ContentId="ProjectExplorer">
-                            <ContentControl prism:RegionManager.RegionName="ProjectExplorerRegion"/>
-                        </xcad:LayoutAnchorable>
-                    </xcad:LayoutAnchorablePane>
-
-                    <!-- Main Document Area -->
-                    <xcad:LayoutDocumentPane>
-                        <!-- Source Analysis Document -->
-                        <xcad:LayoutDocument Title="Source Analysis" ContentId="SourceAnalysis">
-                            <ContentControl prism:RegionManager.RegionName="SourceAnalysisRegion"/>
-                        </xcad:LayoutDocument>
-
-                        <!-- Test Case Management Document -->
-                        <xcad:LayoutDocument Title="Test Case Management" ContentId="TestCaseManagement">
-                            <ContentControl prism:RegionManager.RegionName="TestCaseManagementRegion"/>
-                        </xcad:LayoutDocument>
-                    </xcad:LayoutDocumentPane>
-                </xcad:LayoutPanel>
-
-                <!-- Property Grid Pane (Bottom) -->
-                <xcad:LayoutRoot.BottomSide>
-                    <xcad:LayoutAnchorSide>
-                        <xcad:LayoutAnchorGroup>
-                            <xcad:LayoutAnchorable Title="Properties" ContentId="Properties">
-                                <ContentControl prism:RegionManager.RegionName="PropertiesRegion"/>
-                            </xcad:LayoutAnchorable>
-                            <xcad:LayoutAnchorable Title="Output" ContentId="Output">
-                                <ContentControl prism:RegionManager.RegionName="OutputRegion"/>
-                            </xcad:LayoutAnchorable>
-                        </xcad:LayoutAnchorGroup>
-                    </xcad:LayoutAnchorSide>
-                </xcad:LayoutRoot.BottomSide>
-            </xcad:LayoutRoot>
-        </xcad:DockingManager>
+       
     </DockPanel>
 </Window>

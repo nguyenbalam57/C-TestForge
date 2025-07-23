@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Highlighting.Xshd;
+using ICSharpCode.AvalonEdit.Rendering;
+using System.IO;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
+using System.Xml;
 
 namespace C_TestForge.UI.Controls
 {
@@ -23,28 +17,30 @@ namespace C_TestForge.UI.Controls
     public partial class SourceCodeViewer : UserControl
     {
         public static readonly DependencyProperty SourceCodeProperty =
-        DependencyProperty.Register("SourceCode", typeof(string), typeof(SourceCodeViewer),
-            new PropertyMetadata(string.Empty, SourceCodePropertyChanged));
+            DependencyProperty.Register("SourceCode", typeof(string), typeof(SourceCodeViewer),
+                new PropertyMetadata(string.Empty, SourceCodePropertyChanged));
 
         public string SourceCode
         {
             get { return (string)GetValue(SourceCodeProperty); }
             set { SetValue(SourceCodeProperty, value); }
         }
+
+        public static readonly DependencyProperty HighlightedLineProperty =
+            DependencyProperty.Register("HighlightedLine", typeof(int), typeof(SourceCodeViewer),
+                new PropertyMetadata(-1, HighlightedLinePropertyChanged));
+
+        public int HighlightedLine
+        {
+            get { return (int)GetValue(HighlightedLineProperty); }
+            set { SetValue(HighlightedLineProperty, value); }
+        }
         public SourceCodeViewer()
         {
             InitializeComponent();
 
-            // Thiết lập syntax highlighting cho C
-            var assembly = Assembly.GetExecutingAssembly();
-            using (var stream = assembly.GetManifestResourceStream("C_TestForge.UI.Resources.C.xshd"))
-            {
-                using (var reader = new XmlTextReader(stream))
-                {
-                    textEditor.SyntaxHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(
-                        reader, ICSharpCode.AvalonEdit.Highlighting.HighlightingManager.Instance);
-                }
-            }
+            // Load C syntax highlighting
+            LoadSyntaxHighlighting();
         }
 
         private static void SourceCodePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -56,10 +52,83 @@ namespace C_TestForge.UI.Controls
             }
         }
 
-        // Thêm phương thức để highlight dòng cụ thể
+        private static void HighlightedLinePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var control = d as SourceCodeViewer;
+            if (control != null && e.NewValue is int lineNumber)
+            {
+                control.HighlightLine(lineNumber);
+            }
+        }
+
+        private void LoadSyntaxHighlighting()
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream("C_TestForge.UI.Resources.C.xshd"))
+                {
+                    if (stream != null)
+                    {
+                        using (var reader = new XmlTextReader(stream))
+                        {
+                            textEditor.SyntaxHighlighting = HighlightingLoader.Load(
+                                reader, HighlightingManager.Instance);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback to built-in C# highlighting
+                        textEditor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("C");
+                    }
+                }
+            }
+            catch
+            {
+                // If something goes wrong, use default highlighting
+                textEditor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("C");
+            }
+        }
+
         public void HighlightLine(int lineNumber)
         {
-            // Triển khai highlighting cho dòng được chọn
+            // Clear existing highlighting
+            textEditor.TextArea.TextView.LineTransformers.Clear();
+
+            if (lineNumber > 0)
+            {
+                // Add a line transformer to highlight the specified line
+                textEditor.TextArea.TextView.BackgroundRenderers.Add(
+                    new LineBackgroundRenderer(textEditor, lineNumber));
+            }
+        }
+
+        public class LineBackgroundRenderer : IBackgroundRenderer
+        {
+            private readonly TextEditor _editor;
+            private readonly int _targetLine;
+
+            public LineBackgroundRenderer(TextEditor editor, int line)
+            {
+                _editor = editor;
+                _targetLine = line;
+            }
+
+            public KnownLayer Layer => KnownLayer.Selection;
+
+            public void Draw(TextView textView, DrawingContext drawingContext)
+            {
+                if (!(_editor.Document?.Text?.Length > 0)) return;
+                textView.EnsureVisualLines();
+
+                var line = _editor.Document.GetLineByNumber(_targetLine);
+                foreach (var rect in BackgroundGeometryBuilder.GetRectsForSegment(textView, line))
+                {
+                    drawingContext.DrawRectangle(
+                        Brushes.LightYellow, null,
+                        new Rect(rect.Location, new Size(rect.Width, rect.Height)));
+                }
+            }
         }
     }
 }

@@ -1,19 +1,7 @@
-﻿using C_TestForge.Models;
-using C_TestForge.Models.TestCases;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using C_TestForge.Models.TestCases;
+using C_TestForge.UI.ViewModels;
 
 namespace C_TestForge.UI.Controls
 {
@@ -22,20 +10,19 @@ namespace C_TestForge.UI.Controls
     /// </summary>
     public partial class TestCaseEditor : UserControl
     {
+        public static readonly DependencyProperty TestCaseProperty =
+            DependencyProperty.Register("TestCase", typeof(Models.TestCases.TestCase), typeof(TestCaseEditor),
+                new PropertyMetadata(null, TestCasePropertyChanged));
+
+        public Models.TestCases.TestCase TestCase
+        {
+            get { return (Models.TestCases.TestCase)GetValue(TestCaseProperty); }
+            set { SetValue(TestCaseProperty, value); }
+        }
+
         public TestCaseEditor()
         {
             InitializeComponent();
-        }
-
-        // DependencyProperty cho TestCase
-        public static readonly DependencyProperty TestCaseProperty =
-            DependencyProperty.Register("TestCase", typeof(TestCaseCustom), typeof(TestCaseEditor),
-                new PropertyMetadata(null, TestCasePropertyChanged));
-
-        public TestCaseCustom TestCase
-        {
-            get { return (TestCaseCustom)GetValue(TestCaseProperty); }
-            set { SetValue(TestCaseProperty, value); }
         }
 
         private static void TestCasePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -43,7 +30,7 @@ namespace C_TestForge.UI.Controls
             var control = d as TestCaseEditor;
             if (control != null && control.DataContext is TestCaseEditorViewModel viewModel)
             {
-                viewModel.TestCase = e.NewValue as TestCaseCustom;
+                viewModel.TestCase = e.NewValue as Models.TestCases.TestCase;
             }
         }
     }

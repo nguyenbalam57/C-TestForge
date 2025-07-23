@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="C" extensions=".c" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <!-- This is a simplified C syntax highlighting definition -->
+  
+  <Color name="Comment" foreground="#008000" />
+  <Color name="String" foreground="#A31515" />
+  <Color name="Preprocessor" foreground="#0000FF" />
+  <Color name="Punctuation" foreground="#000000" />
+  <Color name="NumberLiteral" foreground="#8B008B" />
+  <Color name="Keywords" foreground="#0000FF" fontWeight="bold" />
+  <Color name="DataTypes" foreground="#2B91AF" />
+  
+  <RuleSet ignoreCase="false">
+    <!-- Comments -->
+    <Span color="Comment" multiline="false">
+      <Begin>//</Begin>
+    </Span>
+    
+    <Span color="Comment" multiline="true">
+      <Begin>/\*</Begin>
+      <End>\*/</End>
+    </Span>
+    
+    <!-- Preprocessor -->
+    <Span color="Preprocessor" multiline="false">
+      <Begin>\#</Begin>
+    </Span>
+    
+    <!-- Strings -->
+    <Span color="String" multiline="false">
+      <Begin>"</Begin>
+      <End>"</End>
+      <RuleSet>
+        <Span begin="\\" end="." />
+      </RuleSet>
+    </Span>
+    
+    <Span color="String" multiline="false">
+      <Begin>'</Begin>
+      <End>'</End>
+      <RuleSet>
+        <Span begin="\\" end="." />
+      </RuleSet>
+    </Span>
+    
+    <!-- Keywords -->
+    <Keywords color="Keywords">
+      <Word>if</Word>
+      <Word>else</Word>
+      <Word>switch</Word>
+      <Word>case</Word>
+      <Word>default</Word>
+      <Word>break</Word>
+      <Word>continue</Word>
+      <Word>return</Word>
+      <Word>goto</Word>
+      <Word>for</Word>
+      <Word>while</Word>
+      <Word>do</Word>
+      <Word>sizeof</Word>
+      <Word>typedef</Word>
+      <Word>struct</Word>
+      <Word>union</Word>
+      <Word>enum</Word>
+      <Word>static</Word>
+      <Word>extern</Word>
+      <Word>const</Word>
+      <Word>volatile</Word>
+      <Word>register</Word>
+      <Word>auto</Word>
+      <Word>inline</Word>
+    </Keywords>
+    
+    <!-- Data Types -->
+    <Keywords color="DataTypes">
+      <Word>void</Word>
+      <Word>char</Word>
+      <Word>short</Word>
+      <Word>int</Word>
+      <Word>long</Word>
+      <Word>float</Word>
+      <Word>double</Word>
+      <Word>signed</Word>
+      <Word>unsigned</Word>
+      <Word>bool</Word>
+      <Word>size_t</Word>
+    </Keywords>
+    
+    <!-- Numbers -->
+    <Rule color="NumberLiteral">
+      \b0[xX][0-9a-fA-F]+|
+      \b[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?
+    </Rule>
+  </RuleSet>
+</SyntaxDefinition>

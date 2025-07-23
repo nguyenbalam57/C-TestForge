@@ -1,4 +1,6 @@
-﻿namespace C_TestForge.Models
+﻿using C_TestForge.Models.TestCases;
+
+namespace C_TestForge.Models
 {
     public class TestProject
     {

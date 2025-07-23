@@ -1,9 +1,16 @@
-﻿using C_TestForge.Core;
-using C_TestForge.Core.Services;
+﻿using AutoMapper;
+using C_TestForge.Parser;
+using C_TestForge.TestCase;
+using C_TestForge.TestCase.Repositories;
+using C_TestForge.TestCase.Services;
 using C_TestForge.UI.ViewModels;
-using Microsoft.Extensions.Logging;
-using System.Configuration;
-using System.Data;
+using C_TestForge.UI.Views;
+using Prism.Ioc;
+using Prism.Modularity;
+using Prism.Unity;
+using System;
+using System.ComponentModel;
+using System.IO;
 using System.Windows;
 
 namespace C_TestForge.UI;
@@ -13,33 +20,51 @@ namespace C_TestForge.UI;
 /// </summary>
 public partial class App : Application
 {
-    protected override void OnStartup(StartupEventArgs e)
+    protected override Window CreateShell()
     {
-        base.OnStartup(e);
-
-        // Configure services
-        AppBootstrapper.ConfigureServices();
-
-        // Create main window
-        var projectService = AppBootstrapper.GetService<IProjectService>();
-        var testCaseService = AppBootstrapper.GetService<ITestCaseService>();
-        var logger = AppBootstrapper.GetService<ILogger<MainWindowViewModel>>();
-
-        var mainViewModel = new MainWindowViewModel(projectService, testCaseService, logger);
-        var mainWindow = new MainWindow
-        {
-            DataContext = mainViewModel
-        };
-
-        mainWindow.Show();
+        return Container.Resolve<MainWindow>();
     }
 
-    protected override void OnExit(ExitEventArgs e)
+    protected override void RegisterTypes(IContainerRegistry containerRegistry)
     {
-        // Clean up
-        AppBootstrapper.Shutdown();
+        // Register services from previous stages
 
-        base.OnExit(e);
+        // Register TestCase services
+        containerRegistry.RegisterSingleton<IMapper>(() =>
+        {
+            var config = new MapperConfiguration(cfg =>
+            {
+                // Configure AutoMapper mappings here
+            });
+
+            return config.CreateMapper();
+        });
+
+        containerRegistry.RegisterSingleton<ITestCaseRepository>(() =>
+            new TestCaseRepository(
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "C-TestForge",
+                    "TestCases.db"),
+                Container.Resolve<IMapper>()));
+
+        containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
+
+        // Register dialogs
+        containerRegistry.RegisterDialog<TestCaseEditorDialog, TestCaseEditorDialogViewModel>();
+        containerRegistry.RegisterDialog<TestCaseComparisonDialog, TestCaseComparisonDialogViewModel>();
+        containerRegistry.RegisterDialog<GenerateTestCaseDialog, GenerateTestCaseDialogViewModel>();
+        containerRegistry.RegisterDialog<ConfirmationDialog, ConfirmationDialogViewModel>();
+    }
+
+    protected override void ConfigureModuleCatalog(IModuleCatalog moduleCatalog)
+    {
+        // Register the Parser module from stage 1
+        moduleCatalog.AddModule<ParserModule>();
+
+        // Register the TestCase module from stage 2
+        moduleCatalog.AddModule<TestCaseModule>();
     }
 }
+
 
