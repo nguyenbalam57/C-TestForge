@@ -29,4 +29,8 @@
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="FileTest\" />
+  </ItemGroup>
+
 </Project>
