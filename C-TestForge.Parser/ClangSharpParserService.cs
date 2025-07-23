@@ -57,7 +57,32 @@ namespace C_TestForge.Parser
 
                 // Create a cursor visitor to process the AST
                 var cursor = _translationUnit.Cursor;
-                cursor.VisitChildren(VisitNode, new CXClientData(IntPtr.Zero));
+
+                // Tạo một instance của CXCursorVisitor từ lambda
+                CXCursorVisitor visitor = new CXCursorVisitor((c, p, d) => {
+                    // Only process nodes from the main file
+                    if (!c.Location.IsFromMainFile)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Continue;
+                    }
+
+                    switch (c.Kind)
+                    {
+                        case CXCursorKind.CXCursor_FunctionDecl:
+                            ProcessFunction(c);
+                            break;
+                        case CXCursorKind.CXCursor_VarDecl:
+                            ProcessVariable(c, p);
+                            break;
+                        case CXCursorKind.CXCursor_ParmDecl:
+                            // Parameters are processed within the function processing
+                            break;
+                    }
+
+                    return CXChildVisitResult.CXChildVisit_Recurse;
+                });
+
+                cursor.VisitChildren(visitor, new CXClientData(IntPtr.Zero));
 
                 // Process functions and variables
                 foreach (var functionPair in _functions)
@@ -120,7 +145,7 @@ namespace C_TestForge.Parser
             return args.ToArray();
         }
 
-        private void ExtractPreprocessorInfo(CSourceFile sourceFile)
+        private unsafe void ExtractPreprocessorInfo(CSourceFile sourceFile)
         {
             var fileName = Path.GetFileName(sourceFile.FilePath);
             var fileContent = sourceFile.Content;
@@ -171,11 +196,10 @@ namespace C_TestForge.Parser
             }, new CXClientData(IntPtr.Zero));
         }
 
-        private void ProcessMacroDefinition(CXCursor cursor, int lineNumber, string lineText, CSourceFile sourceFile)
+        private unsafe void ProcessMacroDefinition(CXCursor cursor, int lineNumber, string lineText, CSourceFile sourceFile)
         {
-            var name = cursor.Spelling.ToString();
+            var name = clang.getCursorSpelling(cursor).ToString();
             var tokens = GetTokens(cursor);
-
             if (tokens.Count > 1)
             {
                 var definition = new CDefinition
@@ -186,34 +210,34 @@ namespace C_TestForge.Parser
                     IsEnabled = true
                 };
 
+                // Lấy TranslationUnit từ cursor để sử dụng khi lấy spelling của token
+                var translationUnit = clang.Cursor_getTranslationUnit(cursor);
+
                 // Check if it's a function-like macro
-                if (tokens.Count > 2 && tokens[1].Spelling.ToString() == "(")
+                if (tokens.Count > 2 && GetTokenSpelling(tokens[1], translationUnit) == "(")
                 {
                     definition.Type = DefinitionType.FunctionLike;
-
                     // Extract parameters
                     int paramStart = 2;
-                    int paramEnd = tokens.FindIndex(paramStart, t => t.Spelling.ToString() == ")");
-
+                    int paramEnd = tokens.FindIndex(paramStart, t => GetTokenSpelling(t, translationUnit) == ")");
                     if (paramEnd > paramStart)
                     {
                         for (int i = paramStart; i < paramEnd; i++)
                         {
-                            var token = tokens[i].Spelling.ToString();
+                            var token = GetTokenSpelling(tokens[i], translationUnit);
                             if (token != "," && !string.IsNullOrWhiteSpace(token))
                             {
                                 definition.Parameters.Add(token);
                             }
                         }
                     }
-
                     // Extract value (everything after the closing parenthesis)
                     if (paramEnd < tokens.Count - 1)
                     {
                         var valueBuilder = new StringBuilder();
                         for (int i = paramEnd + 1; i < tokens.Count; i++)
                         {
-                            valueBuilder.Append(tokens[i].Spelling.ToString());
+                            valueBuilder.Append(GetTokenSpelling(tokens[i], translationUnit));
                             if (i < tokens.Count - 1) valueBuilder.Append(" ");
                         }
                         definition.Value = valueBuilder.ToString().Trim();
@@ -223,26 +247,29 @@ namespace C_TestForge.Parser
                 {
                     // Simple define or simple macro
                     definition.Type = tokens.Count > 2 ? DefinitionType.Macro : DefinitionType.Simple;
-
                     // Extract value (everything after the name)
                     var valueBuilder = new StringBuilder();
                     for (int i = 1; i < tokens.Count; i++)
                     {
-                        valueBuilder.Append(tokens[i].Spelling.ToString());
+                        valueBuilder.Append(GetTokenSpelling(tokens[i], translationUnit));
                         if (i < tokens.Count - 1) valueBuilder.Append(" ");
                     }
                     definition.Value = valueBuilder.ToString().Trim();
                 }
-
                 sourceFile.Definitions.Add(definition);
                 _definitions[name] = definition;
-
                 // Check if this define is inside a conditional directive
                 if (_directiveStack.Count > 0)
                 {
                     definition.ParentDirective = _directiveStack.Peek();
                 }
             }
+        }
+
+        // Helper method để lấy spelling của token
+        private unsafe string GetTokenSpelling(CXToken token, CXTranslationUnit translationUnit)
+        {
+            return clang.getTokenSpelling(translationUnit, token).ToString();
         }
 
         private void ProcessPreprocessorDirective(CXCursor cursor, int lineNumber, string lineText, CSourceFile sourceFile)
@@ -318,7 +345,7 @@ namespace C_TestForge.Parser
             _preprocessorDirectives[cursor] = directive;
         }
 
-        private unsafe CXChildVisitResult VisitNode(CXCursor cursor, CXCursor parent, IntPtr data)
+        private CXChildVisitResult VisitNode(CXCursor cursor, CXCursor parent, IntPtr data)
         {
             // Only process nodes from the main file
             if (!cursor.Location.IsFromMainFile)
@@ -463,7 +490,7 @@ namespace C_TestForge.Parser
             return param;
         }
 
-        private CVariable ProcessLocalVariable(CXCursor cursor, CFunction parentFunction)
+        private unsafe CVariable ProcessLocalVariable(CXCursor cursor, CFunction parentFunction)
         {
             var varName = cursor.Spelling.ToString();
             var varType = cursor.Type.Spelling.ToString();
@@ -500,6 +527,9 @@ namespace C_TestForge.Parser
             variable.IsArray = varType.Contains("[") && varType.Contains("]");
 
             // Try to extract default value
+            var translationUnit = clang.Cursor_getTranslationUnit(cursor);
+
+            // Try to extract default value
             cursor.VisitChildren((childCursor, childParent, clientData) =>
             {
                 if (childCursor.Kind == CXCursorKind.CXCursor_IntegerLiteral ||
@@ -510,7 +540,7 @@ namespace C_TestForge.Parser
                     var tokenList = GetTokens(childCursor);
                     if (tokenList.Count > 0)
                     {
-                        variable.DefaultValue = string.Join(" ", tokenList.Select(t => t.Spelling.ToString()));
+                        variable.DefaultValue = string.Join(" ", tokenList.Select(t => GetTokenSpelling(t, translationUnit)));
                     }
                 }
                 return CXChildVisitResult.CXChildVisit_Continue;
@@ -519,7 +549,7 @@ namespace C_TestForge.Parser
             return variable;
         }
 
-        private void ProcessVariable(CXCursor cursor, CXCursor parent)
+        private unsafe void ProcessVariable(CXCursor cursor, CXCursor parent)
         {
             // Skip if parent is a function - we handle local variables separately
             if (parent.Kind == CXCursorKind.CXCursor_FunctionDecl)
@@ -565,6 +595,9 @@ namespace C_TestForge.Parser
             variable.IsArray = varType.Contains("[") && varType.Contains("]");
 
             // Try to extract default value
+            var translationUnit = clang.Cursor_getTranslationUnit(cursor);
+
+            // Try to extract default value
             cursor.VisitChildren((childCursor, childParent, clientData) =>
             {
                 if (childCursor.Kind == CXCursorKind.CXCursor_IntegerLiteral ||
@@ -575,7 +608,7 @@ namespace C_TestForge.Parser
                     var tokenList = GetTokens(childCursor);
                     if (tokenList.Count > 0)
                     {
-                        variable.DefaultValue = string.Join(" ", tokenList.Select(t => t.Spelling.ToString()));
+                        variable.DefaultValue = string.Join(" ", tokenList.Select(t => GetTokenSpelling(t, translationUnit)));
                     }
                 }
                 return CXChildVisitResult.CXChildVisit_Continue;
@@ -593,17 +626,34 @@ namespace C_TestForge.Parser
             var range = cursor.Extent;
             var tokenList = new List<CXToken>();
 
-            CXToken.Tokenize(_translationUnit, range, out CXToken[] tokens);
-
-            if (tokens != null && tokens.Length > 0)
+            try
             {
-                tokenList.AddRange(tokens);
+
+                // Thử phương thức 2: _translationUnit.Tokenize trả về array
+                try
+                {
+                    var tokens = _translationUnit.Tokenize(range);
+                    if (tokens != null && tokens.Length > 0)
+                    {
+                        tokenList.AddRange(tokens);
+                        return tokenList;
+                    }
+                }
+                catch (Exception ex2)
+                {
+                    Console.WriteLine($"Method 2 failed: {ex2.Message}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetTokens: {ex.Message}");
             }
 
             return tokenList;
         }
 
-        private string GetSourceText(CXSourceRange range)
+        private unsafe string GetSourceText(CXSourceRange range)
         {
             var start = range.Start;
             var end = range.End;
@@ -611,13 +661,20 @@ namespace C_TestForge.Parser
             start.GetFileLocation(out CXFile startFile, out uint startLine, out uint startColumn, out uint startOffset);
             end.GetFileLocation(out CXFile endFile, out uint endLine, out uint endColumn, out uint endOffset);
 
-            if (startFile.Name != endFile.Name)
+            // Lấy tên file bằng API thích hợp
+            var startFileName = clang.getFileName(startFile).ToString();
+            var endFileName = clang.getFileName(endFile).ToString();
+
+            // So sánh tên file thay vì so sánh đối tượng CXFile
+            if (startFileName != endFileName)
             {
                 return string.Empty;
             }
 
             var length = endOffset - startOffset;
-            var fileContent = File.ReadAllText(startFile.Name);
+
+            // Sử dụng startFileName thay vì startFile.Name
+            var fileContent = File.ReadAllText(startFileName);
 
             if (startOffset < fileContent.Length && startOffset + length <= fileContent.Length)
             {
