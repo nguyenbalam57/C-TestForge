@@ -1,0 +1,88 @@
+﻿<Window x:Class="C_TestForge.UI.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:prism="http://prismlibrary.com/"
+        xmlns:xcad="http://schemas.xceed.com/wpf/xaml/avalondock"
+        Title="{Binding Title}" Height="768" Width="1024">
+    <DockPanel>
+        <!-- Main Menu -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New Project" Command="{Binding NewProjectCommand}"/>
+                <MenuItem Header="_Open Project" Command="{Binding OpenProjectCommand}"/>
+                <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Exit" Command="{Binding ExitCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Preferences" Command="{Binding PreferencesCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Reset Layout" Command="{Binding ResetLayoutCommand}"/>
+                <MenuItem Header="Save Layout" Command="{Binding SaveLayoutCommand}"/>
+                <MenuItem Header="Load Layout" Command="{Binding LoadLayoutCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="Import Test Cases" Command="{Binding ImportTestCasesCommand}"/>
+                <MenuItem Header="Export Test Cases" Command="{Binding ExportTestCasesCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
+                <MenuItem Header="_Documentation" Command="{Binding DocumentationCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Status Bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- Main Content with AvalonDock -->
+        <xcad:DockingManager x:Name="dockManager">
+            <xcad:DockingManager.LayoutUpdateStrategy>
+                <local:LayoutUpdateStrategy/>
+            </xcad:DockingManager.LayoutUpdateStrategy>
+
+            <xcad:LayoutRoot>
+                <xcad:LayoutPanel Orientation="Horizontal">
+                    <!-- Project Explorer Pane -->
+                    <xcad:LayoutAnchorablePane DockWidth="250">
+                        <xcad:LayoutAnchorable Title="Project Explorer" ContentId="ProjectExplorer">
+                            <ContentControl prism:RegionManager.RegionName="ProjectExplorerRegion"/>
+                        </xcad:LayoutAnchorable>
+                    </xcad:LayoutAnchorablePane>
+
+                    <!-- Main Document Area -->
+                    <xcad:LayoutDocumentPane>
+                        <!-- Source Analysis Document -->
+                        <xcad:LayoutDocument Title="Source Analysis" ContentId="SourceAnalysis">
+                            <ContentControl prism:RegionManager.RegionName="SourceAnalysisRegion"/>
+                        </xcad:LayoutDocument>
+
+                        <!-- Test Case Management Document -->
+                        <xcad:LayoutDocument Title="Test Case Management" ContentId="TestCaseManagement">
+                            <ContentControl prism:RegionManager.RegionName="TestCaseManagementRegion"/>
+                        </xcad:LayoutDocument>
+                    </xcad:LayoutDocumentPane>
+                </xcad:LayoutPanel>
+
+                <!-- Property Grid Pane (Bottom) -->
+                <xcad:LayoutRoot.BottomSide>
+                    <xcad:LayoutAnchorSide>
+                        <xcad:LayoutAnchorGroup>
+                            <xcad:LayoutAnchorable Title="Properties" ContentId="Properties">
+                                <ContentControl prism:RegionManager.RegionName="PropertiesRegion"/>
+                            </xcad:LayoutAnchorable>
+                            <xcad:LayoutAnchorable Title="Output" ContentId="Output">
+                                <ContentControl prism:RegionManager.RegionName="OutputRegion"/>
+                            </xcad:LayoutAnchorable>
+                        </xcad:LayoutAnchorGroup>
+                    </xcad:LayoutAnchorSide>
+                </xcad:LayoutRoot.BottomSide>
+            </xcad:LayoutRoot>
+        </xcad:DockingManager>
+    </DockPanel>
+</Window>
