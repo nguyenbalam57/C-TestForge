@@ -1,16 +1,16 @@
-﻿using C_TestForge.Models;
-using C_TestForge.Models.TestCases;
-using C_TestForge.TestCase.Repositories;
-using CsvHelper;
-using CsvHelper.Configuration;
-using OfficeOpenXml;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
+using C_TestForge.TestCase.Repositories;
+using CsvHelper;
+using CsvHelper.Configuration;
+using OfficeOpenXml;
 
 namespace C_TestForge.TestCase.Services
 {
@@ -96,7 +96,93 @@ namespace C_TestForge.TestCase.Services
             {
                 // Read main test case records
                 var records = csv.GetRecords<TestCaseCsvRecord>().ToList();
-                testCases = ConvertCsvRecordsToTestCases(records);
+
+                // Convert records to test cases
+                foreach (var record in records)
+                {
+                    // Find existing test case or create new one
+                    var testCase = testCases.FirstOrDefault(tc => tc.Name == record.Name);
+                    if (testCase == null)
+                    {
+                        testCase = new Models.TestCases.TestCase
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = record.Name,
+                            Description = record.Description,
+                            FunctionName = record.FunctionName,
+                            Type = Enum.TryParse<TestCaseType>(record.Type, out var parsedType)
+                                ? parsedType
+                                : TestCaseType.UnitTest,
+                            Status = Enum.TryParse<TestCaseStatus>(record.Status, out var parsedStatus)
+                                ? parsedStatus
+                                : TestCaseStatus.NotExecuted,
+                            CreatedDate = DateTime.Now,
+                            ModifiedDate = DateTime.Now,
+                            Inputs = new List<TestCaseInput>(),
+                            ExpectedOutputs = new List<TestCaseOutput>(),
+                            ActualOutputs = new List<TestCaseOutput>()
+                        };
+
+                        testCases.Add(testCase);
+                    }
+                }
+
+                // Reset reader position
+                reader.BaseStream.Position = 0;
+                csv.Read();
+                csv.ReadHeader();
+
+                // Read input records
+                while (csv.Read())
+                {
+                    var testCaseName = csv.GetField("TestCaseName");
+                    var variableName = csv.GetField("VariableName");
+                    var variableType = csv.GetField("VariableType");
+                    var value = csv.GetField("Value");
+                    var isInputStr = csv.GetField("IsInput");
+                    var isStubStr = csv.GetField("IsStub");
+
+                    if (string.IsNullOrEmpty(testCaseName) || string.IsNullOrEmpty(variableName))
+                        continue;
+
+                    var testCase = testCases.FirstOrDefault(tc => tc.Name == testCaseName);
+                    if (testCase == null)
+                        continue;
+
+                    bool isInput = true;
+                    if (!string.IsNullOrEmpty(isInputStr))
+                    {
+                        bool.TryParse(isInputStr, out isInput);
+                    }
+
+                    bool isStub = false;
+                    if (!string.IsNullOrEmpty(isStubStr))
+                    {
+                        bool.TryParse(isStubStr, out isStub);
+                    }
+
+                    if (isInput)
+                    {
+                        testCase.Inputs.Add(new TestCaseInput
+                        {
+                            Id = Guid.NewGuid(),
+                            VariableName = variableName,
+                            VariableType = variableType ?? "int",
+                            Value = value ?? "0",
+                            IsStub = isStub
+                        });
+                    }
+                    else
+                    {
+                        testCase.ExpectedOutputs.Add(new TestCaseOutput
+                        {
+                            Id = Guid.NewGuid(),
+                            VariableName = variableName,
+                            VariableType = variableType ?? "int",
+                            Value = value ?? "0"
+                        });
+                    }
+                }
             }
 
             // Save to repository
@@ -131,13 +217,23 @@ namespace C_TestForge.TestCase.Services
                             Name = testCasesWorksheet.Cells[row, 1].Value?.ToString(),
                             Description = testCasesWorksheet.Cells[row, 2].Value?.ToString(),
                             FunctionName = testCasesWorksheet.Cells[row, 3].Value?.ToString(),
-                            Type = Enum.Parse<TestCaseType>(testCasesWorksheet.Cells[row, 4].Value?.ToString() ?? "UnitTest"),
-                            Status = Enum.Parse<TestCaseStatus>(testCasesWorksheet.Cells[row, 5].Value?.ToString() ?? "NotExecuted"),
+                            Type = Enum.TryParse<TestCaseType>(testCasesWorksheet.Cells[row, 4].Value?.ToString(), out var type)
+                                ? type
+                                : TestCaseType.UnitTest,
+                            Status = Enum.TryParse<TestCaseStatus>(testCasesWorksheet.Cells[row, 5].Value?.ToString(), out var status)
+                                ? status
+                                : TestCaseStatus.NotExecuted,
                             CreatedDate = DateTime.Now,
-                            ModifiedDate = DateTime.Now
+                            ModifiedDate = DateTime.Now,
+                            Inputs = new List<TestCaseInput>(),
+                            ExpectedOutputs = new List<TestCaseOutput>(),
+                            ActualOutputs = new List<TestCaseOutput>()
                         };
 
-                        testCases.Add(testCase);
+                        if (!string.IsNullOrEmpty(testCase.Name) && !string.IsNullOrEmpty(testCase.FunctionName))
+                        {
+                            testCases.Add(testCase);
+                        }
                     }
                 }
 
@@ -155,13 +251,19 @@ namespace C_TestForge.TestCase.Services
 
                         if (testCase != null)
                         {
-                            testCase.Inputs.Add(new TestCaseInput
+                            var input = new TestCaseInput
                             {
+                                Id = Guid.NewGuid(),
                                 VariableName = inputsWorksheet.Cells[row, 2].Value?.ToString(),
                                 VariableType = inputsWorksheet.Cells[row, 3].Value?.ToString(),
                                 Value = inputsWorksheet.Cells[row, 4].Value?.ToString(),
-                                IsStub = bool.Parse(inputsWorksheet.Cells[row, 5].Value?.ToString() ?? "false")
-                            });
+                                IsStub = Convert.ToBoolean(inputsWorksheet.Cells[row, 5].Value ?? false)
+                            };
+
+                            if (!string.IsNullOrEmpty(input.VariableName))
+                            {
+                                testCase.Inputs.Add(input);
+                            }
                         }
                     }
                 }
@@ -180,12 +282,18 @@ namespace C_TestForge.TestCase.Services
 
                         if (testCase != null)
                         {
-                            testCase.ExpectedOutputs.Add(new TestCaseOutput
+                            var output = new TestCaseOutput
                             {
+                                Id = Guid.NewGuid(),
                                 VariableName = outputsWorksheet.Cells[row, 2].Value?.ToString(),
                                 VariableType = outputsWorksheet.Cells[row, 3].Value?.ToString(),
                                 Value = outputsWorksheet.Cells[row, 4].Value?.ToString()
-                            });
+                            };
+
+                            if (!string.IsNullOrEmpty(output.VariableName))
+                            {
+                                testCase.ExpectedOutputs.Add(output);
+                            }
                         }
                     }
                 }
@@ -215,22 +323,33 @@ namespace C_TestForge.TestCase.Services
                 Directory.CreateDirectory(directory);
             }
 
-            // Convert test cases to CSV records
-            var records = ConvertTestCasesToCsvRecords(testCases);
-
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                Delimiter = ",",
-            };
-
             using (var writer = new StreamWriter(filePath))
-            using (var csv = new CsvWriter(writer, config))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
             {
-                csv.WriteRecords(records);
+                // Write header for test cases
+                csv.WriteHeader<TestCaseCsvRecord>();
+                csv.NextRecord();
+
+                // Write test case records
+                foreach (var testCase in testCases)
+                {
+                    var record = new TestCaseCsvRecord
+                    {
+                        Name = testCase.Name,
+                        Description = testCase.Description,
+                        FunctionName = testCase.FunctionName,
+                        Type = testCase.Type.ToString(),
+                        Status = testCase.Status.ToString(),
+                        CreatedDate = testCase.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                        ModifiedDate = testCase.ModifiedDate.ToString("yyyy-MM-dd HH:mm:ss")
+                    };
+
+                    csv.WriteRecord(record);
+                    csv.NextRecord();
+                }
             }
 
-            // Export inputs and outputs to separate CSV files if needed
+            // Export inputs and outputs to separate CSV files
             var inputsFilePath = Path.Combine(
                 Path.GetDirectoryName(filePath),
                 Path.GetFileNameWithoutExtension(filePath) + "_inputs.csv");
@@ -240,49 +359,64 @@ namespace C_TestForge.TestCase.Services
                 Path.GetFileNameWithoutExtension(filePath) + "_outputs.csv");
 
             // Export inputs
-            var inputRecords = new List<TestCaseInputCsvRecord>();
-            foreach (var testCase in testCases)
-            {
-                foreach (var input in testCase.Inputs)
-                {
-                    inputRecords.Add(new TestCaseInputCsvRecord
-                    {
-                        TestCaseName = testCase.Name,
-                        VariableName = input.VariableName,
-                        VariableType = input.VariableType,
-                        Value = input.Value,
-                        IsStub = input.IsStub
-                    });
-                }
-            }
-
             using (var writer = new StreamWriter(inputsFilePath))
-            using (var csv = new CsvWriter(writer, config))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
             {
-                csv.WriteRecords(inputRecords);
+                // Write header
+                csv.WriteHeader<TestCaseVariableCsvRecord>();
+                csv.NextRecord();
+
+                // Write input records
+                foreach (var testCase in testCases)
+                {
+                    foreach (var input in testCase.Inputs)
+                    {
+                        var record = new TestCaseVariableCsvRecord
+                        {
+                            TestCaseName = testCase.Name,
+                            VariableName = input.VariableName,
+                            VariableType = input.VariableType,
+                            Value = input.Value,
+                            IsInput = true,
+                            IsStub = input.IsStub
+                        };
+
+                        csv.WriteRecord(record);
+                        csv.NextRecord();
+                    }
+                }
             }
 
             // Export outputs
-            var outputRecords = new List<TestCaseOutputCsvRecord>();
-            foreach (var testCase in testCases)
+            using (var writer = new StreamWriter(outputsFilePath))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
             {
-                foreach (var output in testCase.ExpectedOutputs)
+                // Write header
+                csv.WriteHeader<TestCaseVariableCsvRecord>();
+                csv.NextRecord();
+
+                // Write output records
+                foreach (var testCase in testCases)
                 {
-                    outputRecords.Add(new TestCaseOutputCsvRecord
+                    foreach (var output in testCase.ExpectedOutputs)
                     {
-                        TestCaseName = testCase.Name,
-                        VariableName = output.VariableName,
-                        VariableType = output.VariableType,
-                        Value = output.Value
-                    });
+                        var record = new TestCaseVariableCsvRecord
+                        {
+                            TestCaseName = testCase.Name,
+                            VariableName = output.VariableName,
+                            VariableType = output.VariableType,
+                            Value = output.Value,
+                            IsInput = false,
+                            IsStub = false
+                        };
+
+                        csv.WriteRecord(record);
+                        csv.NextRecord();
+                    }
                 }
             }
 
-            using (var writer = new StreamWriter(outputsFilePath))
-            using (var csv = new CsvWriter(writer, config))
-            {
-                csv.WriteRecords(outputRecords);
-            }
+            await Task.CompletedTask;
         }
 
         public async Task ExportToExcelFileAsync(List<Models.TestCases.TestCase> testCases, string filePath)
@@ -457,6 +591,16 @@ namespace C_TestForge.TestCase.Services
                 });
             }
 
+            if (testCase1.Status != testCase2.Status)
+            {
+                result.Differences.Add(new TestCaseDifference
+                {
+                    PropertyName = "Status",
+                    Value1 = testCase1.Status.ToString(),
+                    Value2 = testCase2.Status.ToString()
+                });
+            }
+
             // Compare inputs
             foreach (var input1 in testCase1.Inputs)
             {
@@ -576,13 +720,17 @@ namespace C_TestForge.TestCase.Services
 
             var testCase = new Models.TestCases.TestCase
             {
+                Id = Guid.NewGuid(),
                 Name = $"Test_{function.Name}",
                 Description = $"Auto-generated unit test for function {function.Name}",
                 FunctionName = function.Name,
                 Type = TestCaseType.UnitTest,
                 Status = TestCaseStatus.NotExecuted,
                 CreatedDate = DateTime.Now,
-                ModifiedDate = DateTime.Now
+                ModifiedDate = DateTime.Now,
+                Inputs = new List<TestCaseInput>(),
+                ExpectedOutputs = new List<TestCaseOutput>(),
+                ActualOutputs = new List<TestCaseOutput>()
             };
 
             // Generate inputs from function parameters
@@ -590,6 +738,7 @@ namespace C_TestForge.TestCase.Services
             {
                 testCase.Inputs.Add(new TestCaseInput
                 {
+                    Id = Guid.NewGuid(),
                     VariableName = param.Name,
                     VariableType = param.Type,
                     Value = GenerateDefaultValueForType(param.Type),
@@ -602,6 +751,7 @@ namespace C_TestForge.TestCase.Services
             {
                 testCase.ExpectedOutputs.Add(new TestCaseOutput
                 {
+                    Id = Guid.NewGuid(),
                     VariableName = "return",
                     VariableType = function.ReturnType,
                     Value = GenerateDefaultValueForType(function.ReturnType)
@@ -624,13 +774,17 @@ namespace C_TestForge.TestCase.Services
 
             var testCase = new Models.TestCases.TestCase
             {
+                Id = Guid.NewGuid(),
                 Name = $"IntegrationTest_{mainFunction.Name}",
                 Description = $"Auto-generated integration test for function {mainFunction.Name} and related functions",
                 FunctionName = mainFunction.Name,
                 Type = TestCaseType.IntegrationTest,
                 Status = TestCaseStatus.NotExecuted,
                 CreatedDate = DateTime.Now,
-                ModifiedDate = DateTime.Now
+                ModifiedDate = DateTime.Now,
+                Inputs = new List<TestCaseInput>(),
+                ExpectedOutputs = new List<TestCaseOutput>(),
+                ActualOutputs = new List<TestCaseOutput>()
             };
 
             // Generate inputs from main function parameters
@@ -638,6 +792,7 @@ namespace C_TestForge.TestCase.Services
             {
                 testCase.Inputs.Add(new TestCaseInput
                 {
+                    Id = Guid.NewGuid(),
                     VariableName = param.Name,
                     VariableType = param.Type,
                     Value = GenerateDefaultValueForType(param.Type),
@@ -658,6 +813,7 @@ namespace C_TestForge.TestCase.Services
 
                     testCase.Inputs.Add(new TestCaseInput
                     {
+                        Id = Guid.NewGuid(),
                         VariableName = $"{function.Name}_{param.Name}",
                         VariableType = param.Type,
                         Value = GenerateDefaultValueForType(param.Type),
@@ -671,6 +827,7 @@ namespace C_TestForge.TestCase.Services
             {
                 testCase.ExpectedOutputs.Add(new TestCaseOutput
                 {
+                    Id = Guid.NewGuid(),
                     VariableName = "return",
                     VariableType = mainFunction.ReturnType,
                     Value = GenerateDefaultValueForType(mainFunction.ReturnType)
@@ -885,54 +1042,6 @@ namespace C_TestForge.TestCase.Services
             return new Tuple<string, string>(name, type);
         }
 
-        private List<Models.TestCases.TestCase> ConvertCsvRecordsToTestCases(List<TestCaseCsvRecord> records)
-        {
-            var testCases = new List<Models.TestCases.TestCase>();
-
-            foreach (var record in records)
-            {
-                var testCase = new Models.TestCases.TestCase
-                {
-                    Id = Guid.NewGuid(),
-                    Name = record.Name,
-                    Description = record.Description,
-                    FunctionName = record.FunctionName,
-                    Type = Enum.Parse<TestCaseType>(record.Type),
-                    Status = Enum.Parse<TestCaseStatus>(record.Status),
-                    CreatedDate = DateTime.Now,
-                    ModifiedDate = DateTime.Now
-                };
-
-                // We would need additional CSV records for inputs and outputs
-                // This is a simplified implementation
-
-                testCases.Add(testCase);
-            }
-
-            return testCases;
-        }
-
-        private List<TestCaseCsvRecord> ConvertTestCasesToCsvRecords(List<Models.TestCases.TestCase> testCases)
-        {
-            var records = new List<TestCaseCsvRecord>();
-
-            foreach (var testCase in testCases)
-            {
-                records.Add(new TestCaseCsvRecord
-                {
-                    Name = testCase.Name,
-                    Description = testCase.Description,
-                    FunctionName = testCase.FunctionName,
-                    Type = testCase.Type.ToString(),
-                    Status = testCase.Status.ToString(),
-                    CreatedDate = testCase.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss"),
-                    ModifiedDate = testCase.ModifiedDate.ToString("yyyy-MM-dd HH:mm:ss")
-                });
-            }
-
-            return records;
-        }
-
         private string GenerateDefaultValueForType(string type)
         {
             // Generate a sensible default value for the given C type
@@ -971,30 +1080,23 @@ namespace C_TestForge.TestCase.Services
 
     public class TestCaseCsvRecord
     {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string FunctionName { get; set; }
-        public string Type { get; set; }
-        public string Status { get; set; }
-        public string CreatedDate { get; set; }
-        public string ModifiedDate { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string FunctionName { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string CreatedDate { get; set; } = string.Empty;
+        public string ModifiedDate { get; set; } = string.Empty;
     }
 
-    public class TestCaseInputCsvRecord
+    public class TestCaseVariableCsvRecord
     {
-        public string TestCaseName { get; set; }
-        public string VariableName { get; set; }
-        public string VariableType { get; set; }
-        public string Value { get; set; }
+        public string TestCaseName { get; set; } = string.Empty;
+        public string VariableName { get; set; } = string.Empty;
+        public string VariableType { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public bool IsInput { get; set; }
         public bool IsStub { get; set; }
-    }
-
-    public class TestCaseOutputCsvRecord
-    {
-        public string TestCaseName { get; set; }
-        public string VariableName { get; set; }
-        public string VariableType { get; set; }
-        public string Value { get; set; }
     }
 
     #endregion

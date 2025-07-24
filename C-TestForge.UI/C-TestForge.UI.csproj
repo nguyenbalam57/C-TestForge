@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\C-TestForge.Core\C-TestForge.Core.csproj" />
+    <ProjectReference Include="..\C-TestForge.Infrastructure\C-TestForge.Infrastructure.csproj" />
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
@@ -16,9 +17,13 @@
     <PackageReference Include="Prism.Unity" Version="8.1.97" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Services\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
     <RootNamespace>C_TestForge.UI</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -1,6 +1,6 @@
-﻿using C_TestForge.TestCase.Repositories;
+﻿using C_TestForge.Infrastructure.Views;
+using C_TestForge.TestCase.Repositories;
 using C_TestForge.TestCase.Services;
-using C_TestForge.UI.Views;
 using Prism.Ioc;
 using Prism.Modularity;
 using Prism.Regions;
@@ -21,7 +21,7 @@ namespace C_TestForge.TestCase
 
         public void OnInitialized(IContainerProvider containerProvider)
         {
-            _regionManager.RegisterViewWithRegion("TestCaseManagementRegion", typeof(TestCaseManagementView));
+            _regionManager.RegisterViewWithRegion("TestCaseManagementRegion", typeof(ITestCaseManagementView));
         }
 
         public void RegisterTypes(IContainerRegistry containerRegistry)
@@ -33,16 +33,10 @@ namespace C_TestForge.TestCase
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                         "C-TestForge",
                         "TestCases.db"),
-                    null)); // Replace with proper mapper registration
+                    null));
 
             // Register services
             containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
-
-            // Register dialogs
-            containerRegistry.RegisterDialog<TestCaseEditorDialog, TestCaseEditorDialogViewModel>();
-            containerRegistry.RegisterDialog<TestCaseComparisonDialog, TestCaseComparisonDialogViewModel>();
-            containerRegistry.RegisterDialog<GenerateTestCaseDialog, GenerateTestCaseDialogViewModel>();
-            containerRegistry.RegisterDialog<ConfirmationDialog, ConfirmationDialogViewModel>();
         }
     }
 }

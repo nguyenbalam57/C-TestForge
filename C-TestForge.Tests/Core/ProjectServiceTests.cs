@@ -124,14 +124,14 @@ namespace C_TestForge.Tests.Core
                     { "DEBUG", "1" },
                     { "VERSION", "\"1.0\"" }
                 },
-                TestCases = new List<TestCase>
+                TestCases = new List<Models.TestCases.TestCase>
                 {
-                    new TestCase
+                    new Models.TestCases.TestCase
                     {
-                        Id = Guid.NewGuid().ToString(),
+                        Id = Guid.NewGuid(),
                         Name = "Test Case 1",
-                        TargetFunction = "main",
-                        Type = TestCaseType.UnitTest
+                        FunctionName = "main",
+                        Type = Models.TestCases.TestCaseType.UnitTest
                     }
                 }
             };
@@ -152,8 +152,8 @@ namespace C_TestForge.Tests.Core
             importedProject.PreprocessorDefinitions.Should().BeEquivalentTo(project.PreprocessorDefinitions);
             importedProject.TestCases.Should().HaveCount(1);
             importedProject.TestCases[0].Name.Should().Be("Test Case 1");
-            importedProject.TestCases[0].TargetFunction.Should().Be("main");
-            importedProject.TestCases[0].Type.Should().Be(TestCaseType.UnitTest);
+            importedProject.TestCases[0].FunctionName.Should().Be("main");
+            importedProject.TestCases[0].Type.Should().Be(Models.TestCases.TestCaseType.UnitTest);
         }
 
         public void Dispose()

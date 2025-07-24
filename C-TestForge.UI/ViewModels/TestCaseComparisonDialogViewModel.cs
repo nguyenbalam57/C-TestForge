@@ -1,15 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
+﻿using C_TestForge.Infrastructure.ViewModels;
 using C_TestForge.TestCase.Services;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace C_TestForge.UI.ViewModels
 {
-    public class TestCaseComparisonDialogViewModel : BindableBase, IDialogAware
+    public class TestCaseComparisonDialogViewModel : BindableBase, IDialogAware, ITestCaseComparisonDialogViewModel
     {
         private readonly ITestCaseService _testCaseService;
 
@@ -17,7 +18,7 @@ namespace C_TestForge.UI.ViewModels
         private ObservableCollection<Models.TestCases.TestCase> _testCases;
         private Models.TestCases.TestCase _testCase1;
         private Models.TestCases.TestCase _testCase2;
-        private ObservableCollection<TestCaseDifference> _differences;
+        private ObservableCollection<Models.TestCases.TestCaseDifference> _differences;
         private bool _isComparing;
 
         public string Title
@@ -56,7 +57,7 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        public ObservableCollection<TestCaseDifference> Differences
+        public ObservableCollection<Models.TestCases.TestCaseDifference> Differences
         {
             get => _differences;
             set => SetProperty(ref _differences, value);
@@ -75,7 +76,7 @@ namespace C_TestForge.UI.ViewModels
             _testCaseService = testCaseService;
 
             CloseCommand = new DelegateCommand(ExecuteClose);
-            Differences = new ObservableCollection<TestCaseDifference>();
+            Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>();
         }
 
         private void ExecuteClose()
@@ -93,7 +94,7 @@ namespace C_TestForge.UI.ViewModels
             try
             {
                 var result = await _testCaseService.CompareTestCasesAsync(TestCase1, TestCase2);
-                Differences = new ObservableCollection<TestCaseDifference>(result.Differences);
+                Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>(result.Differences);
             }
             catch (Exception)
             {

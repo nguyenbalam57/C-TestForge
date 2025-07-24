@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:C_TestForge.UI.Dialogs"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:models="clr-namespace:C_TestForge.Models;assembly=C-TestForge.Models"
+        xmlns:models="clr-namespace:C_TestForge.Models.TestCases;assembly=C-TestForge.Models"
         mc:Ignorable="d"
         Title="Edit Test Case" Height="600" Width="800"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
@@ -16,20 +16,6 @@
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{materialDesign:MaterialDesignFont}"
         WindowStartupLocation="CenterOwner">
-
-    <Window.Resources>
-        <ObjectDataProvider x:Key="TestCaseTypeEnum" MethodName="GetValues" ObjectType="{x:Type models:TestCaseType}">
-            <ObjectDataProvider.MethodParameters>
-                <x:Type TypeName="models:TestCaseType"/>
-            </ObjectDataProvider.MethodParameters>
-        </ObjectDataProvider>
-
-        <ObjectDataProvider x:Key="TestCaseStatusEnum" MethodName="GetValues" ObjectType="{x:Type models:TestCaseStatus}">
-            <ObjectDataProvider.MethodParameters>
-                <x:Type TypeName="models:TestCaseStatus"/>
-            </ObjectDataProvider.MethodParameters>
-        </ObjectDataProvider>
-    </Window.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -60,15 +46,20 @@
             <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Target Function:" Margin="0,0,10,10" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding TargetFunction, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,10"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding FunctionName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,10,10"/>
 
             <TextBlock Grid.Row="1" Grid.Column="2" Text="Type:" Margin="0,0,10,10" VerticalAlignment="Center"/>
             <ComboBox Grid.Row="1" Grid.Column="3" Margin="0,0,0,10" 
-                      ItemsSource="{Binding Source={StaticResource TestCaseTypeEnum}}"
+                      ItemsSource="{Binding TestCaseTypes}"
                       SelectedItem="{Binding Type}"/>
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" Margin="0,0,10,0" VerticalAlignment="Top"/>
-            <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" 
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Status:" Margin="0,0,10,10" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,10,10" 
+                      ItemsSource="{Binding TestCaseStatuses}"
+                      SelectedItem="{Binding Status}"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="2" Text="Description:" Margin="0,0,10,0" VerticalAlignment="Top"/>
+            <TextBox Grid.Row="2" Grid.Column="3" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" 
                      TextWrapping="Wrap" AcceptsReturn="True" Height="60"/>
         </Grid>
 
@@ -83,13 +74,13 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                        <Button Command="{Binding AddInputVariableCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
+                        <Button Command="{Binding AddInputCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Plus" VerticalAlignment="Center"/>
                                 <TextBlock Margin="5,0,0,0">Add Input</TextBlock>
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding RemoveInputVariableCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
+                        <Button Command="{Binding RemoveInputCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Delete" VerticalAlignment="Center"/>
                                 <TextBlock Margin="5,0,0,0">Remove</TextBlock>
@@ -98,18 +89,16 @@
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" 
-                              ItemsSource="{Binding InputVariables}"
-                              SelectedItem="{Binding SelectedInputVariable}"
+                              ItemsSource="{Binding Inputs}"
+                              SelectedItem="{Binding SelectedInput}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150"/>
-                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100"/>
+                            <DataGridTextColumn Header="Variable Name" Binding="{Binding VariableName}" Width="150"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding VariableType}" Width="100"/>
                             <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
-                            <DataGridCheckBoxColumn Header="Pointer" Binding="{Binding IsPointer}" Width="70"/>
-                            <DataGridCheckBoxColumn Header="Array" Binding="{Binding IsArray}" Width="70"/>
-                            <DataGridTextColumn Header="Array Size" Binding="{Binding ArraySize}" Width="80"/>
+                            <DataGridCheckBoxColumn Header="Is Stub" Binding="{Binding IsStub}" Width="70"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -124,13 +113,13 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                        <Button Command="{Binding AddOutputVariableCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
+                        <Button Command="{Binding AddExpectedOutputCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Plus" VerticalAlignment="Center"/>
                                 <TextBlock Margin="5,0,0,0">Add Output</TextBlock>
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding RemoveOutputVariableCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
+                        <Button Command="{Binding RemoveExpectedOutputCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Delete" VerticalAlignment="Center"/>
                                 <TextBlock Margin="5,0,0,0">Remove</TextBlock>
@@ -139,25 +128,22 @@
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" 
-                              ItemsSource="{Binding OutputVariables}"
-                              SelectedItem="{Binding SelectedOutputVariable}"
+                              ItemsSource="{Binding ExpectedOutputs}"
+                              SelectedItem="{Binding SelectedExpectedOutput}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150"/>
-                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100"/>
+                            <DataGridTextColumn Header="Variable Name" Binding="{Binding VariableName}" Width="150"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding VariableType}" Width="100"/>
                             <DataGridTextColumn Header="Expected Value" Binding="{Binding Value}" Width="*"/>
-                            <DataGridCheckBoxColumn Header="Pointer" Binding="{Binding IsPointer}" Width="70"/>
-                            <DataGridCheckBoxColumn Header="Array" Binding="{Binding IsArray}" Width="70"/>
-                            <DataGridTextColumn Header="Array Size" Binding="{Binding ArraySize}" Width="80"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
             </TabItem>
 
-            <!-- Stubs Tab -->
-            <TabItem Header="Stubs">
+            <!-- Actual Outputs Tab -->
+            <TabItem Header="Actual Outputs">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -165,13 +151,13 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                        <Button Command="{Binding AddStubCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
+                        <Button Command="{Binding AddActualOutputCommand}" Style="{StaticResource MaterialDesignRaisedButton}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Plus" VerticalAlignment="Center"/>
-                                <TextBlock Margin="5,0,0,0">Add Stub</TextBlock>
+                                <TextBlock Margin="5,0,0,0">Add Actual Output</TextBlock>
                             </StackPanel>
                         </Button>
-                        <Button Command="{Binding RemoveStubCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
+                        <Button Command="{Binding RemoveActualOutputCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10,0,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Delete" VerticalAlignment="Center"/>
                                 <TextBlock Margin="5,0,0,0">Remove</TextBlock>
@@ -180,14 +166,15 @@
                     </StackPanel>
 
                     <DataGrid Grid.Row="1" 
-                              ItemsSource="{Binding Stubs}"
-                              SelectedItem="{Binding SelectedStub}"
+                              ItemsSource="{Binding ActualOutputs}"
+                              SelectedItem="{Binding SelectedActualOutput}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Function Name" Binding="{Binding FunctionName}" Width="200"/>
-                            <DataGridTextColumn Header="Return Value" Binding="{Binding ReturnValue}" Width="*"/>
+                            <DataGridTextColumn Header="Variable Name" Binding="{Binding VariableName}" Width="150"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding VariableType}" Width="100"/>
+                            <DataGridTextColumn Header="Actual Value" Binding="{Binding Value}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

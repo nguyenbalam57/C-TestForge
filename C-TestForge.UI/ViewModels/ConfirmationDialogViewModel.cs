@@ -1,11 +1,12 @@
-﻿using System;
+﻿using C_TestForge.Infrastructure.ViewModels;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
+using System;
 
 namespace C_TestForge.UI.ViewModels
 {
-    public class ConfirmationDialogViewModel : BindableBase, IDialogAware
+    public class ConfirmationDialogViewModel : BindableBase, IDialogAware, IConfirmationDialogViewModel
     {
         private string _title = "Confirm";
         private string _message;

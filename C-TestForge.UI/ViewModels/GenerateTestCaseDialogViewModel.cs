@@ -1,4 +1,5 @@
-﻿using C_TestForge.Models;
+﻿using C_TestForge.Infrastructure.ViewModels;
+using C_TestForge.Models;
 using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;
@@ -9,7 +10,7 @@ using System.Linq;
 
 namespace C_TestForge.UI.ViewModels
 {
-    public class GenerateTestCaseDialogViewModel : BindableBase, IDialogAware
+    public class GenerateTestCaseDialogViewModel : BindableBase, IDialogAware, IGenerateTestCaseDialogViewModel
     {
         private string _title = "Generate Test Case";
         private List<CFunction> _functions;

@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using C_TestForge.Core.Services;
 using C_TestForge.Models;
+using C_TestForge.TestCase.Services;
+using C_TestForge.Models.TestCases;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -14,14 +16,14 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
         private readonly ILogger<TestCaseViewModel> _logger;
 
-        private TestCase _testCase;
+        private Models.TestCases.TestCase _testCase;
         private string _name;
         private string _description;
         private string _targetFunction;
         private TestCaseType _type;
         private TestCaseStatus _status;
-        private ObservableCollection<TestCaseVariable> _inputVariables;
-        private ObservableCollection<TestCaseVariable> _outputVariables;
+        private ObservableCollection<TestCaseInput> _inputVariables;
+        private ObservableCollection<TestCaseOutput> _outputVariables;
         private ObservableCollection<TestCaseStub> _stubs;
         private TestCaseVariable _selectedInputVariable;
         private TestCaseVariable _selectedOutputVariable;

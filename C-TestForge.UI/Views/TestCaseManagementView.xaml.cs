@@ -1,4 +1,5 @@
-﻿using System;
+﻿using C_TestForge.Infrastructure.Views;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +19,7 @@ namespace C_TestForge.UI.Views
     /// <summary>
     /// Interaction logic for TestCaseManagementView.xaml
     /// </summary>
-    public partial class TestCaseManagementView : UserControl
+    public partial class TestCaseManagementView : UserControl, ITestCaseManagementView
     {
         public TestCaseManagementView()
         {

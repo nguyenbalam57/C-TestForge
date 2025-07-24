@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\C-TestForge.Infrastructure\C-TestForge.Infrastructure.csproj" />
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
@@ -14,10 +15,11 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
     <RootNamespace>C_TestForge.TestCase</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
 </Project>

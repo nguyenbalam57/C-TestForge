@@ -386,49 +386,49 @@ namespace C_TestForge.UI.ViewModels
                 {
                     Name = "sum",
                     ReturnType = "int",
-                    Parameters = new List<CParameter>
+                    Parameters = new List<Models.CVariable>
                     {
-                        new CParameter { Name = "a", Type = "int" },
-                        new CParameter { Name = "b", Type = "int" }
+                        new Models.CVariable { Name = "a", Type = "int" },
+                        new Models.CVariable { Name = "b", Type = "int" }
                     }
                 },
-                new CFunction
+                new Models.CFunction
                 {
                     Name = "subtract",
                     ReturnType = "int",
-                    Parameters = new List<CParameter>
+                    Parameters = new List<Models.CVariable>
                     {
-                        new CParameter { Name = "a", Type = "int" },
-                        new CParameter { Name = "b", Type = "int" }
+                        new Models.CVariable { Name = "a", Type = "int" },
+                        new Models.CVariable { Name = "b", Type = "int" }
                     }
                 },
-                new CFunction
+                new Models.CFunction
                 {
                     Name = "multiply",
                     ReturnType = "int",
-                    Parameters = new List<CParameter>
+                    Parameters = new List<Models.CVariable>
                     {
-                        new CParameter { Name = "a", Type = "int" },
-                        new CParameter { Name = "b", Type = "int" }
+                        new Models.CVariable { Name = "a", Type = "int" },
+                        new Models.CVariable { Name = "b", Type = "int" }
                     }
                 },
-                new CFunction
+                new Models.CFunction
                 {
                     Name = "divide",
                     ReturnType = "double",
-                    Parameters = new List<CParameter>
+                    Parameters = new List<Models.CVariable>
                     {
-                        new CParameter { Name = "a", Type = "int" },
-                        new CParameter { Name = "b", Type = "int" }
+                        new Models.CVariable { Name = "a", Type = "int" },
+                        new Models.CVariable { Name = "b", Type = "int" }
                     }
                 },
-                new CFunction
+                new Models.CFunction
                 {
                     Name = "printMessage",
                     ReturnType = "void",
-                    Parameters = new List<CParameter>
+                    Parameters = new List<Models.CVariable>
                     {
-                        new CParameter { Name = "message", Type = "const char*" }
+                        new Models.CVariable { Name = "message", Type = "const char*" }
                     }
                 }
             };

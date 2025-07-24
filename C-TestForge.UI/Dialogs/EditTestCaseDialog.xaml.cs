@@ -1,4 +1,5 @@
-﻿using C_TestForge.UI.ViewModels;
+﻿using C_TestForge.Models.TestCases;
+using C_TestForge.UI.ViewModels;
 using System.Windows;
 
 namespace C_TestForge.UI.Dialogs
@@ -9,42 +10,60 @@ namespace C_TestForge.UI.Dialogs
     public partial class EditTestCaseDialog : Window
     {
         public TestCaseViewModel ViewModel { get; private set; }
-        public EditTestCaseDialog(TestCaseViewModel viewModel)
+
+        public Models.TestCases.TestCase TestCase { get; private set; }
+
+        public EditTestCaseDialog(Models.TestCases.TestCase testCase = null)
         {
             InitializeComponent();
 
-            ViewModel = viewModel;
-            DataContext = ViewModel;
+            // Tạo và gán ViewModel
+            var viewModel = new EditTestCaseDialogViewModel(testCase);
+            DataContext = viewModel;
+
+            // Lưu testCase gốc
+            TestCase = testCase ?? new Models.TestCases.TestCase();
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(ViewModel.Name))
-                {
-                    MessageBox.Show("Test case name is required.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+            // Lấy ViewModel
+            var viewModel = DataContext as EditTestCaseDialogViewModel;
 
-                if (string.IsNullOrWhiteSpace(ViewModel.TargetFunction))
-                {
-                    MessageBox.Show("Target function is required.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+            // Cập nhật TestCase từ ViewModel
+            TestCase.Name = viewModel.Name;
+            TestCase.Description = viewModel.Description;
+            TestCase.FunctionName = viewModel.FunctionName;
+            TestCase.Type = viewModel.Type;
+            TestCase.Status = viewModel.Status;
 
-                ViewModel.SaveCommand.Execute(null);
-                DialogResult = true;
-                Close();
-            }
-            catch (Exception ex)
+            // Cập nhật inputs và outputs
+            TestCase.Inputs.Clear();
+            foreach (var input in viewModel.Inputs)
             {
-                MessageBox.Show($"Error saving test case: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                TestCase.Inputs.Add(input);
             }
+
+            TestCase.ExpectedOutputs.Clear();
+            foreach (var output in viewModel.ExpectedOutputs)
+            {
+                TestCase.ExpectedOutputs.Add(output);
+            }
+
+            TestCase.ActualOutputs.Clear();
+            foreach (var output in viewModel.ActualOutputs)
+            {
+                TestCase.ActualOutputs.Add(output);
+            }
+
+            // Đặt DialogResult và đóng dialog
+            DialogResult = true;
+            Close();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
+            // Hủy và đóng dialog
             DialogResult = false;
             Close();
         }
