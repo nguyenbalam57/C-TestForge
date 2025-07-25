@@ -11,7 +11,7 @@ namespace C_TestForge.Models
         public List<string> SourceFiles { get; set; } = new List<string>();
         public List<string> IncludeDirectories { get; set; } = new List<string>();
         public Dictionary<string, string> PreprocessorDefinitions { get; set; } = new Dictionary<string, string>();
-        public List<TestCase> TestCases { get; set; } = new List<TestCase>();
+        public List<TestCaseUser> TestCases { get; set; } = new List<TestCaseUser>();
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         public DateTime ModifiedDate { get; set; } = DateTime.Now;
     }

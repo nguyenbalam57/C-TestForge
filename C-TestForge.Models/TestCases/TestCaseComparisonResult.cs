@@ -2,8 +2,8 @@
 {
     public class TestCaseComparisonResult
     {
-        public TestCase TestCase1 { get; set; } = new TestCase();
-        public TestCase TestCase2 { get; set; } = new TestCase();
+        public TestCaseUser TestCase1 { get; set; } = new TestCaseUser();
+        public TestCaseUser TestCase2 { get; set; } = new TestCaseUser();
         public List<TestCaseDifference> Differences { get; set; } = new List<TestCaseDifference>();
     }
 }
