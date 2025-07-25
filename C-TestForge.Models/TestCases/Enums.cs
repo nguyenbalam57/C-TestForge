@@ -3,13 +3,23 @@
     public enum TestCaseType 
     { 
         UnitTest, 
-        IntegrationTest 
+        IntegrationTest,
+        Regression,
+        Performance,
+        Security
     }
     public enum TestCaseStatus 
-    { 
-        NotExecuted, 
-        Passed, 
-        Failed, 
-        Error 
+    {
+        NotRun,
+        Passed,
+        Failed,
+        Error,
+        Skipped
+    }
+    public enum StubParameterAction
+    {
+        SetValue,
+        CopyBuffer,
+        CallCallback
     }
 }

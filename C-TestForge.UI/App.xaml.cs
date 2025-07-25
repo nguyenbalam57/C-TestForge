@@ -4,13 +4,18 @@ using C_TestForge.Parser;
 using C_TestForge.TestCase;
 using C_TestForge.TestCase.Repositories;
 using C_TestForge.TestCase.Services;
+using C_TestForge.UI.Controls;
+using C_TestForge.UI.ViewModels;
 using C_TestForge.UI.Views;
+using Microsoft.Extensions.DependencyInjection;
 using Prism.Ioc;
 using Prism.Modularity;
 using Prism.Unity;
 using System;
 using System.IO;
 using System.Windows;
+using C_TestForge.UI.Services;
+using System;
 
 
 namespace C_TestForge.UI;
@@ -68,6 +73,43 @@ public partial class App : PrismApplication
         // Đăng ký các module khác
         //moduleCatalog.AddModule<ParserModule>();
         moduleCatalog.AddModule<TestCaseModule>();
+    }
+
+    private readonly ServiceProvider _serviceProvider;
+
+    public App()
+    {
+        var services = new ServiceCollection();
+        ConfigureServices(services);
+        _serviceProvider = services.BuildServiceProvider();
+    }
+
+    private void ConfigureServices(ServiceCollection services)
+    {
+        // Register all services from all phases
+        services.RegisterAllServices();
+
+        // Register ViewModels
+        services.AddSingleton<MainViewModel>();
+        services.AddSingleton<ProjectViewModel>();
+        services.AddSingleton<SourceCodeViewModel>();
+        services.AddSingleton<TestCaseViewModel>();
+        services.AddSingleton<TestGenerationViewModel>();
+
+        // Register Views
+        services.AddSingleton<MainWindow>();
+        services.AddTransient<ProjectView>();
+        services.AddTransient<SourceCodeView>();
+        services.AddTransient<TestCaseView>();
+        services.AddTransient<TestGenerationView>();
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var mainWindow = _serviceProvider.GetService<MainWindow>();
+        mainWindow.Show();
     }
 }
 
