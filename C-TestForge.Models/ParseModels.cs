@@ -2,10 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace C_TestForge.Models
 {
+    #region Parse Models
+
+    /// <summary>
+    /// Options for parsing C source files
+    /// </summary>
     public class ParseOptions
     {
         /// <summary>
@@ -37,8 +44,27 @@ namespace C_TestForge.Models
         /// Whether to analyze functions
         /// </summary>
         public bool AnalyzeFunctions { get; set; } = true;
+
+        /// <summary>
+        /// Creates a clone of the parse options
+        /// </summary>
+        public ParseOptions Clone()
+        {
+            return new ParseOptions
+            {
+                IncludePaths = new List<string>(IncludePaths),
+                MacroDefinitions = new Dictionary<string, string>(MacroDefinitions),
+                AdditionalClangArguments = new List<string>(AdditionalClangArguments),
+                ParsePreprocessorDefinitions = ParsePreprocessorDefinitions,
+                AnalyzeVariables = AnalyzeVariables,
+                AnalyzeFunctions = AnalyzeFunctions
+            };
+        }
     }
 
+    /// <summary>
+    /// Result of parsing a C source file
+    /// </summary>
     public class ParseResult
     {
         /// <summary>
@@ -74,9 +100,40 @@ namespace C_TestForge.Models
         /// <summary>
         /// Gets whether the parse result contains critical errors
         /// </summary>
+        [JsonIgnore]
         public bool HasCriticalErrors => ParseErrors.Any(e => e.Severity == ErrorSeverity.Critical);
+
+        /// <summary>
+        /// Gets whether the parse result contains any errors
+        /// </summary>
+        [JsonIgnore]
+        public bool HasErrors => ParseErrors.Any(e => e.Severity >= ErrorSeverity.Error);
+
+        /// <summary>
+        /// Gets whether the parse result contains any warnings
+        /// </summary>
+        [JsonIgnore]
+        public bool HasWarnings => ParseErrors.Any(e => e.Severity == ErrorSeverity.Warning);
+
+        /// <summary>
+        /// Merges another parse result into this one
+        /// </summary>
+        public void Merge(ParseResult other)
+        {
+            if (other == null)
+                return;
+
+            Definitions.AddRange(other.Definitions);
+            Variables.AddRange(other.Variables);
+            Functions.AddRange(other.Functions);
+            ConditionalDirectives.AddRange(other.ConditionalDirectives);
+            ParseErrors.AddRange(other.ParseErrors);
+        }
     }
 
+    /// <summary>
+    /// Result of preprocessing a C source file
+    /// </summary>
     public class PreprocessorResult
     {
         /// <summary>
@@ -95,6 +152,9 @@ namespace C_TestForge.Models
         public List<IncludeDirective> Includes { get; set; } = new List<IncludeDirective>();
     }
 
+    /// <summary>
+    /// Options for analyzing C source files
+    /// </summary>
     public class AnalysisOptions
     {
         /// <summary>
@@ -121,8 +181,43 @@ namespace C_TestForge.Models
         /// Whether to analyze variable constraints
         /// </summary>
         public bool AnalyzeVariableConstraints { get; set; } = true;
+
+        /// <summary>
+        /// Level of detail for analysis
+        /// </summary>
+        public AnalysisLevel DetailLevel { get; set; } = AnalysisLevel.Normal;
+
+        /// <summary>
+        /// Creates a clone of the analysis options
+        /// </summary>
+        public AnalysisOptions Clone()
+        {
+            return new AnalysisOptions
+            {
+                AnalyzeVariables = AnalyzeVariables,
+                AnalyzeFunctions = AnalyzeFunctions,
+                AnalyzePreprocessorDefinitions = AnalyzePreprocessorDefinitions,
+                AnalyzeFunctionRelationships = AnalyzeFunctionRelationships,
+                AnalyzeVariableConstraints = AnalyzeVariableConstraints,
+                DetailLevel = DetailLevel
+            };
+        }
     }
 
+    /// <summary>
+    /// Level of detail for analysis
+    /// </summary>
+    public enum AnalysisLevel
+    {
+        Basic,
+        Normal,
+        Detailed,
+        Comprehensive
+    }
+
+    /// <summary>
+    /// Result of analyzing a C source file or project
+    /// </summary>
     public class AnalysisResult
     {
         /// <summary>
@@ -154,5 +249,77 @@ namespace C_TestForge.Models
         /// List of variable constraints found in the analysis
         /// </summary>
         public List<VariableConstraint> VariableConstraints { get; set; } = new List<VariableConstraint>();
+
+        /// <summary>
+        /// Get variable by name
+        /// </summary>
+        public CVariable GetVariable(string name)
+        {
+            return Variables.FirstOrDefault(v => v.Name == name);
+        }
+
+        /// <summary>
+        /// Get function by name
+        /// </summary>
+        public CFunction GetFunction(string name)
+        {
+            return Functions.FirstOrDefault(f => f.Name == name);
+        }
+
+        /// <summary>
+        /// Get definition by name
+        /// </summary>
+        public CDefinition GetDefinition(string name)
+        {
+            return Definitions.FirstOrDefault(d => d.Name == name);
+        }
+
+        /// <summary>
+        /// Get functions that call the specified function
+        /// </summary>
+        public List<CFunction> GetCallers(string functionName)
+        {
+            var callerNames = FunctionRelationships
+                .Where(r => r.CalleeName == functionName)
+                .Select(r => r.CallerName)
+                .ToList();
+
+            return Functions
+                .Where(f => callerNames.Contains(f.Name))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Get functions called by the specified function
+        /// </summary>
+        public List<CFunction> GetCallees(string functionName)
+        {
+            var calleeNames = FunctionRelationships
+                .Where(r => r.CallerName == functionName)
+                .Select(r => r.CalleeName)
+                .ToList();
+
+            return Functions
+                .Where(f => calleeNames.Contains(f.Name))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Merges another analysis result into this one
+        /// </summary>
+        public void Merge(AnalysisResult other)
+        {
+            if (other == null)
+                return;
+
+            Variables.AddRange(other.Variables);
+            Functions.AddRange(other.Functions);
+            Definitions.AddRange(other.Definitions);
+            ConditionalDirectives.AddRange(other.ConditionalDirectives);
+            FunctionRelationships.AddRange(other.FunctionRelationships);
+            VariableConstraints.AddRange(other.VariableConstraints);
+        }
     }
+
+    #endregion
 }
