@@ -22,7 +22,7 @@ namespace C_TestForge.Models
     /// <summary>
     /// Represents a source file
     /// </summary>
-    public class SourceFile : IModelObject
+    public class SourceFile
     {
         /// <summary>
         /// Unique identifier

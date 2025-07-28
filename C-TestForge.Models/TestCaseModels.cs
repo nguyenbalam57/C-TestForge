@@ -34,12 +34,12 @@ namespace C_TestForge.Models
     /// <summary>
     /// Represents a test case
     /// </summary>
-    public class TestCaseModels : IModelObject
+    public class TestCaseModels
     {
         /// <summary>
         /// Unique identifier
         /// </summary>
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public int Id { get; set; } = BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0);
 
         /// <summary>
         /// Name of the test case
@@ -96,6 +96,9 @@ namespace C_TestForge.Models
         /// </summary>
         public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
 
+        public DateTime CreatedDate { get; set; }
+        public DateTime? ModifiedDate { get; set; }
+
         /// <summary>
         /// Get a string representation of the test case
         /// </summary>
@@ -130,12 +133,14 @@ namespace C_TestForge.Models
     /// <summary>
     /// Represents a variable in a test case
     /// </summary>
-    public class TestCaseVariable : IModelObject
+    public class TestCaseInput : IModelObject
     {
         /// <summary>
         /// Unique identifier
         /// </summary>
         public string Id { get; set; } = Guid.NewGuid().ToString();
+
+
 
         /// <summary>
         /// Name of the variable
