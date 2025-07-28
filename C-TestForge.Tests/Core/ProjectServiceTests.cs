@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using C_TestForge.Core.Services;
+﻿using C_TestForge.Core.Services;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 using C_TestForge.Parser;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using Xunit;
 
 namespace C_TestForge.Tests.Core
@@ -124,14 +125,14 @@ namespace C_TestForge.Tests.Core
                     { "DEBUG", "1" },
                     { "VERSION", "\"1.0\"" }
                 },
-                TestCases = new List<Models.TestCases.TestCase>
+                TestCases = new List<TestCaseUser>
                 {
-                    new Models.TestCases.TestCase
+                    new TestCaseUser
                     {
                         Id = Guid.NewGuid(),
                         Name = "Test Case 1",
                         FunctionName = "main",
-                        Type = Models.TestCases.TestCaseType.UnitTest
+                        Type = TestCaseType.UnitTest
                     }
                 }
             };

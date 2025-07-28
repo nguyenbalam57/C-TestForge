@@ -1,18 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\C-TestForge.Parser\C-TestForge.Parser.csproj" />
-    <ProjectReference Include="..\C-TestForge.Solver\C-TestForge.Solver.csproj" />
-    <ProjectReference Include="..\C-TestForge.TestCase\C-TestForge.TestCase.csproj" />
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClangSharp.Interop" Version="18.1.0.4" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.7" />
     <PackageReference Include="Serilog" Version="3.0.1" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="7.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
   </ItemGroup>
 

@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using C_TestForge.Core.Interfaces;
 using C_TestForge.Models;
-using C_TestForge.TestCase.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.TestCase.Services
 {
@@ -24,9 +23,9 @@ namespace C_TestForge.TestCase.Services
             _stubGenerator = stubGenerator ?? throw new ArgumentNullException(nameof(stubGenerator));
         }
 
-        public List<TestCase> GenerateTestCasesForFunction(CFunction function, List<CVariable> availableVariables)
+        public List<TestCaseUser> GenerateTestCasesForFunction(CFunction function, List<CVariable> availableVariables)
         {
-            List<TestCase> testCases = new List<TestCase>();
+            List<TestCaseUser> testCases = new List<TestCaseUser>();
 
             // 1. Analyze function to identify branches
             var branches = AnalyzeFunctionBranches(function);
@@ -43,9 +42,9 @@ namespace C_TestForge.TestCase.Services
                     if (inputValues.Any())
                     {
                         // Create a test case for this branch
-                        var testCase = new TestCase
+                        var testCase = new TestCaseUser
                         {
-                            Id = Guid.NewGuid().ToString(),
+                            Id = Guid.NewGuid(),
                             Name = $"Test_{function.Name}_{testCases.Count + 1}",
                             Description = $"Test case for {function.Name} - Branch: {branch}",
                             InputParameters = ConvertToTestParameters(inputValues, function),
@@ -54,11 +53,11 @@ namespace C_TestForge.TestCase.Services
 
                         // For output parameters, we'll need to execute the function or use stub behavior
                         // Here we'll set placeholder values for now
-                        testCase.ExpectedOutputs = new List<TestParameter>();
+                        testCase.ExpectedOutputs = new List<CVariable>();
 
                         if (!string.IsNullOrEmpty(function.ReturnType) && function.ReturnType != "void")
                         {
-                            testCase.ExpectedOutputs.Add(new TestParameter
+                            testCase.ExpectedOutputs.Add(new CVariable
                             {
                                 Name = "return_value",
                                 Type = function.ReturnType,
@@ -98,7 +97,7 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        public string GenerateTestCode(TestCase testCase, string templateFormat = "c")
+        public string GenerateTestCode(TestCaseUser testCase, string templateFormat = "c")
         {
             StringBuilder code = new StringBuilder();
 
@@ -177,7 +176,7 @@ namespace C_TestForge.TestCase.Services
                     }
 
                     // Check other outputs (parameters passed by reference)
-                    foreach (var output in testCase.ExpectedOutputs ?? new List<TestParameter>())
+                    foreach (var output in testCase.ExpectedOutputs ?? new List<CVariable>())
                     {
                         if (output.Name != "return_value")
                         {
@@ -264,15 +263,15 @@ namespace C_TestForge.TestCase.Services
             return calledFunctions;
         }
 
-        private List<TestParameter> ConvertToTestParameters(Dictionary<string, object> values, CFunction function)
+        private List<CVariable> ConvertToTestParameters(Dictionary<string, object> values, CFunction function)
         {
-            List<TestParameter> parameters = new List<TestParameter>();
+            List<CVariable> parameters = new List<CVariable>();
 
             foreach (var param in function.Parameters)
             {
                 if (values.TryGetValue(param.Name, out object value))
                 {
-                    parameters.Add(new TestParameter
+                    parameters.Add(new CVariable
                     {
                         Name = param.Name,
                         Type = param.Type,
@@ -282,7 +281,7 @@ namespace C_TestForge.TestCase.Services
                 else
                 {
                     // If no value was found, use a default value
-                    parameters.Add(new TestParameter
+                    parameters.Add(new CVariable
                     {
                         Name = param.Name,
                         Type = param.Type,
@@ -365,7 +364,7 @@ namespace C_TestForge.TestCase.Services
             }
         }
 
-        private string FormatAssertValue(TestParameter parameter)
+        private string FormatAssertValue(CVariable parameter)
         {
             if (parameter.Type.ToLower() == "char*" || parameter.Type.ToLower() == "const char*")
             {
@@ -380,7 +379,7 @@ namespace C_TestForge.TestCase.Services
 
     public interface IUnitTestGeneratorService
     {
-        List<TestCase> GenerateTestCasesForFunction(CFunction function, List<CVariable> availableVariables);
-        string GenerateTestCode(TestCase testCase, string templateFormat = "c");
+        List<TestCaseUser> GenerateTestCasesForFunction(CFunction function, List<CVariable> availableVariables);
+        string GenerateTestCode(TestCaseUser testCase, string templateFormat = "c");
     }
 }

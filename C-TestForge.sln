@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-TestForge.Core", "C-TestF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-TestForge.Parser", "C-TestForge.Parser\C-TestForge.Parser.csproj", "{77EB5E27-11A5-4797-9260-062A3ACB4C3C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-TestForge.Solver", "C-TestForge.Solver\C-TestForge.Solver.csproj", "{0654D848-9824-4EEF-B035-FF309BCA867E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-TestForge.SolverServices", "C-TestForge.Solver\C-TestForge.SolverServices.csproj", "{0654D848-9824-4EEF-B035-FF309BCA867E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-TestForge.TestCase", "C-TestForge.TestCase\C-TestForge.TestCase.csproj", "{E98F9BAE-8259-4562-8E24-17ECAECBFE07}"
 EndProject

@@ -34,7 +34,7 @@ namespace C_TestForge.Models
     /// <summary>
     /// Represents a test case
     /// </summary>
-    public class TestCase : IModelObject
+    public class TestCaseModels : IModelObject
     {
         /// <summary>
         /// Unique identifier
@@ -107,9 +107,9 @@ namespace C_TestForge.Models
         /// <summary>
         /// Create a clone of the test case
         /// </summary>
-        public TestCase Clone()
+        public TestCaseModels Clone()
         {
-            return new TestCase
+            return new TestCaseModels
             {
                 Id = Id,
                 Name = Name,
@@ -232,7 +232,7 @@ namespace C_TestForge.Models
         /// <summary>
         /// List of test cases in the suite
         /// </summary>
-        public List<TestCase> TestCases { get; set; } = new List<TestCase>();
+        public List<TestCaseModels> TestCases { get; set; } = new List<TestCaseModels>();
 
         /// <summary>
         /// Tags for the test suite
@@ -279,7 +279,7 @@ namespace C_TestForge.Models
                 Id = Id,
                 Name = Name,
                 Description = Description,
-                TestCases = TestCases?.Select(t => t.Clone()).ToList() ?? new List<TestCase>(),
+                TestCases = TestCases?.Select(t => t.Clone()).ToList() ?? new List<TestCaseModels>(),
                 Tags = Tags != null ? new List<string>(Tags) : new List<string>(),
                 Properties = Properties != null ? new Dictionary<string, string>(Properties) : new Dictionary<string, string>()
             };

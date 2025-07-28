@@ -1,5 +1,5 @@
 ﻿using C_TestForge.Core.Services;
-using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 using C_TestForge.Parser;
 using C_TestForge.Parser.Services;
 using C_TestForge.Solver.Services;
@@ -37,12 +37,12 @@ namespace C_TestForge.UI.ViewModels
         private readonly IZ3SolverService _solverService;
         private readonly IEventAggregator _eventAggregator;
 
-        private ObservableCollection<TestCase> _testCases;
-        private TestCase _selectedTestCase;
+        private ObservableCollection<TestCaseUser> _testCases;
+        private TestCaseUser _selectedTestCase;
         private string _statusMessage;
         private bool _isBusy;
         private bool _isComparisonMode;
-        private TestCase _testCaseForComparison;
+        private TestCaseUser _testCaseForComparison;
         private bool _showOnlyDifferences;
         private string _searchFilter;
         private bool _autoUpdateExpectedOutput;
@@ -54,7 +54,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Collection of test cases displayed in the UI
         /// </summary>
-        public ObservableCollection<TestCase> TestCases
+        public ObservableCollection<TestCaseUser> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
@@ -63,7 +63,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Currently selected test case
         /// </summary>
-        public TestCase SelectedTestCase
+        public TestCaseUser SelectedTestCase
         {
             get => _selectedTestCase;
             set
@@ -125,7 +125,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Test case used for comparison
         /// </summary>
-        public TestCase TestCaseForComparison
+        public TestCaseUser TestCaseForComparison
         {
             get => _testCaseForComparison;
             set => SetProperty(ref _testCaseForComparison, value);
@@ -203,7 +203,7 @@ namespace C_TestForge.UI.ViewModels
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
             // Initialize collections
-            _testCases = new ObservableCollection<TestCase>();
+            _testCases = new ObservableCollection<TestCaseUser>();
 
             // Initialize commands
             ImportTestCasesCommand = new DelegateCommand(ImportTestCases, CanExecuteCommand);
@@ -257,7 +257,7 @@ namespace C_TestForge.UI.ViewModels
                     var fileName = openFileDialog.FileName;
                     var extension = Path.GetExtension(fileName).ToLower();
 
-                    List<TestCase> importedTestCases = new List<TestCase>();
+                    List<TestCaseUser> importedTestCases = new List<TestCaseUser>();
 
                     switch (extension)
                     {
@@ -445,12 +445,12 @@ namespace C_TestForge.UI.ViewModels
                 StatusMessage = "Adding new test case...";
 
                 // Create a new test case with default values
-                var newTestCase = new TestCase
+                var newTestCase = new TestCaseUser
                 {
                     Id = Guid.NewGuid(),
                     Name = $"TestCase_{TestCases.Count + 1}",
                     Description = "New test case",
-                    Inputs = new Dictionary<string, string>(),
+                    InputParameters = new Dictionary<string, string>(),
                     ExpectedOutputs = new Dictionary<string, string>(),
                     ActualOutputs = new Dictionary<string, string>(),
                     IsEnabled = true,
@@ -1077,12 +1077,12 @@ namespace C_TestForge.UI.ViewModels
     /// <summary>
     /// Event triggered when test cases are imported
     /// </summary>
-    public class TestCasesImportedEvent : PubSubEvent<List<TestCase>> { }
+    public class TestCasesImportedEvent : PubSubEvent<List<TestCaseUser>> { }
 
     /// <summary>
     /// Event triggered to edit a test case
     /// </summary>
-    public class EditTestCaseEvent : PubSubEvent<TestCase> { }
+    public class EditTestCaseEvent : PubSubEvent<TestCaseUser> { }
 
     /// <summary>
     /// Event triggered to select a function
@@ -1092,12 +1092,12 @@ namespace C_TestForge.UI.ViewModels
     /// <summary>
     /// Event triggered to get constraints for a test case
     /// </summary>
-    public class GetConstraintsEvent : PubSubEvent<TestCase, List<Constraint>> { }
+    public class GetConstraintsEvent : PubSubEvent<TestCaseUser, List<Constraint>> { }
 
     /// <summary>
     /// Event triggered to get the function associated with a test case
     /// </summary>
-    public class GetFunctionForTestCaseEvent : PubSubEvent<TestCase, CFunction> { }
+    public class GetFunctionForTestCaseEvent : PubSubEvent<TestCaseUser, CFunction> { }
 
     /// <summary>
     /// Event triggered when code analysis is completed

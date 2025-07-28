@@ -9,29 +9,29 @@ namespace C_TestForge.TestCase.Services
     public interface ITestCaseService
     {
         // CRUD operations
-        Task<List<Models.TestCases.TestCase>> GetAllTestCasesAsync();
-        Task<Models.TestCases.TestCase> GetTestCaseByIdAsync(Guid id);
-        Task<List<Models.TestCases.TestCase>> GetTestCasesByFunctionNameAsync(string functionName);
-        Task<Models.TestCases.TestCase> CreateTestCaseAsync(Models.TestCases.TestCase testCase);
-        Task<Models.TestCases.TestCase> UpdateTestCaseAsync(Models.TestCases.TestCase testCase);
+        Task<List<TestCaseUser>> GetAllTestCasesAsync();
+        Task<TestCaseUser> GetTestCaseByIdAsync(Guid id);
+        Task<List<TestCaseUser>> GetTestCasesByFunctionNameAsync(string functionName);
+        Task<TestCaseUser> CreateTestCaseAsync(TestCaseUser testCase);
+        Task<TestCaseUser> UpdateTestCaseAsync(TestCaseUser testCase);
         Task<bool> DeleteTestCaseAsync(Guid id);
         Task<bool> DeleteAllTestCasesAsync();
 
         // Import/Export
-        Task<List<Models.TestCases.TestCase>> ImportFromTstFileAsync(string filePath);
-        Task<List<Models.TestCases.TestCase>> ImportFromCsvFileAsync(string filePath);
-        Task<List<Models.TestCases.TestCase>> ImportFromExcelFileAsync(string filePath);
+        Task<List<TestCaseUser>> ImportFromTstFileAsync(string filePath);
+        Task<List<TestCaseUser>> ImportFromCsvFileAsync(string filePath);
+        Task<List<TestCaseUser>> ImportFromExcelFileAsync(string filePath);
 
-        Task ExportToTstFileAsync(List<Models.TestCases.TestCase> testCases, string filePath);
-        Task ExportToCsvFileAsync(List<Models.TestCases.TestCase> testCases, string filePath);
-        Task ExportToExcelFileAsync(List<Models.TestCases.TestCase> testCases, string filePath);
+        Task ExportToTstFileAsync(List<TestCaseUser> testCases, string filePath);
+        Task ExportToCsvFileAsync(List<TestCaseUser> testCases, string filePath);
+        Task ExportToExcelFileAsync(List<TestCaseUser> testCases, string filePath);
 
         // Analysis
-        Task<TestCaseComparisonResult> CompareTestCasesAsync(Models.TestCases.TestCase testCase1, Models.TestCases.TestCase testCase2);
-        Task<TestCaseCoverageResult> AnalyzeTestCaseCoverageAsync(List<Models.TestCases.TestCase> testCases, CFunction function);
+        Task<TestCaseComparisonResult> CompareTestCasesAsync(TestCaseUser testCase1, TestCaseUser testCase2);
+        Task<TestCaseCoverageResult> AnalyzeTestCaseCoverageAsync(List<TestCaseUser> testCases, CFunction function);
 
         // Test Case Generation
-        Task<Models.TestCases.TestCase> GenerateUnitTestCaseAsync(CFunction function);
-        Task<Models.TestCases.TestCase> GenerateIntegrationTestCaseAsync(List<CFunction> functions);
+        Task<TestCaseUser> GenerateUnitTestCaseAsync(CFunction function);
+        Task<TestCaseUser> GenerateIntegrationTestCaseAsync(List<CFunction> functions);
     }
 }

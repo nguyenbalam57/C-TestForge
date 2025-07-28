@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\C-TestForge.Core\C-TestForge.Core.csproj" />
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
   </ItemGroup>
 
@@ -10,6 +11,7 @@
     <PackageReference Include="ClangSharp.PInvokeGenerator" Version="18.1.0.4" />
     <PackageReference Include="libclang.runtime.win-x64" Version="18.1.3.2" />
     <PackageReference Include="libClangSharp" Version="18.1.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.7" />
   </ItemGroup>
 
   <PropertyGroup>

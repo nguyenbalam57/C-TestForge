@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
-using C_TestForge.Core.Services;
-using C_TestForge.Parser;
-using C_TestForge.TestCase.Services;
+//using C_TestForge.Core.Services;
+//using C_TestForge.Parser;
+//using C_TestForge.TestCase.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -40,16 +40,16 @@ namespace C_TestForge.Core
             var services = new ServiceCollection();
 
             // Add logging
-            services.AddLogging(config =>
-            {
-                config.ClearProviders();
-                config.AddSerilog(dispose: true);
-            });
+            //services.AddLogging(config =>
+            //{
+            //    config.ClearProviders();
+            //    config.AddSerilog(dispose: true);
+            //});
 
-            // Register services
-            services.AddSingleton<IParser, ClangSharpParserService>();
-            services.AddSingleton<IProjectService, ProjectService>();
-            services.AddSingleton<ITestCaseService, TestCaseService>();
+            //// Register services
+            //services.AddSingleton<IParser, ClangSharpParserService>();
+            //services.AddSingleton<IProjectService, ProjectService>();
+            //services.AddSingleton<ITestCaseService, TestCaseService>();
 
             // Build service provider
             _serviceProvider = services.BuildServiceProvider();

@@ -5,7 +5,7 @@ using Microsoft.Z3;
 using C_TestForge.Models;
 using C_TestForge.Core.Interfaces;
 
-namespace C_TestForge.Solver
+namespace C_TestForge.SolverServices
 {
     public class Z3SolverService : IZ3SolverService
     {

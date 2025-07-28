@@ -11,9 +11,9 @@ namespace C_TestForge.UI.Dialogs
     {
         public TestCaseViewModel ViewModel { get; private set; }
 
-        public Models.TestCases.TestCase TestCase { get; private set; }
+        public TestCaseUser TestCase { get; private set; }
 
-        public EditTestCaseDialog(Models.TestCases.TestCase testCase = null)
+        public EditTestCaseDialog(TestCaseUser testCase = null)
         {
             InitializeComponent();
 
@@ -22,7 +22,7 @@ namespace C_TestForge.UI.Dialogs
             DataContext = viewModel;
 
             // Lưu testCase gốc
-            TestCase = testCase ?? new Models.TestCases.TestCase();
+            TestCase = testCase ?? new TestCaseUser();
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)

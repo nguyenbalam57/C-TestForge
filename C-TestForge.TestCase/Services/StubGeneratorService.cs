@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using C_TestForge.Core.Interfaces;
 using C_TestForge.Models;
-using C_TestForge.TestCase.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.TestCase.Services
 {
@@ -131,7 +130,7 @@ namespace C_TestForge.TestCase.Services
             return code.ToString();
         }
 
-        private bool IsOutputParameter(CParameter parameter)
+        private bool IsOutputParameter(CVariable parameter)
         {
             if (parameter == null)
                 return false;

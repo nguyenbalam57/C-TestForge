@@ -8,7 +8,7 @@ namespace C_TestForge.UI.Dialogs
     /// </summary>
     public partial class AddVariableDialog : Window
     {
-        public TestCaseVariable Variable { get; private set; }
+        public CVariable Variable { get; private set; }
 
         public AddVariableDialog()
         {
@@ -41,11 +41,11 @@ namespace C_TestForge.UI.Dialogs
                     }
                 }
 
-                Variable = new TestCaseVariable
+                Variable = new CVariable
                 {
                     Name = txtName.Text,
                     Type = txtType.Text,
-                    Value = txtValue.Text,
+                    DefaultValue = txtValue.Text,
                     IsPointer = chkPointer.IsChecked == true,
                     IsArray = chkArray.IsChecked == true,
                     ArraySize = arraySize

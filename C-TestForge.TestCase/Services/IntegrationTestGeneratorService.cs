@@ -1,7 +1,6 @@
-﻿using C_TestForge.Core.Interfaces;
+﻿
 using C_TestForge.Models;
 using C_TestForge.Models.TestCases;
-using C_TestForge.TestCase.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,9 +24,9 @@ namespace C_TestForge.TestCase.Services
             _unitTestGenerator = unitTestGenerator ?? throw new ArgumentNullException(nameof(unitTestGenerator));
         }
 
-        public List<TestCase> GenerateIntegrationTests(List<string> functionNames, List<CVariable> availableVariables)
+        public List<TestCaseUser> GenerateIntegrationTests(List<string> functionNames, List<CVariable> availableVariables)
         {
-            List<TestCase> testCases = new List<TestCase>();
+            List<TestCaseUser> testCases = new List<TestCaseUser>();
 
             // 1. Load all functions
             var allFunctions = _parserService.GetFunctions();
@@ -64,7 +63,7 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        public string GenerateIntegrationTestCode(TestCase testCase, string templateFormat = "c")
+        public string GenerateIntegrationTestCode(TestCaseUser testCase, string templateFormat = "c")
         {
             StringBuilder code = new StringBuilder();
 
@@ -132,7 +131,7 @@ namespace C_TestForge.TestCase.Services
                     }
 
                     // Check other outputs (parameters passed by reference)
-                    foreach (var output in testCase.ExpectedOutputs ?? new List<TestParameter>())
+                    foreach (var output in testCase.ExpectedOutputs ?? new List<CVariable>())
                     {
                         if (output.Name != "return_value")
                         {
@@ -189,7 +188,7 @@ namespace C_TestForge.TestCase.Services
                 .ToList();
         }
 
-        private TestCase GenerateIntegrationTestForFunction(
+        private TestCaseUser GenerateIntegrationTestForFunction(
             CFunction entryPoint,
             Dictionary<string, List<string>> dependencyGraph,
             List<CVariable> availableVariables,
@@ -198,9 +197,9 @@ namespace C_TestForge.TestCase.Services
             try
             {
                 // Create a basic test case first
-                var testCase = new TestCase
+                var testCase = new TestCaseUser
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     Name = $"ITST_{entryPoint.Name}_{Guid.NewGuid().ToString().Substring(0, 8)}",
                     Description = $"Integration test for {entryPoint.Name}",
                     FunctionUnderTest = entryPoint.Name,
@@ -214,11 +213,11 @@ namespace C_TestForge.TestCase.Services
                 testCase.InputParameters = ConvertToTestParameters(inputValues, entryPoint);
 
                 // For output parameters, we'll need placeholder values for now
-                testCase.ExpectedOutputs = new List<TestParameter>();
+                testCase.ExpectedOutputs = new List<CVariable>();
 
                 if (!string.IsNullOrEmpty(entryPoint.ReturnType) && entryPoint.ReturnType != "void")
                 {
-                    testCase.ExpectedOutputs.Add(new TestParameter
+                    testCase.ExpectedOutputs.Add(new CVariable
                     {
                         Name = "return_value",
                         Type = entryPoint.ReturnType,
@@ -270,15 +269,15 @@ namespace C_TestForge.TestCase.Services
             return result;
         }
 
-        private List<TestParameter> ConvertToTestParameters(Dictionary<string, object> values, CFunction function)
+        private List<CVariable> ConvertToTestParameters(Dictionary<string, object> values, CFunction function)
         {
-            List<TestParameter> parameters = new List<TestParameter>();
+            List<CVariable> parameters = new List<CVariable>();
 
             foreach (var param in function.Parameters)
             {
                 if (values.TryGetValue(param.Name, out object value))
                 {
-                    parameters.Add(new TestParameter
+                    parameters.Add(new CVariable
                     {
                         Name = param.Name,
                         Type = param.Type,
@@ -288,7 +287,7 @@ namespace C_TestForge.TestCase.Services
                 else
                 {
                     // If no value was found, use a default value
-                    parameters.Add(new TestParameter
+                    parameters.Add(new CVariable
                     {
                         Name = param.Name,
                         Type = param.Type,
@@ -371,7 +370,7 @@ namespace C_TestForge.TestCase.Services
             }
         }
 
-        private string FormatAssertValue(TestParameter parameter)
+        private string FormatAssertValue(CVariable parameter)
         {
             if (parameter.Type.ToLower() == "char*" || parameter.Type.ToLower() == "const char*")
             {
@@ -386,7 +385,7 @@ namespace C_TestForge.TestCase.Services
 
     public interface IIntegrationTestGeneratorService
     {
-        List<TestCase> GenerateIntegrationTests(List<string> functionNames, List<CVariable> availableVariables);
-        string GenerateIntegrationTestCode(TestCase testCase, string templateFormat = "c");
+        List<TestCaseUser> GenerateIntegrationTests(List<string> functionNames, List<CVariable> availableVariables);
+        string GenerateIntegrationTestCode(TestCaseUser testCase, string templateFormat = "c");
     }
 }

@@ -11,7 +11,7 @@ namespace C_TestForge.UI.ViewModels
 {
     public class EditTestCaseDialogViewModel : BindableBase, ITestCaseEditorDialogViewModel
     {
-        private Models.TestCases.TestCase _originalTestCase;
+        private TestCaseUser _originalTestCase;
 
         #region Properties
 
@@ -110,7 +110,7 @@ namespace C_TestForge.UI.ViewModels
 
         #endregion
 
-        public EditTestCaseDialogViewModel(Models.TestCases.TestCase testCase = null)
+        public EditTestCaseDialogViewModel(TestCaseUser testCase = null)
         {
             // Initialize collections
             Inputs = new ObservableCollection<TestCaseInput>();
@@ -246,7 +246,7 @@ namespace C_TestForge.UI.ViewModels
 
         #region Helper Methods
 
-        private void LoadTestCase(Models.TestCases.TestCase testCase)
+        private void LoadTestCase(TestCaseUser testCase)
         {
             // Basic properties
             Name = testCase.Name;
@@ -298,9 +298,9 @@ namespace C_TestForge.UI.ViewModels
             };
         }
 
-        public Models.TestCases.TestCase GetUpdatedTestCase()
+        public TestCaseUser GetUpdatedTestCase()
         {
-            Models.TestCases.TestCase testCase = _originalTestCase ?? new Models.TestCases.TestCase
+            TestCaseUser testCase = _originalTestCase ?? new TestCaseUser
             {
                 Id = Guid.NewGuid(),
                 CreatedDate = DateTime.Now

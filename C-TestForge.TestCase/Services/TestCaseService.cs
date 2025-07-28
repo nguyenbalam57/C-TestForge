@@ -25,29 +25,29 @@ namespace C_TestForge.TestCase.Services
 
         #region CRUD Operations
 
-        public async Task<List<Models.TestCases.TestCase>> GetAllTestCasesAsync()
+        public async Task<List<TestCaseUser>> GetAllTestCasesAsync()
         {
             return await _repository.GetAllAsync();
         }
 
-        public async Task<Models.TestCases.TestCase> GetTestCaseByIdAsync(Guid id)
+        public async Task<TestCaseUser> GetTestCaseByIdAsync(Guid id)
         {
             return await _repository.GetByIdAsync(id);
         }
 
-        public async Task<List<Models.TestCases.TestCase>> GetTestCasesByFunctionNameAsync(string functionName)
+        public async Task<List<TestCaseUser>> GetTestCasesByFunctionNameAsync(string functionName)
         {
             return await _repository.GetByFunctionNameAsync(functionName);
         }
 
-        public async Task<Models.TestCases.TestCase> CreateTestCaseAsync(Models.TestCases.TestCase testCase)
+        public async Task<TestCaseUser> CreateTestCaseAsync(TestCaseUser testCase)
         {
             testCase.CreatedDate = DateTime.Now;
             testCase.ModifiedDate = DateTime.Now;
             return await _repository.CreateAsync(testCase);
         }
 
-        public async Task<Models.TestCases.TestCase> UpdateTestCaseAsync(Models.TestCases.TestCase testCase)
+        public async Task<TestCaseUser> UpdateTestCaseAsync(TestCaseUser testCase)
         {
             testCase.ModifiedDate = DateTime.Now;
             return await _repository.UpdateAsync(testCase);
@@ -67,7 +67,7 @@ namespace C_TestForge.TestCase.Services
 
         #region Import/Export
 
-        public async Task<List<Models.TestCases.TestCase>> ImportFromTstFileAsync(string filePath)
+        public async Task<List<TestCaseUser>> ImportFromTstFileAsync(string filePath)
         {
             var content = await File.ReadAllTextAsync(filePath);
             var testCases = ParseTstContent(content);
@@ -80,9 +80,9 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        public async Task<List<Models.TestCases.TestCase>> ImportFromCsvFileAsync(string filePath)
+        public async Task<List<TestCaseUser>> ImportFromCsvFileAsync(string filePath)
         {
-            var testCases = new List<Models.TestCases.TestCase>();
+            var testCases = new List<TestCaseUser>();
 
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -104,7 +104,7 @@ namespace C_TestForge.TestCase.Services
                     var testCase = testCases.FirstOrDefault(tc => tc.Name == record.Name);
                     if (testCase == null)
                     {
-                        testCase = new Models.TestCases.TestCase
+                        testCase = new TestCaseUser
                         {
                             Id = Guid.NewGuid(),
                             Name = record.Name,
@@ -194,9 +194,9 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        public async Task<List<Models.TestCases.TestCase>> ImportFromExcelFileAsync(string filePath)
+        public async Task<List<TestCaseUser>> ImportFromExcelFileAsync(string filePath)
         {
-            var testCases = new List<Models.TestCases.TestCase>();
+            var testCases = new List<TestCaseUser>();
 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
@@ -211,7 +211,7 @@ namespace C_TestForge.TestCase.Services
                     // Skip header row
                     for (int row = 2; row <= rows; row++)
                     {
-                        var testCase = new Models.TestCases.TestCase
+                        var testCase = new TestCaseUser
                         {
                             Id = Guid.NewGuid(),
                             Name = testCasesWorksheet.Cells[row, 1].Value?.ToString(),
@@ -308,13 +308,13 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        public async Task ExportToTstFileAsync(List<Models.TestCases.TestCase> testCases, string filePath)
+        public async Task ExportToTstFileAsync(List<TestCaseUser> testCases, string filePath)
         {
             var content = GenerateTstContent(testCases);
             await File.WriteAllTextAsync(filePath, content);
         }
 
-        public async Task ExportToCsvFileAsync(List<Models.TestCases.TestCase> testCases, string filePath)
+        public async Task ExportToCsvFileAsync(List<TestCaseUser> testCases, string filePath)
         {
             // Create directory if it doesn't exist
             var directory = Path.GetDirectoryName(filePath);
@@ -419,7 +419,7 @@ namespace C_TestForge.TestCase.Services
             await Task.CompletedTask;
         }
 
-        public async Task ExportToExcelFileAsync(List<Models.TestCases.TestCase> testCases, string filePath)
+        public async Task ExportToExcelFileAsync(List<TestCaseUser> testCases, string filePath)
         {
             // Create directory if it doesn't exist
             var directory = Path.GetDirectoryName(filePath);
@@ -541,7 +541,7 @@ namespace C_TestForge.TestCase.Services
 
         #region Analysis
 
-        public async Task<TestCaseComparisonResult> CompareTestCasesAsync(Models.TestCases.TestCase testCase1, Models.TestCases.TestCase testCase2)
+        public async Task<TestCaseComparisonResult> CompareTestCasesAsync(TestCaseUser testCase1, TestCaseUser testCase2)
         {
             var result = new TestCaseComparisonResult
             {
@@ -678,7 +678,7 @@ namespace C_TestForge.TestCase.Services
             return await Task.FromResult(result);
         }
 
-        public async Task<TestCaseCoverageResult> AnalyzeTestCaseCoverageAsync(List<Models.TestCases.TestCase> testCases, CFunction function)
+        public async Task<TestCaseCoverageResult> AnalyzeTestCaseCoverageAsync(List<TestCaseUser> testCases, CFunction function)
         {
             // Simplified implementation for now
             var result = new TestCaseCoverageResult
@@ -713,12 +713,12 @@ namespace C_TestForge.TestCase.Services
 
         #region Test Case Generation
 
-        public async Task<Models.TestCases.TestCase> GenerateUnitTestCaseAsync(CFunction function)
+        public async Task<TestCaseUser> GenerateUnitTestCaseAsync(CFunction function)
         {
             if (function == null)
                 throw new ArgumentNullException(nameof(function));
 
-            var testCase = new Models.TestCases.TestCase
+            var testCase = new TestCaseUser
             {
                 Id = Guid.NewGuid(),
                 Name = $"Test_{function.Name}",
@@ -764,7 +764,7 @@ namespace C_TestForge.TestCase.Services
             return await Task.FromResult(testCase);
         }
 
-        public async Task<Models.TestCases.TestCase> GenerateIntegrationTestCaseAsync(List<CFunction> functions)
+        public async Task<TestCaseUser> GenerateIntegrationTestCaseAsync(List<CFunction> functions)
         {
             if (functions == null || functions.Count == 0)
                 throw new ArgumentException("At least one function must be provided", nameof(functions));
@@ -772,7 +772,7 @@ namespace C_TestForge.TestCase.Services
             // For integration test, we'll use the first function as the main function
             var mainFunction = functions[0];
 
-            var testCase = new Models.TestCases.TestCase
+            var testCase = new TestCaseUser
             {
                 Id = Guid.NewGuid(),
                 Name = $"IntegrationTest_{mainFunction.Name}",
@@ -844,7 +844,7 @@ namespace C_TestForge.TestCase.Services
 
         #region Helper Methods
 
-        private string GenerateTstContent(List<Models.TestCases.TestCase> testCases)
+        private string GenerateTstContent(List<TestCaseUser> testCases)
         {
             var sb = new StringBuilder();
 
@@ -875,12 +875,12 @@ namespace C_TestForge.TestCase.Services
             return sb.ToString();
         }
 
-        private List<Models.TestCases.TestCase> ParseTstContent(string content)
+        private List<TestCaseUser> ParseTstContent(string content)
         {
-            var testCases = new List<Models.TestCases.TestCase>();
+            var testCases = new List<TestCaseUser>();
             var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            Models.TestCases.TestCase currentTestCase = null;
+            TestCaseUser currentTestCase = null;
             bool inInputs = false;
             bool inOutputs = false;
 
@@ -893,7 +893,7 @@ namespace C_TestForge.TestCase.Services
                         testCases.Add(currentTestCase);
                     }
 
-                    currentTestCase = new Models.TestCases.TestCase
+                    currentTestCase = new TestCaseUser
                     {
                         Id = Guid.NewGuid(),
                         CreatedDate = DateTime.Now,
@@ -941,7 +941,7 @@ namespace C_TestForge.TestCase.Services
             return testCases;
         }
 
-        private void ParseTestCaseLine(string line, Models.TestCases.TestCase testCase)
+        private void ParseTestCaseLine(string line, TestCaseUser testCase)
         {
             var parts = line.Split(new[] { '=' }, 2);
             if (parts.Length != 2)
@@ -976,7 +976,7 @@ namespace C_TestForge.TestCase.Services
             }
         }
 
-        private void ParseInputLine(string line, Models.TestCases.TestCase testCase)
+        private void ParseInputLine(string line, TestCaseUser testCase)
         {
             // Format: variableName(variableType)=value|isStub
             var parts = line.Split(new[] { '=' }, 2);
@@ -1004,7 +1004,7 @@ namespace C_TestForge.TestCase.Services
             });
         }
 
-        private void ParseOutputLine(string line, Models.TestCases.TestCase testCase)
+        private void ParseOutputLine(string line, TestCaseUser testCase)
         {
             // Format: variableName(variableType)=value
             var parts = line.Split(new[] { '=' }, 2);

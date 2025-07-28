@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 using C_TestForge.TestCase.Services;
 using Prism.Commands;
 using Prism.Mvvm;
@@ -13,7 +14,7 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
 
         private string _title;
-        private Models.TestCases.TestCase _testCase;
+        private TestCaseUser _testCase;
         private List<CFunction> _functions;
         private string _mode;
 
@@ -23,7 +24,7 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _title, value);
         }
 
-        public Models.TestCases.TestCase TestCase
+        public TestCaseUser TestCase
         {
             get => _testCase;
             set => SetProperty(ref _testCase, value);
@@ -108,11 +109,11 @@ namespace C_TestForge.UI.ViewModels
 
             if (parameters.ContainsKey("TestCase"))
             {
-                TestCase = parameters.GetValue<Models.TestCases.TestCase>("TestCase").Clone();
+                TestCase = parameters.GetValue<TestCaseUser>("TestCase").Clone();
             }
             else
             {
-                TestCase = new Models.TestCases.TestCase();
+                TestCase = new TestCaseUser();
             }
 
             if (parameters.ContainsKey("Functions"))

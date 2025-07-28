@@ -6,6 +6,7 @@ using System.Windows.Input;
 using C_TestForge.Core;
 using C_TestForge.Core.Services;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 using C_TestForge.TestCase.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,8 +25,8 @@ namespace C_TestForge.UI.ViewModels
         private string _statusMessage;
         private CSourceFile _selectedSourceFile;
         private ObservableCollection<CSourceFile> _sourceFiles;
-        private ObservableCollection<Models.TestCases.TestCase> _testCases;
-        private Models.TestCases.TestCase _selectedTestCase;
+        private ObservableCollection<TestCaseUser> _testCases;
+        private TestCaseUser _selectedTestCase;
 
         public MainWindowViewModel(IProjectService projectService, ITestCaseService testCaseService, ILogger<MainWindowViewModel> logger)
         {
@@ -44,7 +45,7 @@ namespace C_TestForge.UI.ViewModels
 
             // Initialize collections
             SourceFiles = new ObservableCollection<CSourceFile>();
-            TestCases = new ObservableCollection<Models.TestCases.TestCase>();
+            TestCases = new ObservableCollection<TestCaseUser>();
 
             // Set default status
             StatusMessage = "Ready";
@@ -84,13 +85,13 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _sourceFiles, value);
         }
 
-        public ObservableCollection<Models.TestCases.TestCase> TestCases
+        public ObservableCollection<TestCaseUser> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
         }
 
-        public Models.TestCases.TestCase SelectedTestCase
+        public TestCaseUser SelectedTestCase
         {
             get => _selectedTestCase;
             set => SetProperty(ref _selectedTestCase, value);

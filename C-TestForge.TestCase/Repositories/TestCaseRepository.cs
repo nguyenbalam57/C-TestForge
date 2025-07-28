@@ -27,50 +27,50 @@ namespace C_TestForge.TestCase.Repositories
             }
         }
 
-        public async Task<List<Models.TestCases.TestCase>> GetAllAsync()
+        public async Task<List<TestCaseUser>> GetAllAsync()
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 return await Task.FromResult(collection.FindAll().ToList());
             }
         }
 
-        public async Task<Models.TestCases.TestCase> GetByIdAsync(Guid id)
+        public async Task<TestCaseUser> GetByIdAsync(Guid id)
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 return await Task.FromResult(collection.FindById(new BsonValue(id)));
             }
         }
 
-        public async Task<List<Models.TestCases.TestCase>> GetByFunctionNameAsync(string functionName)
+        public async Task<List<TestCaseUser>> GetByFunctionNameAsync(string functionName)
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 return await Task.FromResult(collection
-                    .Find(x => x.FunctionName == functionName)
+                    .Find(x => x.FunctionUnderTest == functionName)
                     .ToList());
             }
         }
 
-        public async Task<Models.TestCases.TestCase> CreateAsync(Models.TestCases.TestCase testCase)
+        public async Task<TestCaseUser> CreateAsync(TestCaseUser testCase)
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 collection.Insert(testCase);
                 return await Task.FromResult(testCase);
             }
         }
 
-        public async Task<Models.TestCases.TestCase> UpdateAsync(Models.TestCases.TestCase testCase)
+        public async Task<TestCaseUser> UpdateAsync(TestCaseUser testCase)
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 collection.Update(testCase);
                 return await Task.FromResult(testCase);
             }
@@ -80,7 +80,7 @@ namespace C_TestForge.TestCase.Repositories
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 return await Task.FromResult(collection.Delete(new BsonValue(id)));
             }
         }
@@ -89,7 +89,7 @@ namespace C_TestForge.TestCase.Repositories
         {
             using (var db = new LiteDatabase(_dbPath))
             {
-                var collection = db.GetCollection<Models.TestCases.TestCase>("testcases");
+                var collection = db.GetCollection<TestCaseUser>("testcases");
                 return await Task.FromResult(collection.DeleteAll() > 0);
             }
         }
