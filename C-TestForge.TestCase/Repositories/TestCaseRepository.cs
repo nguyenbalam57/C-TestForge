@@ -27,7 +27,7 @@ namespace C_TestForge.TestCase.Repositories
             }
         }
 
-        public async Task<List<TestCaseUser>> GetAllAsync()
+        public async Task<List<TestCase>> GetAllAsync()
         {
             using (var db = new LiteDatabase(_dbPath))
             {

@@ -28,7 +28,7 @@ namespace C_TestForge.UI.Services
                 throw new ArgumentNullException(nameof(services));
 
             // Register parser services
-            services.AddSingleton<IParserService, ClangSharpParserService>();
+            services.AddSingleton<IClangSharpParserService, ClangSharpParserService>();
             services.AddSingleton<IPreprocessorService, PreprocessorService>();
             services.AddSingleton<ISourceCodeService, SourceCodeService>();
 
@@ -72,6 +72,15 @@ namespace C_TestForge.UI.Services
             services.AddSingleton<ITestCaseViewModelFactory, TestCaseViewModelFactory>();
             services.AddSingleton<ISourceCodeHighlightService, SourceCodeHighlightService>();
 
+            // Register UI customization services
+            services.AddSingleton<IUILayoutService, UILayoutService>();
+            services.AddSingleton<IUIThemeService, UIThemeService>();
+            services.AddSingleton<IColumnVisibilityService, ColumnVisibilityService>();
+
+            // Register search and filter services
+            services.AddSingleton<ITestCaseFilterService, TestCaseFilterService>();
+            services.AddSingleton<ITestCaseSearchService, TestCaseSearchService>();
+
             return services;
         }
 
@@ -100,6 +109,13 @@ namespace C_TestForge.UI.Services
             services.AddSingleton<IBranchAnalysisService, BranchAnalysisService>();
             services.AddSingleton<IFunctionCallGraphService, FunctionCallGraphService>();
             services.AddSingleton<ICodeCoverageService, CodeCoverageService>();
+
+            // Register reporting and analysis services
+            services.AddSingleton<ITestResultAnalysisService, TestResultAnalysisService>();
+            services.AddSingleton<ITestReportGeneratorService, TestReportGeneratorService>();
+
+            // Register optimization services
+            services.AddSingleton<ITestCaseOptimizationService, TestCaseOptimizationService>();
 
             return services;
         }
