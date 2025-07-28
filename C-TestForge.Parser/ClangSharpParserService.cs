@@ -111,20 +111,21 @@ namespace C_TestForge.Parser
                     var translationFlags = CXTranslationUnit_Flags.CXTranslationUnit_DetailedPreprocessingRecord |
                                           CXTranslationUnit_Flags.CXTranslationUnit_KeepGoing;
 
-                    CXTranslationUnit translationUnit;
-                    CXErrorCode errorCode = index.ParseTranslationUnit(
+                    // Sửa lỗi: Thay đổi cách tạo translation unit
+                    CXTranslationUnit translationUnit = CXTranslationUnit.Parse(
+                        index,
                         tempPath,
                         clangArgs,
                         Array.Empty<CXUnsavedFile>(),
-                        translationFlags,
-                        out translationUnit);
+                        translationFlags);
 
-                    if (errorCode != CXErrorCode.CXError_Success)
+                    // Kiểm tra lỗi
+                    if (translationUnit.Handle == IntPtr.Zero)
                     {
-                        _logger.LogError($"Failed to parse source code for: {fileName}, Error code: {errorCode}");
+                        _logger.LogError($"Failed to parse source code for: {fileName}");
                         result.ParseErrors.Add(new ParseError
                         {
-                            Message = $"Failed to parse source code. Error code: {errorCode}",
+                            Message = "Failed to parse source code. Could not create translation unit.",
                             Severity = ErrorSeverity.Critical,
                             FileName = fileName
                         });
@@ -320,14 +321,15 @@ namespace C_TestForge.Parser
                 using var diagnostic = translationUnit.GetDiagnostic(i);
                 var severity = diagnostic.Severity;
                 var message = diagnostic.Spelling.ToString();
-                var location = diagnostic.Location.PresumedLocation;
+
+                diagnostic.Location.GetFileLocation(out CXFile file, out uint line, out uint column, out _);
 
                 var parseError = new ParseError
                 {
                     Message = message,
-                    LineNumber = location.Line,
-                    ColumnNumber = location.Column,
-                    FileName = location.Filename,
+                    LineNumber = (int)line,
+                    ColumnNumber = (int)column,
+                    FileName = file != null ? file.Name.ToString() : string.Empty,
                     Severity = ConvertSeverity(severity)
                 };
 
@@ -335,11 +337,11 @@ namespace C_TestForge.Parser
 
                 if (severity >= CXDiagnosticSeverity.CXDiagnostic_Error)
                 {
-                    _logger.LogError($"Error in {location.Filename} at {location.Line}:{location.Column}: {message}");
+                    _logger.LogError($"Error in {parseError.FileName} at {parseError.LineNumber}:{parseError.ColumnNumber}: {message}");
                 }
                 else if (severity == CXDiagnosticSeverity.CXDiagnostic_Warning)
                 {
-                    _logger.LogWarning($"Warning in {location.Filename} at {location.Line}:{location.Column}: {message}");
+                    _logger.LogWarning($"Warning in {parseError.FileName} at {parseError.LineNumber}:{parseError.ColumnNumber}: {message}");
                 }
             }
         }
@@ -391,11 +393,15 @@ namespace C_TestForge.Parser
                 options);
 
             // Visit all the children of the translation unit
-            cursor.VisitChildren((child, parent, clientData) =>
+            unsafe 
             {
-                visitor.Visit(child, parent);
-                return CXChildVisitResult.CXChildVisit_Continue;
-            }, IntPtr.Zero);
+                cursor.VisitChildren((child, parent, clientData) =>
+                {
+                    visitor.Visit(child, parent);
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, default(CXClientData));
+            }
+            
 
             // Get the extracted data from the visitor
             result.Variables.AddRange(visitor.Variables);
@@ -534,7 +540,8 @@ namespace C_TestForge.Parser
                 }
 
                 // Check if the file matches our source file name
-                var fileLocation = location.GetFileLocation(out var file, out _, out _, out _);
+                // Đồng thời thay thế dấu * bằng out _ (out discard)
+                location.GetFileLocation(out CXFile file, out _, out _, out _);
                 if (file != null)
                 {
                     var fileName = Path.GetFileName(file.Name.ToString());
@@ -572,7 +579,7 @@ namespace C_TestForge.Parser
                         string name = child.Spelling.ToString();
                         var value = child.EnumConstantDeclValue.ToString();
 
-                        var location = child.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
+                        child.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
                         string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : _sourceFileName;
 
                         // Create a variable for the enum constant
@@ -594,7 +601,7 @@ namespace C_TestForge.Parser
                     }
 
                     return CXChildVisitResult.CXChildVisit_Continue;
-                }, IntPtr.Zero);
+                }, default(CXClientData));
             }
 
             private void ProcessStructDeclaration(CXCursor cursor)

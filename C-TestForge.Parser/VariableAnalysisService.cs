@@ -36,7 +36,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public CVariable ExtractVariable(CXCursor cursor)
+        public unsafe CVariable ExtractVariable(CXCursor cursor)
         {
             try
             {
@@ -49,7 +49,9 @@ namespace C_TestForge.Parser
                 _logger.LogDebug($"Extracting variable: {variableName}");
 
                 // Get variable location
-                var location = cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
+                CXFile file;
+                uint line, column, offset;
+                cursor.Location.GetFileLocation(out file, out line, out column, out offset);
                 string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
                 // Get variable type
@@ -81,7 +83,7 @@ namespace C_TestForge.Parser
                     }
 
                     return CXChildVisitResult.CXChildVisit_Continue;
-                }, IntPtr.Zero);
+                }, default(CXClientData));
 
                 // Create variable object
                 var variable = new CVariable
@@ -368,7 +370,7 @@ namespace C_TestForge.Parser
             }
         }
 
-        private VariableScope DetermineScope(CXCursor cursor)
+        private unsafe VariableScope DetermineScope(CXCursor cursor)
         {
             // Check if the variable is a parameter
             if (cursor.SemanticParent.Kind == CXCursorKind.CXCursor_FunctionDecl ||
@@ -387,17 +389,26 @@ namespace C_TestForge.Parser
             bool isStatic = false;
             cursor.VisitChildren((child, parent, clientData) =>
             {
-                if (child.Kind == CXCursorKind.CXCursor_StorageClass)
+                // Kiểm tra bất kỳ attr nào có thể chứa thông tin về storage class
+                if (child.Kind == CXCursorKind.CXCursor_UnexposedAttr ||
+                    child.Kind == CXCursorKind.CXCursor_DeclRefExpr)
                 {
-                    string storage = child.Spelling.ToString();
-                    if (storage == "static")
+                    string spelling = child.Spelling.ToString();
+                    if (spelling == "static")
                     {
                         isStatic = true;
                     }
                 }
 
+                // Kiểm tra thông qua spelling của cursor, không phụ thuộc vào loại cursor
+                string childText = child.Spelling.ToString();
+                if (childText == "static")
+                {
+                    isStatic = true;
+                }
+
                 return CXChildVisitResult.CXChildVisit_Continue;
-            }, IntPtr.Zero);
+            }, default(CXClientData));
 
             if (isStatic)
             {
@@ -417,7 +428,7 @@ namespace C_TestForge.Parser
 
         private VariableType DetermineVariableType(CXType type)
         {
-            switch (type.Kind)
+            switch (type.kind)
             {
                 case CXTypeKind.CXType_ConstantArray:
                 case CXTypeKind.CXType_VariableArray:
@@ -471,7 +482,7 @@ namespace C_TestForge.Parser
         private int DetermineVariableSize(CXType type)
         {
             // This is a simplified approach - a real implementation would be more sophisticated
-            switch (type.Kind)
+            switch (type.kind)
             {
                 case CXTypeKind.CXType_Bool:
                     return 1;
@@ -505,8 +516,8 @@ namespace C_TestForge.Parser
                     return 4; // Assume 32-bit pointers
 
                 case CXTypeKind.CXType_ConstantArray:
-                    long elementCount = type.GetArraySize();
-                    var elementType = type.GetArrayElementType();
+                    long elementCount = type.ArraySize;
+                    var elementType = type.ElementType;
                     int elementSize = DetermineVariableSize(elementType);
                     return (int)(elementCount * elementSize);
 

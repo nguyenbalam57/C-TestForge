@@ -40,13 +40,11 @@ namespace C_TestForge.Parser
                 };
 
                 // Get all tokens from the translation unit
-                translationUnit.Cursor.Tokenize(out var tokens);
+                CXSourceRange extent = translationUnit.Cursor.Extent;
+                CXToken[] tokens = translationUnit.Tokenize(extent).ToArray();
 
-                using (tokens)
-                {
-                    // Process the tokens to find preprocessor directives
-                    await ProcessTokensAsync(tokens, translationUnit, sourceFileName, result);
-                }
+                // Process the tokens to find preprocessor directives
+                await ProcessTokensAsync(tokens, translationUnit, sourceFileName, result);
 
                 _logger.LogInformation($"Extracted {result.Definitions.Count} preprocessor definitions, " +
                                        $"{result.ConditionalDirectives.Count} conditional directives, " +
@@ -362,27 +360,30 @@ namespace C_TestForge.Parser
         {
             var includes = new List<IncludeDirective>();
 
-            // Use the ClangSharp cursor visitor to find includes
-            translationUnit.Cursor.VisitChildren((cursor, parent, clientData) =>
+            unsafe
             {
-                if (cursor.Kind == CXCursorKind.CXCursor_InclusionDirective)
+                // Use the ClangSharp cursor visitor to find includes
+                translationUnit.Cursor.VisitChildren((cursor, parent, clientData) =>
                 {
-                    string includedFile = cursor.GetIncludedFile().Name.ToString();
-                    var location = cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
-
-                    if (file != null && Path.GetFileName(file.Name.ToString()) == sourceFileName)
+                    if (cursor.Kind == CXCursorKind.CXCursor_InclusionDirective)
                     {
-                        includes.Add(new IncludeDirective
+                        string includedFile = cursor.DisplayName.ToString();
+                        cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
+                        if (file != null && Path.GetFileName(file.Name.ToString()) == sourceFileName)
                         {
-                            FilePath = includedFile,
-                            LineNumber = (int)line,
-                            IsSystemInclude = includedFile.StartsWith('<') && includedFile.EndsWith('>')
-                        });
+                            includes.Add(new IncludeDirective
+                            {
+                                FilePath = includedFile,
+                                LineNumber = (int)line,
+                                IsSystemInclude = includedFile.StartsWith('<') && includedFile.EndsWith('>')
+                            });
+                        }
                     }
-                }
 
-                return CXChildVisitResult.CXChildVisit_Continue;
-            }, IntPtr.Zero);
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, default(CXClientData));
+            }
+            
 
             await Task.CompletedTask;
 
@@ -394,23 +395,27 @@ namespace C_TestForge.Parser
             var definitions = new List<CDefinition>();
 
             // Visit preprocessor nodes to find macro definitions
-            translationUnit.Cursor.VisitChildren((cursor, parent, clientData) =>
+            unsafe
             {
-                if (cursor.Kind == CXCursorKind.CXCursor_MacroDefinition)
+                translationUnit.Cursor.VisitChildren((cursor, parent, clientData) =>
                 {
-                    string macroName = cursor.Spelling.ToString();
-                    var location = cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
-
-                    if (file != null && Path.GetFileName(file.Name.ToString()) == sourceFileName)
+                    if (cursor.Kind == CXCursorKind.CXCursor_MacroDefinition)
                     {
-                        // Get the tokens for this macro to extract its value
-                        cursor.Tokenize(out var macroTokens);
-                        string macroValue = null;
-                        bool isFunctionLike = false;
-                        List<string> parameters = null;
+                        string macroName = cursor.Spelling.ToString();
+                        cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
 
-                        using (macroTokens)
+                        if (file != null && Path.GetFileName(file.Name.ToString()) == sourceFileName)
                         {
+                            // Get the tokens for this macro to extract its value
+                            // Lấy phạm vi (extent) của cursor
+                            CXSourceRange extent = cursor.Extent;
+                            // Lấy tokens từ extent
+                            CXToken[] macroTokens = translationUnit.Tokenize(extent).ToArray();
+
+                            string macroValue = null;
+                            bool isFunctionLike = false;
+                            List<string> parameters = null;
+
                             if (macroTokens.Length > 1)
                             {
                                 // Check if this is a function-like macro
@@ -424,32 +429,33 @@ namespace C_TestForge.Parser
                                 // Extract the macro value
                                 macroValue = ExtractMacroValue(macroTokens, translationUnit);
                             }
-                        }
 
-                        var definition = new CDefinition
-                        {
-                            Name = macroName,
-                            Value = macroValue,
-                            LineNumber = (int)line,
-                            ColumnNumber = (int)column,
-                            SourceFile = sourceFileName,
-                            IsFunctionLike = isFunctionLike,
-                            Parameters = parameters,
-                            DefinitionType = isFunctionLike ? DefinitionType.MacroFunction : DefinitionType.MacroConstant
-                        };
+                            var definition = new CDefinition
+                            {
+                                Name = macroName,
+                                Value = macroValue,
+                                LineNumber = (int)line,
+                                ColumnNumber = (int)column,
+                                SourceFile = sourceFileName,
+                                IsFunctionLike = isFunctionLike,
+                                Parameters = parameters,
+                                DefinitionType = isFunctionLike ? DefinitionType.MacroFunction : DefinitionType.MacroConstant
+                            };
 
-                        definitions.Add(definition);
+                            definitions.Add(definition);
 
-                        // Track the line number of this definition
-                        if (!definitionLineMap.ContainsKey(definition.Name))
-                        {
-                            definitionLineMap.Add(definition.Name, (int)line);
+                            // Track the line number of this definition
+                            if (!definitionLineMap.ContainsKey(definition.Name))
+                            {
+                                definitionLineMap.Add(definition.Name, (int)line);
+                            }
                         }
                     }
-                }
 
-                return CXChildVisitResult.CXChildVisit_Continue;
-            }, IntPtr.Zero);
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, default(CXClientData));
+            }
+
 
             await Task.CompletedTask;
 
@@ -545,7 +551,7 @@ namespace C_TestForge.Parser
             var conditionals = new List<ConditionalDirective>();
 
             // We need to manually parse the file to extract conditional directives
-            string filePath = translationUnit.Spelling;
+            string filePath = translationUnit.Spelling.ToString();
             if (!_fileService.FileExists(filePath))
             {
                 _logger.LogWarning($"Source file not found for conditional directive extraction: {filePath}");

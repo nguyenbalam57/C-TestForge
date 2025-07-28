@@ -1,12 +1,13 @@
 ﻿using C_TestForge.Core.Interfaces;
+using C_TestForge.Core.Interfaces.Analysis;
+using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Core.Services;
-using C_TestForge.Parser;
-using C_TestForge.Solver;
-using C_TestForge.TestCase.Repositories;
-using C_TestForge.TestCase.Services;
 using Microsoft.Extensions.DependencyInjection;
+using C_TestForge.Parser;
 using Prism.Services.Dialogs;
 using System;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
 
 namespace C_TestForge.UI.Services
 {

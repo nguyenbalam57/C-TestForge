@@ -3,6 +3,7 @@ using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -203,7 +204,7 @@ namespace C_TestForge.Core.Services
                 project.Properties["LastModifiedDate"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
                 // Serialize the project
-                string json = JsonConvert.SerializeObject(project, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(project, Newtonsoft.Json.Formatting.Indented);
 
                 // Write the project file
                 await _fileService.WriteFileAsync(project.ProjectFilePath, json);

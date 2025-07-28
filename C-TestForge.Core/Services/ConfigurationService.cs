@@ -1,6 +1,7 @@
 ﻿using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -89,7 +90,7 @@ namespace C_TestForge.Core.Services
                 }
 
                 // Serialize the configuration
-                string json = JsonConvert.SerializeObject(configuration, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(configuration, Newtonsoft.Json.Formatting.Indented);
 
                 // Write the configuration file
                 await _fileService.WriteFileAsync(filePath, json);
@@ -207,7 +208,7 @@ namespace C_TestForge.Core.Services
                 }
 
                 // Serialize the configurations
-                string json = JsonConvert.SerializeObject(configurations, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(configurations, Newtonsoft.Json.Formatting.Indented);
 
                 // Write the file
                 await _fileService.WriteFileAsync(filePath, json);

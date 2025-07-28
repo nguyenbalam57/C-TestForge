@@ -39,7 +39,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public CFunction ExtractFunction(CXCursor cursor)
+        public unsafe CFunction ExtractFunction(CXCursor cursor)
         {
             try
             {
@@ -52,39 +52,66 @@ namespace C_TestForge.Parser
                 _logger.LogDebug($"Extracting function: {functionName}");
 
                 // Get function location
-                var location = cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
+                CXFile file;
+                uint line, column, offset;
+                cursor.Location.GetFileLocation(out file, out line, out column, out offset);
                 string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
                 // Get function return type
                 var type = cursor.Type;
-                var returnType = type.GetResultType().Spelling.ToString();
+                var resultType = clang.getResultType(type);
+                var returnType = resultType.Spelling.ToString();
 
                 // Check function attributes
                 bool isStatic = false;
                 bool isInline = false;
                 bool isExternal = false;
 
-                cursor.VisitChildren((child, parent, clientData) =>
+                // Kiểm tra storage class bằng cách khác - sửa lỗi CXCursorKind.CXCursor_StorageClass
+                var storageClass = clang.Cursor_getStorageClass(cursor);
+                if (storageClass == CX_StorageClass.CX_SC_Static)
                 {
-                    if (child.Kind == CXCursorKind.CXCursor_StorageClass)
-                    {
-                        string storage = child.Spelling.ToString();
-                        if (storage == "static")
-                        {
-                            isStatic = true;
-                        }
-                        else if (storage == "extern")
-                        {
-                            isExternal = true;
-                        }
-                    }
-                    else if (child.Kind == CXCursorKind.CXCursor_InlineAttr)
-                    {
-                        isInline = true;
-                    }
+                    isStatic = true;
+                }
+                else if (storageClass == CX_StorageClass.CX_SC_Extern)
+                {
+                    isExternal = true;
+                }
 
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, IntPtr.Zero);
+                // Kiểm tra inline bằng cách phân tích token - sửa lỗi CXCursor_InlineAttr
+                // Kiểm tra inline bằng cách phân tích range text thay vì tokenize
+                // Sử dụng extent để lấy phạm vi của khai báo hàm
+                CXSourceRange range = cursor.Extent;
+
+                // Lấy translation unit từ cursor
+                CXTranslationUnit tu = cursor.TranslationUnit;
+
+                // Tokenize extent thay vì cursor
+                CXToken* tokens;
+                uint numTokens;
+                clang.tokenize(tu, range, &tokens, &numTokens);
+
+                // Kiểm tra từng token
+                try
+                {
+                    for (uint i = 0; i < numTokens; i++)
+                    {
+                        CXString spelling = clang.getTokenSpelling(tu, tokens[i]);
+                        string tokenText = spelling.ToString();
+                        clang.disposeString(spelling);
+
+                        if (tokenText == "inline")
+                        {
+                            isInline = true;
+                            break;
+                        }
+                    }
+                }
+                finally
+                {
+                    // Giải phóng tokens
+                    clang.disposeTokens(tu, tokens, numTokens);
+                }
 
                 // Create function object
                 var function = new CFunction
@@ -103,7 +130,7 @@ namespace C_TestForge.Parser
                 };
 
                 // Extract parameters
-                uint paramCount = cursor.NumArguments;
+                int paramCount = cursor.NumArguments;
                 for (uint i = 0; i < paramCount; i++)
                 {
                     var paramCursor = cursor.GetArgument(i);
@@ -115,7 +142,16 @@ namespace C_TestForge.Parser
                 }
 
                 // Extract function body if available
-                if (cursor.HasChildren)
+                // Extract function body if available - sửa lỗi "CXCursor does not contain HasChildren"
+                // Kiểm tra cursor có con bằng cách đếm con hoặc kiểm tra phạm vi
+                bool hasChildren = false;
+                cursor.VisitChildren((child, parent, clientData) =>
+                {
+                    hasChildren = true;
+                    return CXChildVisitResult.CXChildVisit_Break;
+                }, default(CXClientData));
+
+                if (hasChildren)
                 {
                     ExtractFunctionBody(cursor, function);
                 }
@@ -377,7 +413,7 @@ namespace C_TestForge.Parser
             string typeName = type.Spelling.ToString();
 
             // Get parameter location
-            var location = cursor.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
+            cursor.Location.GetFileLocation(out CXFile file, out uint line, out uint column, out _);
             string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
             // Determine variable type
@@ -401,7 +437,7 @@ namespace C_TestForge.Parser
 
         private VariableType DetermineVariableType(CXType type)
         {
-            switch (type.Kind)
+            switch (type.kind)
             {
                 case CXTypeKind.CXType_ConstantArray:
                 case CXTypeKind.CXType_VariableArray:
@@ -423,7 +459,7 @@ namespace C_TestForge.Parser
             }
         }
 
-        private void ExtractFunctionBody(CXCursor cursor, CFunction function)
+        private unsafe void ExtractFunctionBody(CXCursor cursor, CFunction function)
         {
             // Find the function body
             CXCursor bodyStmt = default;
@@ -437,7 +473,7 @@ namespace C_TestForge.Parser
                 }
 
                 return CXChildVisitResult.CXChildVisit_Continue;
-            }, IntPtr.Zero);
+            }, default(CXClientData));
 
             if (bodyStmt.Kind != CXCursorKind.CXCursor_CompoundStmt)
             {
@@ -445,9 +481,8 @@ namespace C_TestForge.Parser
             }
 
             // Extract the source code of the body
-            var extent = bodyStmt.Extent;
-            var startLocation = extent.Start.GetFileLocation(out var startFile, out uint startLine, out uint startColumn, out _);
-            var endLocation = extent.End.GetFileLocation(out var endFile, out uint endLine, out uint endColumn, out _);
+            bodyStmt.Extent.Start.GetFileLocation(out CXFile startFile, out uint startLine, out uint startColumn, out _);
+            bodyStmt.Extent.End.GetFileLocation(out CXFile endFile, out uint endLine, out uint endColumn, out _);
 
             if (startFile != null && endFile != null && startFile.Name.ToString() == endFile.Name.ToString())
             {
@@ -474,7 +509,7 @@ namespace C_TestForge.Parser
                 }
 
                 return CXChildVisitResult.CXChildVisit_Recurse;
-            }, IntPtr.Zero);
+            }, default(CXClientData));
 
             function.UsedVariables = usedVariables.ToList();
             function.CalledFunctions = calledFunctions.ToList();
@@ -623,7 +658,7 @@ namespace C_TestForge.Parser
                         SourceId = currentNodeId,
                         TargetId = statementNode.Id,
                         EdgeType = "Sequential",
-                        SourceFile = null // Would need to get this from somewhere
+                        //SourceFile = null // Would need to get this from somewhere
                     });
 
                     // Update current node
@@ -651,7 +686,7 @@ namespace C_TestForge.Parser
                     SourceId = currentNodeId,
                     TargetId = exitNode.Id,
                     EdgeType = "Sequential",
-                    SourceFile = null // Would need to get this from somewhere
+                    //SourceFile = null // Would need to get this from somewhere
                 });
             }
 
@@ -683,7 +718,7 @@ namespace C_TestForge.Parser
                 SourceId = currentNodeId,
                 TargetId = conditionNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the 'then' branch
@@ -708,7 +743,7 @@ namespace C_TestForge.Parser
                 TargetId = thenNode.Id,
                 EdgeType = "True",
                 Condition = condition,
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the 'then' branch recursively
@@ -741,7 +776,7 @@ namespace C_TestForge.Parser
                     TargetId = elseNode.Id,
                     EdgeType = "False",
                     Condition = $"!({condition})",
-                    SourceFile = null // Would need to get this from somewhere
+                    //SourceFile = null // Would need to get this from somewhere
                 });
 
                 // Process the 'else' branch recursively
@@ -774,7 +809,7 @@ namespace C_TestForge.Parser
                 SourceId = currentNodeId,
                 TargetId = loopNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the loop body
@@ -799,7 +834,7 @@ namespace C_TestForge.Parser
                 TargetId = loopBodyNode.Id,
                 EdgeType = "True",
                 Condition = condition,
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the loop body recursively
@@ -812,7 +847,7 @@ namespace C_TestForge.Parser
                 SourceId = loopBodyNode.Id,
                 TargetId = loopNode.Id,
                 EdgeType = "Loop",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Create a node for the loop exit
@@ -834,7 +869,7 @@ namespace C_TestForge.Parser
                 TargetId = loopExitNode.Id,
                 EdgeType = "False",
                 Condition = $"!({condition})",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Update current node
@@ -861,7 +896,7 @@ namespace C_TestForge.Parser
                 SourceId = currentNodeId,
                 TargetId = doWhileNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the do-while body
@@ -898,7 +933,7 @@ namespace C_TestForge.Parser
                 SourceId = doWhileNode.Id,
                 TargetId = conditionNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Add edge from condition back to do-while if true
@@ -909,7 +944,7 @@ namespace C_TestForge.Parser
                 TargetId = doWhileNode.Id,
                 EdgeType = "True",
                 Condition = condition,
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Create a node for the loop exit
@@ -931,7 +966,7 @@ namespace C_TestForge.Parser
                 TargetId = loopExitNode.Id,
                 EdgeType = "False",
                 Condition = $"!({condition})",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Update current node
@@ -963,7 +998,7 @@ namespace C_TestForge.Parser
                 SourceId = currentNodeId,
                 TargetId = switchNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Extract the switch body
@@ -989,7 +1024,7 @@ namespace C_TestForge.Parser
                 TargetId = caseBodyNode.Id,
                 EdgeType = "Switch",
                 Condition = switchExpr,
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Process the switch body recursively
@@ -1013,7 +1048,7 @@ namespace C_TestForge.Parser
                 SourceId = caseBodyNode.Id,
                 TargetId = switchExitNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             // Update current node
@@ -1054,7 +1089,7 @@ namespace C_TestForge.Parser
                 SourceId = currentNodeId,
                 TargetId = returnNode.Id,
                 EdgeType = "Sequential",
-                SourceFile = null // Would need to get this from somewhere
+                //SourceFile = null // Would need to get this from somewhere
             });
 
             await Task.CompletedTask;
