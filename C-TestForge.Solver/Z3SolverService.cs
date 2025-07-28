@@ -7,309 +7,815 @@ using C_TestForge.Core.Interfaces;
 
 namespace C_TestForge.SolverServices
 {
+    /// <summary>
+    /// Service for solving variable values using Z3 Theorem Prover
+    /// </summary>
     public class Z3SolverService : IZ3SolverService
     {
-        private readonly Context _context;
-
-        public Z3SolverService()
+        /// <summary>
+        /// Finds variable values that satisfy the given constraints
+        /// </summary>
+        public async Task<Dictionary<string, string>> FindVariableValuesAsync(
+            Dictionary<string, VariableConstraint> constraints,
+            Dictionary<string, string> expectedOutputs)
         {
-            // Configure Z3 context
-            Dictionary<string, string> config = new Dictionary<string, string>
-            {
-                { "model", "true" }
-            };
-            _context = new Context(config);
-        }
+            if (constraints == null)
+                throw new ArgumentNullException(nameof(constraints));
+            if (expectedOutputs == null)
+                throw new ArgumentNullException(nameof(expectedOutputs));
 
-        public Dictionary<string, object> FindSatisfyingValues(List<CVariable> variables, List<string> constraints)
-        {
-            Solver solver = _context.MkSolver();
-            Dictionary<string, Expr> z3Vars = new Dictionary<string, Expr>();
-            Dictionary<string, object> results = new Dictionary<string, object>();
+            using var context = new Context();
+            var solver = context.MkSolver();
+            var variables = new Dictionary<string, Expr>();
+            var result = new Dictionary<string, string>();
 
             try
             {
-                // Create Z3 variables for each CVariable
-                foreach (var variable in variables)
-                {
-                    Expr z3Var = CreateZ3Variable(variable);
-                    z3Vars.Add(variable.Name, z3Var);
-
-                    // Add variable constraints (min/max values)
-                    AddVariableConstraints(solver, variable, z3Var);
-                }
-
-                // Add additional constraints
+                // Create Z3 variables and add constraints
                 foreach (var constraint in constraints)
                 {
-                    BoolExpr constraintExpr = ParseConstraint(constraint, z3Vars);
-                    if (constraintExpr != null)
+                    var varName = constraint.Key;
+                    var varConstraint = constraint.Value;
+
+                    // Create variable
+                    Expr variable;
+                    if (IsIntegerType(varConstraint.VariableName))
                     {
-                        solver.Add(constraintExpr);
+                        variable = context.MkIntConst(varName);
                     }
-                }
-
-                // Check for satisfiability
-                Status status = solver.Check();
-                if (status == Status.SATISFIABLE)
-                {
-                    Model model = solver.Model;
-
-                    // Extract results
-                    foreach (var entry in z3Vars)
+                    else if (IsRealType(varConstraint.VariableName))
                     {
-                        string varName = entry.Key;
-                        Expr varExpr = entry.Value;
+                        variable = context.MkRealConst(varName);
+                    }
+                    else if (IsBooleanType(varConstraint.VariableName))
+                    {
+                        variable = context.MkBoolConst(varName);
+                    }
+                    else
+                    {
+                        // Default to integer
+                        variable = context.MkIntConst(varName);
+                    }
 
-                        var variable = variables.FirstOrDefault(v => v.Name == varName);
-                        if (variable != null)
+                    variables[varName] = variable;
+
+                    // Add min/max constraints
+                    if (!string.IsNullOrEmpty(varConstraint.MinValue))
+                    {
+                        if (IsIntegerType(varConstraint.VariableName))
                         {
-                            var interpretation = model.Eval(varExpr, true);
-                            results[varName] = ConvertZ3ResultToNativeType(interpretation, variable.Type);
+                            if (int.TryParse(varConstraint.MinValue, out int minValue))
+                            {
+                                solver.Add(context.MkGe((ArithExpr)variable, context.MkInt(minValue)));
+                            }
+                        }
+                        else if (IsRealType(varConstraint.VariableName))
+                        {
+                            if (double.TryParse(varConstraint.MinValue, out double minValue))
+                            {
+                                solver.Add(context.MkGe((ArithExpr)variable, context.MkReal(minValue.ToString())));
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(varConstraint.MaxValue))
+                    {
+                        if (IsIntegerType(varConstraint.VariableName))
+                        {
+                            if (int.TryParse(varConstraint.MaxValue, out int maxValue))
+                            {
+                                solver.Add(context.MkLe((ArithExpr)variable, context.MkInt(maxValue)));
+                            }
+                        }
+                        else if (IsRealType(varConstraint.VariableName))
+                        {
+                            if (double.TryParse(varConstraint.MaxValue, out double maxValue))
+                            {
+                                solver.Add(context.MkLe((ArithExpr)variable, context.MkReal(maxValue.ToString())));
+                            }
+                        }
+                    }
+
+                    // Add enum value constraints
+                    if (varConstraint.EnumValues != null && varConstraint.EnumValues.Count > 0)
+                    {
+                        var enumConstraints = new List<BoolExpr>();
+                        foreach (var enumValue in varConstraint.EnumValues)
+                        {
+                            // Extract the value from the enum (e.g., "VALUE = 1" -> "1")
+                            var parts = enumValue.Split('=');
+                            if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int value))
+                            {
+                                enumConstraints.Add(context.MkEq((ArithExpr)variable, context.MkInt(value)));
+                            }
+                        }
+
+                        if (enumConstraints.Count > 0)
+                        {
+                            solver.Add(context.MkOr(enumConstraints.ToArray()));
+                        }
+                    }
+
+                    // Add allowed values constraints
+                    if (varConstraint.AllowedValues != null && varConstraint.AllowedValues.Count > 0)
+                    {
+                        var allowedConstraints = new List<BoolExpr>();
+                        foreach (var allowedValue in varConstraint.AllowedValues)
+                        {
+                            if (IsIntegerType(varConstraint.VariableName) && int.TryParse(allowedValue, out int intValue))
+                            {
+                                allowedConstraints.Add(context.MkEq((ArithExpr)variable, context.MkInt(intValue)));
+                            }
+                            else if (IsRealType(varConstraint.VariableName) && double.TryParse(allowedValue, out double doubleValue))
+                            {
+                                allowedConstraints.Add(context.MkEq((ArithExpr)variable, context.MkReal(doubleValue.ToString())));
+                            }
+                            else if (IsBooleanType(varConstraint.VariableName) && bool.TryParse(allowedValue, out bool boolValue))
+                            {
+                                allowedConstraints.Add(context.MkEq((BoolExpr)variable, context.MkBool(boolValue)));
+                            }
+                        }
+
+                        if (allowedConstraints.Count > 0)
+                        {
+                            solver.Add(context.MkOr(allowedConstraints.ToArray()));
                         }
                     }
                 }
+
+                // Add expected output constraints
+                foreach (var output in expectedOutputs)
+                {
+                    var outputName = output.Key;
+                    var outputValue = output.Value;
+
+                    if (variables.TryGetValue(outputName, out var variable))
+                    {
+                        if (IsIntegerType(outputName) && int.TryParse(outputValue, out int intValue))
+                        {
+                            solver.Add(context.MkEq((ArithExpr)variable, context.MkInt(intValue)));
+                        }
+                        else if (IsRealType(outputName) && double.TryParse(outputValue, out double doubleValue))
+                        {
+                            solver.Add(context.MkEq((ArithExpr)variable, context.MkReal(doubleValue.ToString())));
+                        }
+                        else if (IsBooleanType(outputName) && bool.TryParse(outputValue, out bool boolValue))
+                        {
+                            solver.Add(context.MkEq((BoolExpr)variable, context.MkBool(boolValue)));
+                        }
+                    }
+                }
+
+                // Check if the constraints are satisfiable
+                var status = solver.Check();
+                if (status == Status.SATISFIABLE)
+                {
+                    var model = solver.Model;
+                    foreach (var variable in variables)
+                    {
+                        var interpretation = model.Eval(variable.Value, true);
+                        result[variable.Key] = interpretation.ToString();
+                    }
+                }
+                else
+                {
+                    // No solution found
+                    return null;
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
-                // Log exception
-                Console.WriteLine($"Z3 Solver error: {ex.Message}");
-            }
-
-            return results;
-        }
-
-        private Expr CreateZ3Variable(CVariable variable)
-        {
-            switch (variable.Type.ToLower())
-            {
-                case "int":
-                case "int32_t":
-                case "int16_t":
-                case "int8_t":
-                    return _context.MkIntConst(variable.Name);
-
-                case "uint32_t":
-                case "uint16_t":
-                case "uint8_t":
-                case "unsigned int":
-                case "unsigned char":
-                    return _context.MkIntConst(variable.Name); // Using Int with constraints
-
-                case "float":
-                case "double":
-                    return _context.MkRealConst(variable.Name);
-
-                case "bool":
-                    return _context.MkBoolConst(variable.Name);
-
-                default:
-                    // For unsupported types, default to int
-                    return _context.MkIntConst(variable.Name);
+                // Log the error
+                Console.WriteLine($"Error finding variable values: {ex.Message}");
+                return null;
             }
         }
 
-        private void AddVariableConstraints(Solver solver, CVariable variable, Expr z3Var)
+        /// <summary>
+        /// Finds variable values that satisfy the given expression
+        /// </summary>
+        public async Task<Dictionary<string, string>> FindVariableValuesForExpressionAsync(
+            string expression,
+            Dictionary<string, string> variableTypes,
+            Dictionary<string, VariableConstraint> constraints)
         {
-            // Handle min/max constraints for numeric types
-            if (z3Var is IntExpr intVar)
-            {
-                // Add min constraint if exists
-                if (variable.MinValue != null && int.TryParse(variable.MinValue.ToString(), out int minValue))
-                {
-                    solver.Add(_context.MkGe(intVar, _context.MkInt(minValue)));
-                }
+            if (string.IsNullOrEmpty(expression))
+                throw new ArgumentNullException(nameof(expression));
+            if (variableTypes == null)
+                throw new ArgumentNullException(nameof(variableTypes));
 
-                // Add max constraint if exists
-                if (variable.MaxValue != null && int.TryParse(variable.MaxValue.ToString(), out int maxValue))
-                {
-                    solver.Add(_context.MkLe(intVar, _context.MkInt(maxValue)));
-                }
+            using var context = new Context();
+            var solver = context.MkSolver();
+            var variables = new Dictionary<string, Expr>();
+            var result = new Dictionary<string, string>();
 
-                // Handle unsigned types
-                if (variable.Type.StartsWith("u") || variable.Type.StartsWith("unsigned"))
-                {
-                    solver.Add(_context.MkGe(intVar, _context.MkInt(0)));
-                }
-            }
-            else if (z3Var is RealExpr realVar)
-            {
-                // Add min constraint if exists
-                if (variable.MinValue != null && double.TryParse(variable.MinValue.ToString(), out double minValue))
-                {
-                    solver.Add(_context.MkGe(realVar, _context.MkReal(minValue.ToString())));
-                }
-
-                // Add max constraint if exists
-                if (variable.MaxValue != null && double.TryParse(variable.MaxValue.ToString(), out double maxValue))
-                {
-                    solver.Add(_context.MkLe(realVar, _context.MkReal(maxValue.ToString())));
-                }
-            }
-
-            // Handle enum constraints
-            if (variable.EnumValues != null && variable.EnumValues.Any())
-            {
-                BoolExpr[] enumConstraints = variable.EnumValues
-                    .Select(enumValue => _context.MkEq(z3Var, ConvertToZ3Value(enumValue, z3Var)))
-                    .ToArray();
-
-                solver.Add(_context.MkOr(enumConstraints));
-            }
-        }
-
-        private Expr ConvertToZ3Value(object value, Expr z3Var)
-        {
-            if (z3Var is IntExpr)
-            {
-                if (int.TryParse(value.ToString(), out int intValue))
-                {
-                    return _context.MkInt(intValue);
-                }
-            }
-            else if (z3Var is RealExpr)
-            {
-                if (double.TryParse(value.ToString(), out double doubleValue))
-                {
-                    return _context.MkReal(doubleValue.ToString());
-                }
-            }
-            else if (z3Var is BoolExpr)
-            {
-                if (bool.TryParse(value.ToString(), out bool boolValue))
-                {
-                    return boolValue ? _context.MkTrue() : _context.MkFalse();
-                }
-            }
-
-            // Default fallback
-            return _context.MkInt(0);
-        }
-
-        private BoolExpr ParseConstraint(string constraint, Dictionary<string, Expr> variables)
-        {
             try
             {
-                // Simple parser for constraints like "a > b", "x == 5", etc.
-                // In a real implementation, you would want a more robust parser
-
-                string[] operators = { "==", "!=", ">=", "<=", ">", "<", "&&", "||" };
-                string foundOperator = operators.FirstOrDefault(op => constraint.Contains(op));
-
-                if (foundOperator != null)
+                // Create Z3 variables
+                foreach (var variable in variableTypes)
                 {
-                    string[] parts = constraint.Split(new[] { foundOperator }, StringSplitOptions.None);
-                    if (parts.Length == 2)
+                    var varName = variable.Key;
+                    var varType = variable.Value;
+
+                    // Create variable
+                    Expr z3Variable;
+                    if (IsIntegerType(varType))
                     {
-                        string leftPart = parts[0].Trim();
-                        string rightPart = parts[1].Trim();
+                        z3Variable = context.MkIntConst(varName);
+                    }
+                    else if (IsRealType(varType))
+                    {
+                        z3Variable = context.MkRealConst(varName);
+                    }
+                    else if (IsBooleanType(varType))
+                    {
+                        z3Variable = context.MkBoolConst(varName);
+                    }
+                    else
+                    {
+                        // Default to integer
+                        z3Variable = context.MkIntConst(varName);
+                    }
 
-                        Expr leftExpr = ParseExpression(leftPart, variables);
-                        Expr rightExpr = ParseExpression(rightPart, variables);
+                    variables[varName] = z3Variable;
 
-                        if (leftExpr != null && rightExpr != null)
+                    // Add constraints if available
+                    if (constraints != null && constraints.TryGetValue(varName, out var constraint))
+                    {
+                        // Add min/max constraints
+                        if (!string.IsNullOrEmpty(constraint.MinValue))
                         {
-                            switch (foundOperator)
+                            if (IsIntegerType(varType))
                             {
-                                case "==": return _context.MkEq(leftExpr, rightExpr);
-                                case "!=": return _context.MkNot(_context.MkEq(leftExpr, rightExpr));
-                                case ">=": return _context.MkGe((ArithExpr)leftExpr, (ArithExpr)rightExpr);
-                                case "<=": return _context.MkLe((ArithExpr)leftExpr, (ArithExpr)rightExpr);
-                                case ">": return _context.MkGt((ArithExpr)leftExpr, (ArithExpr)rightExpr);
-                                case "<": return _context.MkLt((ArithExpr)leftExpr, (ArithExpr)rightExpr);
-                                case "&&": return _context.MkAnd((BoolExpr)leftExpr, (BoolExpr)rightExpr);
-                                case "||": return _context.MkOr((BoolExpr)leftExpr, (BoolExpr)rightExpr);
+                                if (int.TryParse(constraint.MinValue, out int minValue))
+                                {
+                                    solver.Add(context.MkGe((ArithExpr)z3Variable, context.MkInt(minValue)));
+                                }
+                            }
+                            else if (IsRealType(varType))
+                            {
+                                if (double.TryParse(constraint.MinValue, out double minValue))
+                                {
+                                    solver.Add(context.MkGe((ArithExpr)z3Variable, context.MkReal(minValue.ToString())));
+                                }
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(constraint.MaxValue))
+                        {
+                            if (IsIntegerType(varType))
+                            {
+                                if (int.TryParse(constraint.MaxValue, out int maxValue))
+                                {
+                                    solver.Add(context.MkLe((ArithExpr)z3Variable, context.MkInt(maxValue)));
+                                }
+                            }
+                            else if (IsRealType(varType))
+                            {
+                                if (double.TryParse(constraint.MaxValue, out double maxValue))
+                                {
+                                    solver.Add(context.MkLe((ArithExpr)z3Variable, context.MkReal(maxValue.ToString())));
+                                }
                             }
                         }
                     }
                 }
+
+                // Parse and add the expression
+                var parsedExpr = ParseExpression(context, expression, variables);
+                if (parsedExpr != null)
+                {
+                    solver.Add(context.MkEq(parsedExpr, context.MkBool(true)));
+                }
+
+                // Check if the constraints are satisfiable
+                var status = solver.Check();
+                if (status == Status.SATISFIABLE)
+                {
+                    var model = solver.Model;
+                    foreach (var variable in variables)
+                    {
+                        var interpretation = model.Eval(variable.Value, true);
+                        result[variable.Key] = interpretation.ToString();
+                    }
+                }
+                else
+                {
+                    // No solution found
+                    return null;
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error parsing constraint: {constraint}. Error: {ex.Message}");
+                // Log the error
+                Console.WriteLine($"Error finding variable values for expression: {ex.Message}");
+                return null;
             }
-
-            return null;
         }
 
-        private Expr ParseExpression(string expression, Dictionary<string, Expr> variables)
+        /// <summary>
+        /// Finds variable values to achieve the specified code coverage
+        /// </summary>
+        public async Task<List<Dictionary<string, string>>> FindVariableValuesForCoverageAsync(
+            CFunctionAnalysis functionAnalysis,
+            Dictionary<string, string> variableTypes,
+            Dictionary<string, VariableConstraint> constraints,
+            double targetCoverage = 0.9)
         {
-            expression = expression.Trim();
+            if (functionAnalysis == null)
+                throw new ArgumentNullException(nameof(functionAnalysis));
+            if (variableTypes == null)
+                throw new ArgumentNullException(nameof(variableTypes));
 
-            // Check if it's a variable
-            if (variables.ContainsKey(expression))
+            var results = new List<Dictionary<string, string>>();
+
+            try
             {
-                return variables[expression];
+                // Get the paths to cover
+                var pathsToCover = new HashSet<CPath>(functionAnalysis.Paths.Where(p => p.IsExecutable));
+                var coveredPaths = new HashSet<CPath>();
+
+                // Calculate how many paths we need to cover
+                int totalPaths = pathsToCover.Count;
+                int pathsNeeded = (int)Math.Ceiling(totalPaths * targetCoverage);
+
+                using var context = new Context();
+                var solver = context.MkSolver();
+                var variables = new Dictionary<string, Expr>();
+
+                // Create Z3 variables
+                foreach (var variable in variableTypes)
+                {
+                    var varName = variable.Key;
+                    var varType = variable.Value;
+
+                    // Create variable
+                    Expr z3Variable;
+                    if (IsIntegerType(varType))
+                    {
+                        z3Variable = context.MkIntConst(varName);
+                    }
+                    else if (IsRealType(varType))
+                    {
+                        z3Variable = context.MkRealConst(varName);
+                    }
+                    else if (IsBooleanType(varType))
+                    {
+                        z3Variable = context.MkBoolConst(varName);
+                    }
+                    else
+                    {
+                        // Default to integer
+                        z3Variable = context.MkIntConst(varName);
+                    }
+
+                    variables[varName] = z3Variable;
+
+                    // Add constraints if available
+                    if (constraints != null && constraints.TryGetValue(varName, out var constraint))
+                    {
+                        // Add min/max constraints
+                        if (!string.IsNullOrEmpty(constraint.MinValue))
+                        {
+                            if (IsIntegerType(varType))
+                            {
+                                if (int.TryParse(constraint.MinValue, out int minValue))
+                                {
+                                    solver.Add(context.MkGe((ArithExpr)z3Variable, context.MkInt(minValue)));
+                                }
+                            }
+                            else if (IsRealType(varType))
+                            {
+                                if (double.TryParse(constraint.MinValue, out double minValue))
+                                {
+                                    solver.Add(context.MkGe((ArithExpr)z3Variable, context.MkReal(minValue.ToString())));
+                                }
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(constraint.MaxValue))
+                        {
+                            if (IsIntegerType(varType))
+                            {
+                                if (int.TryParse(constraint.MaxValue, out int maxValue))
+                                {
+                                    solver.Add(context.MkLe((ArithExpr)z3Variable, context.MkInt(maxValue)));
+                                }
+                            }
+                            else if (IsRealType(varType))
+                            {
+                                if (double.TryParse(constraint.MaxValue, out double maxValue))
+                                {
+                                    solver.Add(context.MkLe((ArithExpr)z3Variable, context.MkReal(maxValue.ToString())));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Find variable values for each path until we reach the target coverage
+                while (coveredPaths.Count < pathsNeeded && pathsToCover.Any())
+                {
+                    // Reset solver for each path
+                    solver.Reset();
+
+                    // Add variable constraints
+                    foreach (var variable in variableTypes)
+                    {
+                        var varName = variable.Key;
+                        var varType = variable.Value;
+
+                        // Add constraints if available
+                        if (constraints != null && constraints.TryGetValue(varName, out var constraint))
+                        {
+                            // Add min/max constraints
+                            if (!string.IsNullOrEmpty(constraint.MinValue))
+                            {
+                                if (IsIntegerType(varType))
+                                {
+                                    if (int.TryParse(constraint.MinValue, out int minValue))
+                                    {
+                                        solver.Add(context.MkGe((ArithExpr)variables[varName], context.MkInt(minValue)));
+                                    }
+                                }
+                                else if (IsRealType(varType))
+                                {
+                                    if (double.TryParse(constraint.MinValue, out double minValue))
+                                    {
+                                        solver.Add(context.MkGe((ArithExpr)variables[varName], context.MkReal(minValue.ToString())));
+                                    }
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(constraint.MaxValue))
+                            {
+                                if (IsIntegerType(varType))
+                                {
+                                    if (int.TryParse(constraint.MaxValue, out int maxValue))
+                                    {
+                                        solver.Add(context.MkLe((ArithExpr)variables[varName], context.MkInt(maxValue)));
+                                    }
+                                }
+                                else if (IsRealType(varType))
+                                {
+                                    if (double.TryParse(constraint.MaxValue, out double maxValue))
+                                    {
+                                        solver.Add(context.MkLe((ArithExpr)variables[varName], context.MkReal(maxValue.ToString())));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Get a path to cover
+                    var pathToCover = pathsToCover.First();
+                    pathsToCover.Remove(pathToCover);
+
+                    // Parse and add the path condition
+                    var pathCondition = pathToCover.PathCondition;
+                    if (!string.IsNullOrEmpty(pathCondition))
+                    {
+                        var parsedExpr = ParseExpression(context, pathCondition, variables);
+                        if (parsedExpr != null)
+                        {
+                            solver.Add(context.MkEq(parsedExpr, context.MkBool(true)));
+                        }
+                    }
+
+                    // Check if the constraints are satisfiable
+                    var status = solver.Check();
+                    if (status == Status.SATISFIABLE)
+                    {
+                        var model = solver.Model;
+                        var result = new Dictionary<string, string>();
+
+                        foreach (var variable in variables)
+                        {
+                            var interpretation = model.Eval(variable.Value, true);
+                            result[variable.Key] = interpretation.ToString();
+                        }
+
+                        results.Add(result);
+                        coveredPaths.Add(pathToCover);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                Console.WriteLine($"Error finding variable values for coverage: {ex.Message}");
+                return null;
+            }
+        }
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Determines if a type is an integer type
+        /// </summary>
+        private bool IsIntegerType(string type)
+        {
+            if (string.IsNullOrEmpty(type))
+                return false;
+
+            string normalizedType = type.ToLower().Trim();
+            return normalizedType == "int" || normalizedType == "int32" ||
+                   normalizedType == "long" || normalizedType == "int64" ||
+                   normalizedType == "short" || normalizedType == "int16" ||
+                   normalizedType == "byte" || normalizedType == "uint8" ||
+                   normalizedType == "sbyte" || normalizedType == "int8" ||
+                   normalizedType == "uint" || normalizedType == "uint32" ||
+                   normalizedType == "ulong" || normalizedType == "uint64" ||
+                   normalizedType == "ushort" || normalizedType == "uint16";
+        }
+
+        /// <summary>
+        /// Determines if a type is a real (floating-point) type
+        /// </summary>
+        private bool IsRealType(string type)
+        {
+            if (string.IsNullOrEmpty(type))
+                return false;
+
+            string normalizedType = type.ToLower().Trim();
+            return normalizedType == "float" || normalizedType == "single" ||
+                   normalizedType == "double" || normalizedType == "decimal";
+        }
+
+        /// <summary>
+        /// Determines if a type is a boolean type
+        /// </summary>
+        private bool IsBooleanType(string type)
+        {
+            if (string.IsNullOrEmpty(type))
+                return false;
+
+            string normalizedType = type.ToLower().Trim();
+            return normalizedType == "bool" || normalizedType == "boolean";
+        }
+
+        /// <summary>
+        /// Parses an expression string into a Z3 expression
+        /// </summary>
+        private Expr ParseExpression(Context context, string expression, Dictionary<string, Expr> variables)
+        {
+            if (string.IsNullOrEmpty(expression))
+                return null;
+
+            // This is a simplified parser that handles only basic expressions
+            // A real implementation would need a more sophisticated parser
+
+            // Check for simple equality
+            if (expression.Contains("=="))
+            {
+                var parts = expression.Split(new[] { "==" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left != null && right != null)
+                    {
+                        return context.MkEq(left, right);
+                    }
+                }
             }
 
-            // Check if it's a numeric literal
-            if (int.TryParse(expression, out int intValue))
+            // Check for inequality
+            if (expression.Contains("!="))
             {
-                return _context.MkInt(intValue);
+                var parts = expression.Split(new[] { "!=" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left != null && right != null)
+                    {
+                        return context.MkNot(context.MkEq(left, right));
+                    }
+                }
             }
 
-            if (double.TryParse(expression, out double doubleValue))
+            // Check for less than
+            if (expression.Contains("<") && !expression.Contains("<="))
             {
-                return _context.MkReal(doubleValue.ToString());
+                var parts = expression.Split(new[] { "<" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkLt(leftArith, rightArith);
+                    }
+                }
             }
 
-            // Check if it's a boolean literal
+            // Check for less than or equal
+            if (expression.Contains("<="))
+            {
+                var parts = expression.Split(new[] { "<=" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkLe(leftArith, rightArith);
+                    }
+                }
+            }
+
+            // Check for greater than
+            if (expression.Contains(">") && !expression.Contains(">="))
+            {
+                var parts = expression.Split(new[] { ">" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkGt(leftArith, rightArith);
+                    }
+                }
+            }
+
+            // Check for greater than or equal
+            if (expression.Contains(">="))
+            {
+                var parts = expression.Split(new[] { ">=" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkGe(leftArith, rightArith);
+                    }
+                }
+            }
+
+            // Check for logical AND
+            if (expression.Contains("&&"))
+            {
+                var parts = expression.Split(new[] { "&&" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseExpression(context, parts[0].Trim(), variables);
+                    var right = ParseExpression(context, parts[1].Trim(), variables);
+                    if (left is BoolExpr leftBool && right is BoolExpr rightBool)
+                    {
+                        return context.MkAnd(leftBool, rightBool);
+                    }
+                }
+            }
+
+            // Check for logical OR
+            if (expression.Contains("||"))
+            {
+                var parts = expression.Split(new[] { "||" }, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    var left = ParseExpression(context, parts[0].Trim(), variables);
+                    var right = ParseExpression(context, parts[1].Trim(), variables);
+                    if (left is BoolExpr leftBool && right is BoolExpr rightBool)
+                    {
+                        return context.MkOr(leftBool, rightBool);
+                    }
+                }
+            }
+
+            // If it's a simple variable, return it
+            if (variables.TryGetValue(expression, out var variable))
+            {
+                return variable;
+            }
+
+            // If it's a boolean literal
             if (expression.ToLower() == "true")
             {
-                return _context.MkTrue();
+                return context.MkBool(true);
             }
-
-            if (expression.ToLower() == "false")
+            else if (expression.ToLower() == "false")
             {
-                return _context.MkFalse();
+                return context.MkBool(false);
             }
 
+            // If it's a numeric literal
+            if (int.TryParse(expression, out int intValue))
+            {
+                return context.MkInt(intValue);
+            }
+            else if (double.TryParse(expression, out double doubleValue))
+            {
+                return context.MkReal(doubleValue.ToString());
+            }
+
+            // If we can't parse it, return null
             return null;
         }
 
-        private object ConvertZ3ResultToNativeType(Expr result, string cType)
+        /// <summary>
+        /// Parses a term (variable or literal) into a Z3 expression
+        /// </summary>
+        private Expr ParseTerm(Context context, string term, Dictionary<string, Expr> variables)
         {
-            if (result is IntNum intNum)
-            {
-                int value = int.Parse(intNum.ToString());
+            if (string.IsNullOrEmpty(term))
+                return null;
 
-                // Convert to appropriate C type
-                switch (cType.ToLower())
-                {
-                    case "int8_t":
-                    case "char":
-                        return (sbyte)value;
-                    case "uint8_t":
-                    case "unsigned char":
-                        return (byte)value;
-                    case "int16_t":
-                    case "short":
-                        return (short)value;
-                    case "uint16_t":
-                    case "unsigned short":
-                        return (ushort)value;
-                    default:
-                        return value;
-                }
-            }
-            else if (result is RatNum ratNum)
+            // If it's a variable, return it
+            if (variables.TryGetValue(term, out var variable))
             {
-                if (double.TryParse(ratNum.ToString(), out double doubleValue))
-                {
-                    return cType.ToLower() == "float" ? (float)doubleValue : doubleValue;
-                }
-            }
-            else if (result is BoolExpr boolExpr)
-            {
-                return boolExpr.ToString() == "true";
+                return variable;
             }
 
+            // If it's a boolean literal
+            if (term.ToLower() == "true")
+            {
+                return context.MkBool(true);
+            }
+            else if (term.ToLower() == "false")
+            {
+                return context.MkBool(false);
+            }
+
+            // If it's a numeric literal
+            if (int.TryParse(term, out int intValue))
+            {
+                return context.MkInt(intValue);
+            }
+            else if (double.TryParse(term, out double doubleValue))
+            {
+                return context.MkReal(doubleValue.ToString());
+            }
+
+            // Handle basic arithmetic expressions
+            if (term.Contains("+"))
+            {
+                var parts = term.Split('+');
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkAdd(leftArith, rightArith);
+                    }
+                }
+            }
+
+            if (term.Contains("-"))
+            {
+                var parts = term.Split('-');
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkSub(leftArith, rightArith);
+                    }
+                }
+            }
+
+            if (term.Contains("*"))
+            {
+                var parts = term.Split('*');
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkMul(leftArith, rightArith);
+                    }
+                }
+            }
+
+            if (term.Contains("/"))
+            {
+                var parts = term.Split('/');
+                if (parts.Length == 2)
+                {
+                    var left = ParseTerm(context, parts[0].Trim(), variables);
+                    var right = ParseTerm(context, parts[1].Trim(), variables);
+                    if (left is ArithExpr leftArith && right is ArithExpr rightArith)
+                    {
+                        return context.MkDiv(leftArith, rightArith);
+                    }
+                }
+            }
+
+            // If we can't parse it, return null
             return null;
         }
 
-        public void Dispose()
-        {
-            _context?.Dispose();
-        }
+        #endregion
     }
 }
