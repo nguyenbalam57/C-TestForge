@@ -8,84 +8,44 @@ using System.Threading.Tasks;
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
     /// <summary>
-    /// Interface for managing test cases
+    /// Service for managing test cases
     /// </summary>
     public interface ITestCaseService
     {
         /// <summary>
-        /// Creates a new test case
+        /// Gets all test cases
         /// </summary>
-        /// <param name="function">Function to test</param>
-        /// <param name="testCaseType">Type of test case</param>
-        /// <returns>The created test case</returns>
-        Task<TestCaseModels> CreateTestCaseAsync(CFunction function, TestCaseType testCaseType);
+        Task<IEnumerable<TestCase>> GetAllTestCasesAsync();
 
         /// <summary>
-        /// Loads test cases from a file
+        /// Gets test cases for a specific function
         /// </summary>
-        /// <param name="filePath">Path to the test case file</param>
-        /// <returns>List of test cases</returns>
-        Task<List<TestCaseModels>> LoadTestCasesAsync(string filePath);
+        Task<IEnumerable<TestCase>> GetTestCasesForFunctionAsync(string functionName);
 
         /// <summary>
-        /// Saves test cases to a file
+        /// Adds a new test case
         /// </summary>
-        /// <param name="testCases">Test cases to save</param>
-        /// <param name="filePath">Path to the test case file</param>
-        /// <returns>True if successful, false otherwise</returns>
-        Task<bool> SaveTestCasesAsync(List<TestCaseModels> testCases, string filePath);
+        Task<TestCase> AddTestCaseAsync(TestCase testCase);
 
         /// <summary>
-        /// Imports test cases from CSV
+        /// Updates an existing test case
         /// </summary>
-        /// <param name="filePath">Path to the CSV file</param>
-        /// <returns>List of imported test cases</returns>
-        Task<List<TestCaseModels>> ImportFromCsvAsync(string filePath);
+        Task<bool> UpdateTestCaseAsync(TestCase testCase);
 
         /// <summary>
-        /// Exports test cases to CSV
+        /// Deletes a test case
         /// </summary>
-        /// <param name="testCases">Test cases to export</param>
-        /// <param name="filePath">Path to the CSV file</param>
-        /// <returns>True if successful, false otherwise</returns>
-        Task<bool> ExportToCsvAsync(List<TestCaseModels> testCases, string filePath);
+        Task<bool> DeleteTestCaseAsync(int testCaseId);
 
         /// <summary>
-        /// Imports test cases from Excel
+        /// Executes a test case and returns the result
         /// </summary>
-        /// <param name="filePath">Path to the Excel file</param>
-        /// <returns>List of imported test cases</returns>
-        Task<List<TestCaseModels>> ImportFromExcelAsync(string filePath);
-
-        /// <summary>
-        /// Exports test cases to Excel
-        /// </summary>
-        /// <param name="testCases">Test cases to export</param>
-        /// <param name="filePath">Path to the Excel file</param>
-        /// <returns>True if successful, false otherwise</returns>
-        Task<bool> ExportToExcelAsync(List<TestCaseModels> testCases, string filePath);
-
-        /// <summary>
-        /// Runs a test case
-        /// </summary>
-        /// <param name="testCase">Test case to run</param>
-        /// <param name="projectContext">Project context for the test</param>
-        /// <returns>Test result</returns>
-        Task<TestResult> RunTestCaseAsync(TestCaseModels testCase, Project projectContext);
-
-        /// <summary>
-        /// Generates code for a test case
-        /// </summary>
-        /// <param name="testCase">Test case to generate code for</param>
-        /// <returns>Generated code</returns>
-        Task<string> GenerateTestCodeAsync(TestCaseModels testCase);
+        Task<TestCaseResult> ExecuteTestCaseAsync(TestCase testCase);
 
         /// <summary>
         /// Validates a test case
         /// </summary>
-        /// <param name="testCase">Test case to validate</param>
-        /// <returns>List of validation issues</returns>
-        Task<List<ValidationIssue>> ValidateTestCaseAsync(TestCaseModels testCase);
+        Task<TestCaseValidationResult> ValidateTestCaseAsync(TestCase testCase);
     }
 
     /// <summary>

@@ -8,40 +8,44 @@ using System.Threading.Tasks;
 namespace C_TestForge.Core.Interfaces.Solver
 {
     /// <summary>
-    /// Interface for using Z3 to solve constraints
+    /// Service for solving constraints using Z3 Theorem Prover
     /// </summary>
     public interface IZ3SolverService
     {
         /// <summary>
-        /// Finds values for variables that satisfy a set of constraints
+        /// Finds variable values that satisfy the given constraints
         /// </summary>
-        /// <param name="variables">Variables to find values for</param>
-        /// <param name="constraints">Constraints to satisfy</param>
+        /// <param name="constraints">The constraints to satisfy</param>
+        /// <param name="expectedOutputs">The expected outputs</param>
         /// <returns>Dictionary of variable names and their values</returns>
-        Task<Dictionary<string, string>> SolveConstraintsAsync(List<CVariable> variables, List<VariableConstraint> constraints);
+        Task<Dictionary<string, string>> FindVariableValuesAsync(
+            Dictionary<string, VariableConstraint> constraints,
+            Dictionary<string, string> expectedOutputs);
 
         /// <summary>
-        /// Checks if a set of constraints is satisfiable
+        /// Finds variable values that satisfy the given expression
         /// </summary>
-        /// <param name="constraints">Constraints to check</param>
-        /// <returns>True if satisfiable, false otherwise</returns>
-        Task<bool> CheckSatisfiabilityAsync(List<VariableConstraint> constraints);
-
-        /// <summary>
-        /// Finds values for variables that satisfy a Z3 expression
-        /// </summary>
-        /// <param name="variables">Variables to find values for</param>
-        /// <param name="expression">Z3 expression</param>
+        /// <param name="expression">The expression to satisfy</param>
+        /// <param name="variableTypes">Dictionary of variable names and their types</param>
+        /// <param name="constraints">The constraints to satisfy</param>
         /// <returns>Dictionary of variable names and their values</returns>
-        Task<Dictionary<string, string>> SolveExpressionAsync(List<CVariable> variables, string expression);
+        Task<Dictionary<string, string>> FindVariableValuesForExpressionAsync(
+            string expression,
+            Dictionary<string, string> variableTypes,
+            Dictionary<string, VariableConstraint> constraints);
 
         /// <summary>
-        /// Finds multiple sets of values for variables that satisfy a set of constraints
+        /// Finds variable values to achieve the specified code coverage
         /// </summary>
-        /// <param name="variables">Variables to find values for</param>
-        /// <param name="constraints">Constraints to satisfy</param>
-        /// <param name="count">Number of value sets to find</param>
+        /// <param name="functionAnalysis">The function analysis</param>
+        /// <param name="variableTypes">Dictionary of variable names and their types</param>
+        /// <param name="constraints">The constraints to satisfy</param>
+        /// <param name="targetCoverage">The target coverage (0.0-1.0)</param>
         /// <returns>List of dictionaries of variable names and their values</returns>
-        Task<List<Dictionary<string, string>>> FindMultipleSolutionsAsync(List<CVariable> variables, List<VariableConstraint> constraints, int count);
+        Task<List<Dictionary<string, string>>> FindVariableValuesForCoverageAsync(
+            CFunctionAnalysis functionAnalysis,
+            Dictionary<string, string> variableTypes,
+            Dictionary<string, VariableConstraint> constraints,
+            double targetCoverage = 0.9);
     }
 }
