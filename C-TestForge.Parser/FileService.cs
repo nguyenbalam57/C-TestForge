@@ -2,14 +2,13 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace C_TestForge.Core.Services
+namespace C_TestForge.Parser
 {
-    #region FileService Implementation
-
     /// <summary>
     /// Implementation of the file service
     /// </summary>
@@ -283,7 +282,94 @@ namespace C_TestForge.Core.Services
 
             return Path.GetDirectoryName(filePath);
         }
-    }
 
-    #endregion
+        /// <inheritdoc/>
+        public DateTime GetLastModifiedTime(string filePath)
+        {
+            try
+            {
+                _logger.LogDebug($"Getting last modified time: {filePath}");
+
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
+                }
+
+                if (!File.Exists(filePath))
+                {
+                    throw new FileNotFoundException($"File not found: {filePath}");
+                }
+
+                return File.GetLastWriteTime(filePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting last modified time: {filePath}");
+                throw;
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool CreateDirectoryIfNotExists(string directoryPath)
+        {
+            try
+            {
+                _logger.LogDebug($"Creating directory if not exists: {directoryPath}");
+
+                if (string.IsNullOrEmpty(directoryPath))
+                {
+                    throw new ArgumentException("Directory path cannot be null or empty", nameof(directoryPath));
+                }
+
+                if (Directory.Exists(directoryPath))
+                {
+                    return true;
+                }
+
+                Directory.CreateDirectory(directoryPath);
+                return Directory.Exists(directoryPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error creating directory: {directoryPath}");
+                return false;
+            }
+        }
+
+        /// <inheritdoc/>
+        public List<string> GetFilesInDirectory(string directoryPath, string extension, bool recursive = false)
+        {
+            try
+            {
+                _logger.LogDebug($"Getting files in directory: {directoryPath} with extension {extension}, recursive: {recursive}");
+
+                if (string.IsNullOrEmpty(directoryPath))
+                {
+                    throw new ArgumentException("Directory path cannot be null or empty", nameof(directoryPath));
+                }
+
+                if (!Directory.Exists(directoryPath))
+                {
+                    throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+                }
+
+                if (string.IsNullOrEmpty(extension))
+                {
+                    extension = ".*";
+                }
+                else if (!extension.StartsWith("."))
+                {
+                    extension = "." + extension;
+                }
+
+                SearchOption searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                return Directory.GetFiles(directoryPath, $"*{extension}", searchOption).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting files in directory: {directoryPath}");
+                return new List<string>();
+            }
+        }
+    }
 }

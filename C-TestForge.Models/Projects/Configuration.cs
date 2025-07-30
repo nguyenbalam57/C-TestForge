@@ -68,5 +68,18 @@ namespace C_TestForge.Models.Projects
                 Properties = Properties != null ? new Dictionary<string, string>(Properties) : new Dictionary<string, string>()
             };
         }
+
+        /// <summary>
+        /// Clone this configuration with a new name
+        /// </summary>
+        /// <param name="newName">New name for the cloned configuration</param>
+        /// <returns>Cloned configuration</returns>
+        public Configuration Clone(string newName)
+        {
+            var clone = Clone();
+            clone.Id = Guid.NewGuid().ToString();
+            clone.Name = newName ?? $"{Name} (Copy)";
+            return clone;
+        }
     }
 }

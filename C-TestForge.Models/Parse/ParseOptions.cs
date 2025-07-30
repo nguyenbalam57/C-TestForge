@@ -39,6 +39,27 @@ namespace C_TestForge.Models.Parse
         public bool AnalyzeFunctions { get; set; } = true;
 
         /// <summary>
+        /// Gets a default parse options object
+        /// </summary>
+        /// <returns>Default parse options</returns>
+        public static ParseOptions Default => new ParseOptions
+        {
+            AnalyzeFunctions = true,
+            AnalyzeVariables = true,
+            ParsePreprocessorDefinitions = true,
+            IncludePaths = new List<string>
+            {
+                "/usr/include",
+                "/usr/local/include"
+            },
+            MacroDefinitions = new Dictionary<string, string>(),
+            AdditionalClangArguments = new List<string>
+            {
+                "-std=c99"
+            }
+        };
+
+        /// <summary>
         /// Creates a clone of the parse options
         /// </summary>
         public ParseOptions Clone()

@@ -14,20 +14,20 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// C header file (.h)
         /// </summary>
-        Header,
+        CHeader,
         /// <summary>
         /// C source file (.c)
         /// </summary>
-        C,
+        CSource,
         Implementation,
-        // <summary>
+        /// <summary>
         /// Unknown file type
         /// </summary>
         Unknown,
         /// <summary>
         /// C++ source file (.cpp, .cc, .cxx)
         /// </summary>
-        CPP,
+        CPPSource,
         /// <summary>
         /// C++ header file (.hpp)
         /// </summary>

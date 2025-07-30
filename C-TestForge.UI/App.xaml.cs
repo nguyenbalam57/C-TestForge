@@ -1,7 +1,10 @@
-﻿
+﻿using C_TestForge.Core.Extensions;
+using C_TestForge.Core.Interfaces.Analysis;
+using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Core.Interfaces.Solver;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
 using C_TestForge.UI.Controls;
@@ -39,37 +42,39 @@ namespace C_TestForge.UI
         /// <param name="containerRegistry">The container registry</param>
         protected override void RegisterTypes(IContainerRegistry containerRegistry)
         {
-            // Register logger
-            containerRegistry.RegisterSingleton<ILogger>(() =>
-                LoggerFactory.Create(builder =>
-                    builder.AddConsole().AddDebug()).CreateLogger("C-TestForge"));
+            // Configure and register logging services
+            containerRegistry.AddLogging();
 
-            // Register TestCase services
-            //containerRegistry.RegisterSingleton<IMapper>(() =>
-            //{
-            //    var config = new MapperConfiguration(cfg =>
-            //    {
-            //        // Configure AutoMapper mappings here
-            //        // Add specific mappings as needed for your models
-            //    });
+            // Register generic logger
+            containerRegistry.RegisterGenericLogger();
 
-            //    return config.CreateMapper();
-            //});
+            // Register core services
+            containerRegistry.RegisterSingleton<IFileService, FileService>();
+            containerRegistry.RegisterSingleton<IConfigurationService, ConfigurationService>();
 
-            // Register repositories
-            //containerRegistry.RegisterSingleton<ITestCaseRepository>(() =>
-            //    new TestCaseRepository(
-            //        Path.Combine(
-            //            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            //            "C-TestForge",
-            //            "TestCases.db"),
-            //        Container.Resolve<IMapper>()));
+            // Register parser services
+            containerRegistry.RegisterSingleton<ISourceCodeService, SourceCodeService>();
+            containerRegistry.RegisterSingleton<IPreprocessorService, PreprocessorService>();
+            containerRegistry.RegisterSingleton<IParserService, ClangSharpParserService>();
+            containerRegistry.RegisterSingleton<IClangSharpParserService, ClangSharpParserService>();
 
-            // Register services
-            //containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
-            //containerRegistry.RegisterSingleton<IClangParserService, ClangParserService>();
+            // Register analysis services
+            containerRegistry.RegisterSingleton<IFunctionAnalysisService, FunctionAnalysisService>();
+            containerRegistry.RegisterSingleton<IVariableAnalysisService, VariableAnalysisService>();
+            containerRegistry.RegisterSingleton<IMacroAnalysisService, MacroAnalysisService>();
+            containerRegistry.RegisterSingleton<IAnalysisService, AnalysisService>();
+
+            // Register solver services
             //containerRegistry.RegisterSingleton<IZ3SolverService, Z3SolverService>();
-            //containerRegistry.RegisterSingleton<IFileService, FileService>();
+
+            // Register project services
+            containerRegistry.RegisterSingleton<IProjectService, ProjectService>();
+
+            // Register test case services
+            //containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
+            //containerRegistry.RegisterSingleton<IUnitTestGeneratorService, UnitTestGeneratorService>();
+            //containerRegistry.RegisterSingleton<IIntegrationTestGeneratorService, IntegrationTestGeneratorService>();
+            //containerRegistry.RegisterSingleton<ITestCodeGeneratorService, TestCodeGeneratorService>();
 
             // Register dialogs
             containerRegistry.RegisterDialog<TestCaseEditorDialog, TestCaseEditorDialogViewModel>();
@@ -97,6 +102,7 @@ namespace C_TestForge.UI
             moduleCatalog.AddModule<UIModule>();
 
             // Register other modules
+            // You can uncomment these when these modules are implemented
             //moduleCatalog.AddModule<ParserModule>();
             //moduleCatalog.AddModule<TestCaseModule>();
         }
@@ -104,7 +110,6 @@ namespace C_TestForge.UI
         /// <summary>
         /// Application startup event
         /// </summary>
-        /// <param name="e">Startup event arguments</param>
         protected override void OnInitialized()
         {
             base.OnInitialized();
@@ -122,7 +127,6 @@ namespace C_TestForge.UI
             {
                 Directory.CreateDirectory(appDataPath);
             }
-
         }
 
         /// <summary>
@@ -133,12 +137,24 @@ namespace C_TestForge.UI
         private void LogUnhandledException(Exception exception, string source)
         {
             // Get the logger
-            var logger = Container.Resolve<ILogger>();
+            var logger = Container.Resolve<Microsoft.Extensions.Logging.ILogger>();
             logger?.LogError(exception, $"Unhandled exception from {source}");
 
             // Show error message to user
             MessageBox.Show($"An unhandled exception occurred: {exception.Message}\r\n\r\nSource: {source}",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        /// <summary>
+        /// Application exit event
+        /// </summary>
+        /// <param name="e">Exit event arguments</param>
+        protected override void OnExit(ExitEventArgs e)
+        {
+            base.OnExit(e);
+
+            // Flush and close the logger
+            Serilog.Log.CloseAndFlush();
         }
     }
 }

@@ -143,13 +143,13 @@ namespace C_TestForge.Parser
             switch (extension)
             {
                 case ".c":
-                    return SourceFileType.C;
+                    return SourceFileType.CSource;
                 case ".h":
-                    return SourceFileType.Header;
+                    return SourceFileType.CHeader;
                 case ".cpp":
                 case ".cc":
                 case ".cxx":
-                    return SourceFileType.CPP;
+                    return SourceFileType.CPPSource;
                 case ".hpp":
                     return SourceFileType.CPPHeader;
                 default:

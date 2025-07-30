@@ -1,7 +1,6 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Models;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using Microsoft.Extensions.Logging;
@@ -11,12 +10,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Xml;
 
-namespace C_TestForge.Core.Services
+namespace C_TestForge.Parser
 {
-    #region ProjectService Implementation
-
     /// <summary>
     /// Implementation of the project service
     /// </summary>
@@ -574,6 +570,4 @@ namespace C_TestForge.Core.Services
             }
         }
     }
-
-    #endregion
 }

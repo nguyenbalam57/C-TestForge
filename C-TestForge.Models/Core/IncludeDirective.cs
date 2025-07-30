@@ -34,6 +34,21 @@ namespace C_TestForge.Models.Core
         public string SourceFile { get; set; } = string.Empty;
 
         /// <summary>
+        /// Whether the include directive is in an enabled conditional block
+        /// </summary>
+        public bool IsEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Parent conditional directive ID, if this include is inside a conditional block
+        /// </summary>
+        public string ParentConditionalId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets the full path to the included file (resolved against include paths)
+        /// </summary>
+        public string ResolvedPath { get; set; } = string.Empty;
+
+        /// <summary>
         /// Get a string representation of the include directive
         /// </summary>
         public override string ToString()
@@ -59,7 +74,10 @@ namespace C_TestForge.Models.Core
                 FilePath = FilePath,
                 LineNumber = LineNumber,
                 IsSystemInclude = IsSystemInclude,
-                SourceFile = SourceFile
+                SourceFile = SourceFile,
+                IsEnabled = IsEnabled,
+                ParentConditionalId = ParentConditionalId,
+                ResolvedPath = ResolvedPath
             };
         }
     }

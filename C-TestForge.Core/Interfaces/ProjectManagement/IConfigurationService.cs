@@ -83,5 +83,18 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <param name="target">Target configuration</param>
         /// <param name="source">Source configuration</param>
         void MergeConfigurations(Configuration target, Configuration source);
+
+        /// <summary>
+        /// Gets a dictionary of macro values for a specific configuration
+        /// </summary>
+        /// <param name="configName">Name of the configuration</param>
+        /// <returns>Dictionary of macro name to value</returns>
+        Task<Dictionary<string, string>> GetConfigurationValuesAsync(string configName);
+
+        /// <summary>
+        /// Gets all available configuration names
+        /// </summary>
+        /// <returns>List of configuration names</returns>
+        Task<List<string>> GetConfigurationNamesAsync();
     }
 }
