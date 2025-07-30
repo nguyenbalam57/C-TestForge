@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -20,7 +21,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="framework">The test framework to use</param>
         /// <returns>The generated test code</returns>
         Task<string> GenerateTestCodeAsync(
-            IEnumerable<TestCaseModels> testCases,
+            IEnumerable<TestCase> testCases,
             string filePath,
             string framework = "unity");
 

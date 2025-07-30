@@ -2,7 +2,10 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
+using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Models;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using C_TestForge.Parser;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,7 +18,7 @@ namespace C_TestForge.UI.ViewModels
         private readonly IParser _parser;
         private readonly ILogger<SourceFileViewModel> _logger;
 
-        private CSourceFile _sourceFile;
+        private SourceFile _sourceFile;
         private string _filePath;
         private string _content;
         private ObservableCollection<CDefinition> _definitions;
@@ -44,7 +47,7 @@ namespace C_TestForge.UI.ViewModels
         }
 
         // Properties
-        public CSourceFile SourceFile
+        public SourceFile SourceFile
         {
             get => _sourceFile;
             set
@@ -58,29 +61,29 @@ namespace C_TestForge.UI.ViewModels
                         Content = value.Content;
 
                         // Update collections
-                        Definitions.Clear();
-                        foreach (var definition in value.Definitions)
-                        {
-                            Definitions.Add(definition);
-                        }
+                        //Definitions.Clear();
+                        //foreach (var definition in value.Definitions)
+                        //{
+                        //    Definitions.Add(definition);
+                        //}
 
-                        Variables.Clear();
-                        foreach (var variable in value.Variables)
-                        {
-                            Variables.Add(variable);
-                        }
+                        //Variables.Clear();
+                        //foreach (var variable in value.Variables)
+                        //{
+                        //    Variables.Add(variable);
+                        //}
 
-                        Functions.Clear();
-                        foreach (var function in value.Functions)
-                        {
-                            Functions.Add(function);
-                        }
+                        //Functions.Clear();
+                        //foreach (var function in value.Functions)
+                        //{
+                        //    Functions.Add(function);
+                        //}
 
-                        PreprocessorDirectives.Clear();
-                        foreach (var directive in value.PreprocessorDirectives)
-                        {
-                            PreprocessorDirectives.Add(directive);
-                        }
+                        //PreprocessorDirectives.Clear();
+                        //foreach (var directive in value.PreprocessorDirectives)
+                        //{
+                        //    PreprocessorDirectives.Add(directive);
+                        //}
                     }
                     else
                     {
@@ -170,8 +173,8 @@ namespace C_TestForge.UI.ViewModels
                     return;
                 }
 
-                var parsedFile = _parser.ParseFile(FilePath);
-                SourceFile = parsedFile;
+                //var parsedFile = _parser.ParseFile(FilePath);
+                //SourceFile = parsedFile;
 
                 _logger.LogInformation($"Successfully parsed file: {FilePath}");
             }

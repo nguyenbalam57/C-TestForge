@@ -70,7 +70,7 @@ namespace C_TestForge.Models.UI
         /// <summary>
         /// ID of the default layout configuration
         /// </summary>
-        public string DefaultLayoutId { get; set; }
+        public string DefaultLayoutId { get; set; } = string.Empty;
 
         /// <summary>
         /// List of recent projects

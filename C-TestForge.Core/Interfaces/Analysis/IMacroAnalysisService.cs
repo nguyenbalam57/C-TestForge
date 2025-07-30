@@ -1,4 +1,6 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +10,7 @@ using System.Threading.Tasks;
 namespace C_TestForge.Core.Interfaces.Analysis
 {
     /// <summary>
-    /// Interface for analyzing macros
+    /// Interface for the macro analysis service
     /// </summary>
     public interface IMacroAnalysisService
     {

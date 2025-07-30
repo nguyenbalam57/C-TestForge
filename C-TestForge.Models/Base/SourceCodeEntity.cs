@@ -20,7 +20,7 @@ namespace C_TestForge.Models.Base
         /// <summary>
         /// Name of the entity
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number in the source file
@@ -35,7 +35,7 @@ namespace C_TestForge.Models.Base
         /// <summary>
         /// Source file where the entity is defined
         /// </summary>
-        public string SourceFile { get; set; }
+        public string SourceFile { get; set; }  = string.Empty;
 
         /// <summary>
         /// Get a location string in format "SourceFile:LineNumber:ColumnNumber"

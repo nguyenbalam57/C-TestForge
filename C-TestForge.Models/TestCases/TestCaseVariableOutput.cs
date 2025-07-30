@@ -14,7 +14,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Expected value of the output variable
         /// </summary>
-        public string ExpectedValue { get; set; }
+        public string ExpectedValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Expected array values (if IsArray is true)
@@ -24,7 +24,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Actual value after execution
         /// </summary>
-        public string ActualValue { get; set; }
+        public string ActualValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Actual array values after execution (if IsArray is true)
@@ -39,7 +39,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Custom validation expression
         /// </summary>
-        public string ValidationExpression { get; set; }
+        public string ValidationExpression { get; set; } = string.Empty;
 
         /// <summary>
         /// Create a clone of the output variable

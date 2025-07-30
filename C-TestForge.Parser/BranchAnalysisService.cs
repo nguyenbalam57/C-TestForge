@@ -1,6 +1,6 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
-using C_TestForge.Models.Interface;
+using C_TestForge.Models.CodeAnalysis.BranchAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Linq;

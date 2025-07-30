@@ -15,7 +15,7 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Name of the constraint
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the constraint
@@ -25,22 +25,22 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Left-hand side of the constraint (variable name or expression)
         /// </summary>
-        public string LeftHandSide { get; set; }
+        public string LeftHandSide { get; set; } = string.Empty;
 
         /// <summary>
         /// Right-hand side of the constraint (value or expression)
         /// </summary>
-        public string RightHandSide { get; set; }
+        public string RightHandSide { get; set; } = string.Empty;
 
         /// <summary>
         /// Lower bound for range constraint
         /// </summary>
-        public string LowerBound { get; set; }
+        public string LowerBound { get; set; } = string.Empty;
 
         /// <summary>
         /// Upper bound for range constraint
         /// </summary>
-        public string UpperBound { get; set; }
+        public string UpperBound { get; set; } = string.Empty;
 
         /// <summary>
         /// List of allowed values for membership constraint
@@ -50,7 +50,7 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Custom expression for complex constraints
         /// </summary>
-        public string CustomExpression { get; set; }
+        public string CustomExpression { get; set; } = string.Empty;
 
         /// <summary>
         /// Priority of the constraint (higher priority constraints are considered first)
@@ -70,7 +70,7 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Source of the constraint (e.g., function name, line number)
         /// </summary>
-        public string Source { get; set; }
+        public string Source { get; set; } = string.Empty;
 
         /// <summary>
         /// Get a string representation of the constraint

@@ -16,7 +16,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Value of the definition
         /// </summary>
-        public string Value { get; set; }
+        public string Value { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the definition is a function-like macro

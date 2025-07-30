@@ -17,7 +17,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Type of the variable as a string
         /// </summary>
-        public string TypeName { get; set; }
+        public string TypeName { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the variable
@@ -32,7 +32,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Default value of the variable
         /// </summary>
-        public string DefaultValue { get; set; }
+        public string DefaultValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the variable is constant
@@ -48,6 +48,8 @@ namespace C_TestForge.Models.Core
         /// Whether the variable is volatile
         /// </summary>
         public bool IsVolatile { get; set; }
+        public bool IsPointer { get; set; }
+        public bool IsArray { get; set; }
 
         /// <summary>
         /// Size of the variable in bytes

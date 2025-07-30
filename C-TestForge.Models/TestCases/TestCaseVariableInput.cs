@@ -14,7 +14,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Value of the input variable
         /// </summary>
-        public string Value { get; set; }
+        public string Value { get; set; } = string.Empty;
 
         /// <summary>
         /// Array values (if IsArray is true)
@@ -29,7 +29,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Source of the generated value (e.g., solver query ID)
         /// </summary>
-        public string GenerationSource { get; set; }
+        public string GenerationSource { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the input is a stub parameter

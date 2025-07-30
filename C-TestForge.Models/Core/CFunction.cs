@@ -17,7 +17,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Return type of the function
         /// </summary>
-        public string ReturnType { get; set; }
+        public string ReturnType { get; set; } = string.Empty;
 
         /// <summary>
         /// List of parameters
@@ -42,7 +42,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Body of the function
         /// </summary>
-        public string Body { get; set; }
+        public string Body { get; set; } = string.Empty;
 
         /// <summary>
         /// List of functions called by this function
@@ -53,6 +53,9 @@ namespace C_TestForge.Models.Core
         /// List of variables used by this function
         /// </summary>
         public List<string> UsedVariables { get; set; } = new List<string>();
+
+        public int StartLineNumber { get; set; }
+        public int EndLineNumber { get; set; }
 
         /// <summary>
         /// Get the function signature

@@ -11,9 +11,24 @@ namespace C_TestForge.Models.Core
     /// </summary>
     public enum ErrorSeverity
     {
-        Info,
-        Warning,
-        Error,
-        Critical
+        /// <summary>
+        /// Informational message
+        /// </summary>
+        Info = 0,
+
+        /// <summary>
+        /// Warning message
+        /// </summary>
+        Warning = 1,
+
+        /// <summary>
+        /// Error message
+        /// </summary>
+        Error = 2,
+
+        /// <summary>
+        /// Critical error message
+        /// </summary>
+        Critical = 3
     }
 }

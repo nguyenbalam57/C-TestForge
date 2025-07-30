@@ -1,4 +1,6 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,14 +19,14 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// </summary>
         /// <param name="filePath">Path to the source file</param>
         /// <returns>The parsed source file model</returns>
-        Task<CSourceFile> ParseSourceFileAsync(string filePath);
+        Task<SourceFile> ParseSourceFileAsync(string filePath);
 
         /// <summary>
         /// Parses multiple C source files
         /// </summary>
         /// <param name="filePaths">Paths to the source files</param>
         /// <returns>List of parsed source file models</returns>
-        Task<List<CSourceFile>> ParseSourceFilesAsync(IEnumerable<string> filePaths);
+        Task<List<SourceFile>> ParseSourceFilesAsync(IEnumerable<string> filePaths);
 
         /// <summary>
         /// Parses C source code string
@@ -32,27 +34,22 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="sourceCode">The source code to parse</param>
         /// <param name="fileName">Optional file name for the source</param>
         /// <returns>The parsed source file model</returns>
-        Task<CSourceFile> ParseSourceCodeAsync(string sourceCode, string fileName = "inline.c");
-    }
-
-    /// <summary>
-    /// Interface for preprocessor analysis service
-    /// </summary>
-    public interface IPreprocessorService
-    {
-        /// <summary>
-        /// Extracts preprocessor directives from source file
-        /// </summary>
-        /// <param name="sourceFile">The source file to analyze</param>
-        /// <returns>List of preprocessor definitions</returns>
-        Task<List<CDefinition>> ExtractDefinitionsAsync(CSourceFile sourceFile);
+        Task<SourceFile> ParseSourceCodeAsync(string sourceCode, string fileName = "inline.c");
 
         /// <summary>
-        /// Analyzes preprocessor conditions and updates definition states
+        /// Extracts all functions from a C source file
         /// </summary>
-        /// <param name="sourceFile">The source file to analyze</param>
-        /// <param name="activeDefinitions">List of actively defined macros</param>
-        /// <returns>Updated source file with definition states</returns>
-        Task<CSourceFile> AnalyzePreprocessorConditionsAsync(CSourceFile sourceFile, List<string> activeDefinitions);
+        /// <param name="filePath">Path to the source file</param>
+        /// <returns>List of extracted functions</returns>
+        Task<List<CFunction>> ExtractFunctionsAsync(string filePath);
+
+        /// <summary>
+        /// Extracts all functions from C source code string
+        /// </summary>
+        /// <param name="sourceCode">The source code to parse</param>
+        /// <param name="fileName">Optional file name for the source</param>
+        /// <returns>List of extracted functions</returns>
+        Task<List<CFunction>> ExtractFunctionsFromCodeAsync(string sourceCode, string fileName = "inline.c");
     }
+
 }

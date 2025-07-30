@@ -11,9 +11,21 @@ namespace C_TestForge.Models.Core
     /// </summary>
     public enum VariableScope
     {
+        /// <summary>
+        /// Global variable
+        /// </summary>
         Global,
+        /// <summary>
+        /// Static variable
+        /// </summary>
         Static,
+        /// <summary>
+        /// Local variable
+        /// </summary>
         Local,
+        /// <summary>
+        /// Function parameter
+        /// </summary>
         Parameter,
         Rom
     }

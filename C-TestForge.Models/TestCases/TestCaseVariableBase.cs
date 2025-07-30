@@ -20,12 +20,14 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Name of the variable
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the variable
         /// </summary>
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the variable is an array

@@ -4,8 +4,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
-using C_TestForge.TestCase.Services;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
@@ -84,9 +85,9 @@ namespace C_TestForge.UI.ViewModels
                 StatusMessage = "Loading test cases...";
 
                 var testCases = await _testCaseService.GetAllTestCasesAsync();
-                TestCases = new ObservableCollection<Models.TestCases.TestCase>(testCases);
+                TestCases = new ObservableCollection<TestCase>(testCases);
 
-                StatusMessage = $"Loaded {testCases.Count} test cases";
+                //StatusMessage = $"Loaded {testCases.Count} test cases";
             }
             catch (Exception ex)
             {
@@ -135,7 +136,7 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (result.Result == ButtonResult.OK && result.Parameters.ContainsKey("TestCase"))
                 {
-                    var updatedTestCase = result.Parameters.GetValue<Models.TestCases.TestCase>("TestCase");
+                    var updatedTestCase = result.Parameters.GetValue<TestCase>("TestCase");
                     var index = TestCases.IndexOf(testCase);
                     if (index >= 0)
                     {
@@ -146,10 +147,10 @@ namespace C_TestForge.UI.ViewModels
             });
         }
 
-        private void ExecuteDuplicateTestCase(Models.TestCases.TestCase testCase)
+        private void ExecuteDuplicateTestCase(TestCase testCase)
         {
             var duplicate = testCase.Clone();
-            _testCaseService.CreateTestCaseAsync(duplicate);
+            _testCaseService.AddTestCaseAsync(duplicate);
             TestCases.Add(duplicate);
             StatusMessage = $"Duplicated test case: {testCase.Name} -> {duplicate.Name}";
         }
@@ -168,16 +169,16 @@ namespace C_TestForge.UI.ViewModels
                 {
                     try
                     {
-                        var success = await _testCaseService.DeleteTestCaseAsync(testCase.Id);
-                        if (success)
-                        {
-                            TestCases.Remove(testCase);
-                            StatusMessage = $"Deleted test case: {testCase.Name}";
-                        }
-                        else
-                        {
-                            StatusMessage = "Failed to delete test case";
-                        }
+                        //var success = await _testCaseService.DeleteTestCaseAsync(testCase.Id);
+                        //if (success)
+                        //{
+                        //    TestCases.Remove(testCase);
+                        //    StatusMessage = $"Deleted test case: {testCase.Name}";
+                        //}
+                        //else
+                        //{
+                        //    StatusMessage = "Failed to delete test case";
+                        //}
                     }
                     catch (Exception ex)
                     {
@@ -207,15 +208,15 @@ namespace C_TestForge.UI.ViewModels
 
                     switch (extension)
                     {
-                        case ".tst":
-                            importedTestCases = _testCaseService.ImportFromTstFileAsync(dialog.FileName).Result;
-                            break;
-                        case ".csv":
-                            importedTestCases = _testCaseService.ImportFromCsvFileAsync(dialog.FileName).Result;
-                            break;
-                        case ".xlsx":
-                            importedTestCases = _testCaseService.ImportFromExcelFileAsync(dialog.FileName).Result;
-                            break;
+                        //case ".tst":
+                        //    importedTestCases = _testCaseService.ImportFromTstFileAsync(dialog.FileName).Result;
+                        //    break;
+                        //case ".csv":
+                        //    importedTestCases = _testCaseService.ImportFromCsvFileAsync(dialog.FileName).Result;
+                        //    break;
+                        //case ".xlsx":
+                        //    importedTestCases = _testCaseService.ImportFromExcelFileAsync(dialog.FileName).Result;
+                        //    break;
                         default:
                             StatusMessage = "Unsupported file format";
                             return;
@@ -263,15 +264,15 @@ namespace C_TestForge.UI.ViewModels
 
                     switch (extension)
                     {
-                        case ".tst":
-                            _testCaseService.ExportToTstFileAsync(TestCases.ToList(), dialog.FileName).Wait();
-                            break;
-                        case ".csv":
-                            _testCaseService.ExportToCsvFileAsync(TestCases.ToList(), dialog.FileName).Wait();
-                            break;
-                        case ".xlsx":
-                            _testCaseService.ExportToExcelFileAsync(TestCases.ToList(), dialog.FileName).Wait();
-                            break;
+                        //case ".tst":
+                        //    _testCaseService.ExportToTstFileAsync(TestCases.ToList(), dialog.FileName).Wait();
+                        //    break;
+                        //case ".csv":
+                        //    _testCaseService.ExportToCsvFileAsync(TestCases.ToList(), dialog.FileName).Wait();
+                        //    break;
+                        //case ".xlsx":
+                        //    _testCaseService.ExportToExcelFileAsync(TestCases.ToList(), dialog.FileName).Wait();
+                        //    break;
                         default:
                             StatusMessage = "Unsupported file format";
                             return;
@@ -326,7 +327,7 @@ namespace C_TestForge.UI.ViewModels
                     result.Parameters.ContainsKey("Function") &&
                     result.Parameters.ContainsKey("Type"))
                 {
-                    var function = result.Parameters.GetValue<Models.CFunction>("Function");
+                    var function = result.Parameters.GetValue<CFunction>("Function");
                     var type = result.Parameters.GetValue<TestCaseType>("Type");
 
                     try
@@ -338,7 +339,7 @@ namespace C_TestForge.UI.ViewModels
 
                         if (type == TestCaseType.UnitTest)
                         {
-                            generatedTestCase = await _testCaseService.GenerateUnitTestCaseAsync(function);
+                            //generatedTestCase = await _testCaseService.GenerateUnitTestCaseAsync(function);
                         }
                         else
                         {
@@ -349,20 +350,20 @@ namespace C_TestForge.UI.ViewModels
                                 .Take(3)
                                 .ToList();
 
-                            var functions = new List<Models.CFunction> { function };
-                            functions.AddRange(relatedFunctions);
+                            var functions = new List<CFunction> { function };
+                            //functions.AddRange(relatedFunctions);
 
-                            generatedTestCase = await _testCaseService.GenerateIntegrationTestCaseAsync(functions);
+                            //generatedTestCase = await _testCaseService.GenerateIntegrationTestCaseAsync(functions);
                         }
 
                         // Save the generated test case
-                        var savedTestCase = await _testCaseService.CreateTestCaseAsync(generatedTestCase);
-                        TestCases.Add(savedTestCase);
+                        //var savedTestCase = await _testCaseService.CreateTestCaseAsync(generatedTestCase);
+                        //TestCases.Add(savedTestCase);
 
                         StatusMessage = $"Generated {type} for function {function.Name}";
 
                         // Open the generated test case for editing
-                        ExecuteEditTestCase(savedTestCase);
+                        //ExecuteEditTestCase(savedTestCase);
                     }
                     catch (Exception ex)
                     {
@@ -376,59 +377,59 @@ namespace C_TestForge.UI.ViewModels
             });
         }
 
-        private List<Models.CFunction> GetFunctions()
+        private List<CFunction> GetFunctions()
         {
             // This would normally come from the parser
             // For now, return some sample functions
-            return new List<Models.CFunction>
+            return new List<CFunction>
             {
-                new Models.CFunction
+                new CFunction
                 {
                     Name = "sum",
                     ReturnType = "int",
-                    Parameters = new List<Models.CVariable>
+                    Parameters = new List<CVariable>
                     {
-                        new Models.CVariable { Name = "a", Type = "int" },
-                        new Models.CVariable { Name = "b", Type = "int" }
+                        new CVariable { Name = "a", TypeName = "int" },
+                        new CVariable { Name = "b", TypeName = "int" }
                     }
                 },
-                new Models.CFunction
+                new CFunction
                 {
                     Name = "subtract",
                     ReturnType = "int",
-                    Parameters = new List<Models.CVariable>
+                    Parameters = new List<CVariable>
                     {
-                        new Models.CVariable { Name = "a", Type = "int" },
-                        new Models.CVariable { Name = "b", Type = "int" }
+                        new CVariable { Name = "a", TypeName = "int" },
+                        new CVariable { Name = "b", TypeName = "int" }
                     }
                 },
-                new Models.CFunction
+                new CFunction
                 {
                     Name = "multiply",
                     ReturnType = "int",
-                    Parameters = new List<Models.CVariable>
+                    Parameters = new List<CVariable>
                     {
-                        new Models.CVariable { Name = "a", Type = "int" },
-                        new Models.CVariable { Name = "b", Type = "int" }
+                        new CVariable { Name = "a", TypeName = "int" },
+                        new CVariable { Name = "b", TypeName = "int" }
                     }
                 },
-                new Models.CFunction
+                new CFunction
                 {
                     Name = "divide",
                     ReturnType = "double",
-                    Parameters = new List<Models.CVariable>
+                    Parameters = new List<CVariable>
                     {
-                        new Models.CVariable { Name = "a", Type = "int" },
-                        new Models.CVariable { Name = "b", Type = "int" }
+                        new CVariable { Name = "a", TypeName = "int" },
+                        new CVariable { Name = "b", TypeName = "int" }
                     }
                 },
-                new Models.CFunction
+                new CFunction
                 {
                     Name = "printMessage",
                     ReturnType = "void",
-                    Parameters = new List<Models.CVariable>
+                    Parameters = new List<CVariable>
                     {
-                        new Models.CVariable { Name = "message", Type = "const char*" }
+                        new CVariable { Name = "message", TypeName = "const char*" }
                     }
                 }
             };

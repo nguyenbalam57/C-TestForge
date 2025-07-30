@@ -10,7 +10,7 @@ namespace C_TestForge.Models.CodeAnalysis.BranchAnalysis
         /// <summary>
         /// Gets or sets the function name
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the branches in the function

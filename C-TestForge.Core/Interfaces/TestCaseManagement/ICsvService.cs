@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -15,11 +16,11 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <summary>
         /// Reads test cases from a CSV file
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> ReadTestCasesAsync(string filePath);
+        Task<IEnumerable<TestCase>> ReadTestCasesAsync(string filePath);
 
         /// <summary>
         /// Writes test cases to a CSV file
         /// </summary>
-        Task<bool> WriteTestCasesAsync(IEnumerable<TestCaseModels> testCases, string filePath);
+        Task<bool> WriteTestCasesAsync(IEnumerable<TestCase> testCases, string filePath);
     }
 }

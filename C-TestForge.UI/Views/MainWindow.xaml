@@ -1,45 +1,290 @@
 ﻿<Window x:Class="C_TestForge.UI.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:prism="http://prismlibrary.com/"
-        xmlns:xcad="http://schemas.xceed.com/wpf/xaml/avalondock"
-        Title="{Binding Title}" Height="768" Width="1024">
-    <DockPanel>
-        <!-- Main Menu -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_File">
-                <MenuItem Header="_New Project" Command="{Binding NewProjectCommand}"/>
-                <MenuItem Header="_Open Project" Command="{Binding OpenProjectCommand}"/>
-                <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}"/>
-                <Separator/>
-                <MenuItem Header="_Exit" Command="{Binding ExitCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Edit">
-                <MenuItem Header="_Preferences" Command="{Binding PreferencesCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_View">
-                <MenuItem Header="Reset Layout" Command="{Binding ResetLayoutCommand}"/>
-                <MenuItem Header="Save Layout" Command="{Binding SaveLayoutCommand}"/>
-                <MenuItem Header="Load Layout" Command="{Binding LoadLayoutCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Tools">
-                <MenuItem Header="Import Test Cases" Command="{Binding ImportTestCasesCommand}"/>
-                <MenuItem Header="Export Test Cases" Command="{Binding ExportTestCasesCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Help">
-                <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
-                <MenuItem Header="_Documentation" Command="{Binding DocumentationCommand}"/>
-            </MenuItem>
-        </Menu>
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:C_TestForge.UI.Views"
+        xmlns:vm="clr-namespace:C_TestForge.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="C-TestForge - Source Code Analysis" Height="800" Width="1200">
+    <Window.Resources>
+        <Style TargetType="TabItem">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="15,5" />
+            <Setter Property="Margin" Value="5" />
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="HeadersVisibility" Value="All" />
+            <Setter Property="GridLinesVisibility" Value="All" />
+            <Setter Property="AlternatingRowBackground" Value="#FFF0F0F0" />
+        </Style>
+    </Window.Resources>
 
-        <!-- Status Bar -->
-        <StatusBar DockPanel.Dock="Bottom">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Top toolbar -->
+        <ToolBar Grid.Row="0">
+            <Button Content="Open File" Command="{Binding OpenFileCommand}" />
+            <Button Content="Analyze" Command="{Binding AnalyzeCommand}" />
+            <Button Content="Save Results" Command="{Binding SaveAnalysisResultCommand}" />
+            <Separator />
+            <TextBlock Text="File: " VerticalAlignment="Center" />
+            <TextBlock Text="{Binding FileName}" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0" />
+        </ToolBar>
+
+        <!-- Main content area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Source code editor and analysis options -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Source code editor -->
+                <TextBox Grid.Row="0" 
+                         Text="{Binding SourceCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                         FontFamily="Consolas" 
+                         FontSize="12"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         HorizontalScrollBarVisibility="Auto"
+                         VerticalScrollBarVisibility="Auto"
+                         IsReadOnly="{Binding IsAnalyzing}" />
+
+                <!-- Analysis options -->
+                <GroupBox Grid.Row="1" Header="Analysis Options">
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <CheckBox Grid.Row="0" Grid.Column="0" Content="Analyze Preprocessor" 
+                                  IsChecked="{Binding AnalysisOptions.AnalyzePreprocessorDefinitions}" 
+                                  Margin="5" />
+                        <CheckBox Grid.Row="0" Grid.Column="1" Content="Analyze Variables" 
+                                  IsChecked="{Binding AnalysisOptions.AnalyzeVariables}" 
+                                  Margin="5" />
+                        <CheckBox Grid.Row="1" Grid.Column="0" Content="Analyze Functions" 
+                                  IsChecked="{Binding AnalysisOptions.AnalyzeFunctions}" 
+                                  Margin="5" />
+                        <CheckBox Grid.Row="1" Grid.Column="1" Content="Analyze Function Relationships" 
+                                  IsChecked="{Binding AnalysisOptions.AnalyzeFunctionRelationships}" 
+                                  Margin="5" />
+                        <CheckBox Grid.Row="2" Grid.Column="0" Content="Analyze Variable Constraints" 
+                                  IsChecked="{Binding AnalysisOptions.AnalyzeVariableConstraints}" 
+                                  Margin="5" />
+
+                        <ComboBox Grid.Row="2" Grid.Column="1" 
+                                  SelectedIndex="{Binding AnalysisOptions.DetailLevel, Mode=TwoWay}" 
+                                  Margin="5">
+                            <ComboBoxItem Content="Basic Analysis" />
+                            <ComboBoxItem Content="Detailed Analysis" />
+                            <ComboBoxItem Content="Comprehensive Analysis" />
+                        </ComboBox>
+                    </Grid>
+                </GroupBox>
+            </Grid>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" />
+
+            <!-- Analysis results -->
+            <TabControl Grid.Column="2">
+                <!-- Definitions tab -->
+                <TabItem Header="Definitions">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="5" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Definitions list -->
+                        <DataGrid Grid.Row="0" 
+                                  ItemsSource="{Binding Definitions}" 
+                                  SelectedItem="{Binding SelectedDefinition, Mode=TwoWay}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+                                <DataGridTextColumn Header="Type" Binding="{Binding DefinitionType}" Width="100" />
+                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
+                                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding IsEnabled}" Width="70" />
+                                <DataGridCheckBoxColumn Header="Function-like" Binding="{Binding IsFunctionLike}" Width="100" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Splitter -->
+                        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" />
+
+                        <!-- Definition details -->
+                        <GroupBox Grid.Row="2" Header="Definition Details">
+                            <Grid Margin="5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Margin="5" FontWeight="Bold" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedDefinition.Name}" Margin="5" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Value:" Margin="5" FontWeight="Bold" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedDefinition.Value}" Margin="5" TextWrapping="Wrap" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Parameters:" Margin="5" FontWeight="Bold" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedDefinition.Parameters, Converter={StaticResource CollectionToStringConverter}}" Margin="5" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Dependencies:" Margin="5" FontWeight="Bold" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedDefinition.Dependencies, Converter={StaticResource CollectionToStringConverter}}" Margin="5" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Location:" Margin="5" FontWeight="Bold" VerticalAlignment="Top" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedDefinition.Location}" Margin="5" />
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+
+                <!-- Variables tab -->
+                <TabItem Header="Variables">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="5" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Variables list -->
+                        <DataGrid Grid.Row="0" 
+                                  ItemsSource="{Binding Variables}" 
+                                  SelectedItem="{Binding SelectedVariable, Mode=TwoWay}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" Width="*" />
+                                <DataGridTextColumn Header="Scope" Binding="{Binding Scope}" Width="100" />
+                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
+                                <DataGridTextColumn Header="Default Value" Binding="{Binding DefaultValue}" Width="120" />
+                                <DataGridCheckBoxColumn Header="Const" Binding="{Binding IsConst}" Width="60" />
+                                <DataGridCheckBoxColumn Header="Volatile" Binding="{Binding IsVolatile}" Width="70" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Splitter -->
+                        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" />
+
+                        <!-- Variable constraints -->
+                        <GroupBox Grid.Row="2" Header="Variable Constraints">
+                            <DataGrid ItemsSource="{Binding VariableConstraints}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100" />
+                                    <DataGridTextColumn Header="Min Value" Binding="{Binding MinValue}" Width="100" />
+                                    <DataGridTextColumn Header="Max Value" Binding="{Binding MaxValue}" Width="100" />
+                                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="100" />
+                                    <DataGridTextColumn Header="Allowed Values" Binding="{Binding AllowedValues, Converter={StaticResource CollectionToStringConverter}}" Width="*" />
+                                    <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="*" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+
+                <!-- Functions tab -->
+                <TabItem Header="Functions">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="5" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Functions list -->
+                        <DataGrid Grid.Row="0" 
+                                  ItemsSource="{Binding Functions}" 
+                                  SelectedItem="{Binding SelectedFunction, Mode=TwoWay}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="Return Type" Binding="{Binding ReturnType}" Width="120" />
+                                <DataGridTextColumn Header="Parameters" Binding="{Binding Parameters.Count}" Width="100" />
+                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
+                                <DataGridCheckBoxColumn Header="Static" Binding="{Binding IsStatic}" Width="60" />
+                                <DataGridCheckBoxColumn Header="Inline" Binding="{Binding IsInline}" Width="60" />
+                                <DataGridCheckBoxColumn Header="External" Binding="{Binding IsExternal}" Width="80" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Splitter -->
+                        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" />
+
+                        <!-- Function relationships -->
+                        <GroupBox Grid.Row="2"  Header="Function Relationships">
+                            <DataGrid ItemsSource="{Binding FunctionRelationships}" >  
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Caller" Binding="{Binding CallerName}" Width="*" />
+                                    <DataGridTextColumn Header="Callee" Binding="{Binding CalleeName}" Width="*" />
+                                    <DataGridTextColumn Header="Source File" Binding="{Binding SourceFile}" Width="*" />
+                                    <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+                        
+                    </Grid>
+                </TabItem>
+
+                <!-- Conditional Directives tab -->
+                <TabItem Header="Conditionals">
+                    <DataGrid ItemsSource="{Binding ConditionalDirectives}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100" />
+                            <DataGridTextColumn Header="Condition" Binding="{Binding Condition}" Width="*" />
+                            <DataGridTextColumn Header="Start Line" Binding="{Binding LineNumber}" Width="80" />
+                            <DataGridTextColumn Header="End Line" Binding="{Binding EndLineNumber}" Width="80" />
+                            <DataGridTextColumn Header="Source File" Binding="{Binding SourceFile}" Width="*" />
+                            <DataGridCheckBoxColumn Header="Satisfied" Binding="{Binding IsConditionSatisfied}" Width="80" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Status bar -->
+        <StatusBar Grid.Row="2">
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}"/>
+                <TextBlock Text="{Binding StatusMessage}" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <ProgressBar Width="100" Height="15" IsIndeterminate="{Binding IsAnalyzing}" />
             </StatusBarItem>
         </StatusBar>
-
-       
-    </DockPanel>
+    </Grid>
 </Window>

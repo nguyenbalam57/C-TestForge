@@ -25,7 +25,7 @@ namespace C_TestForge.Models.UI
         /// <summary>
         /// Custom title for the panel
         /// </summary>
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the panel is visible
@@ -65,7 +65,7 @@ namespace C_TestForge.Models.UI
         /// <summary>
         /// Panel content ID (for custom panels)
         /// </summary>
-        public string ContentId { get; set; }
+        public string ContentId { get; set; } = string.Empty;
 
         /// <summary>
         /// Creates a clone of the panel layout

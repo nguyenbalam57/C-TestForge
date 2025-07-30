@@ -19,12 +19,12 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Name of the project
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Path to the project file
         /// </summary>
-        public string ProjectFilePath { get; set; }
+        public string ProjectFilePath { get; set; } = string.Empty;
 
         /// <summary>
         /// List of source files in the project
@@ -49,7 +49,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Active configuration name
         /// </summary>
-        public string ActiveConfigurationName { get; set; }
+        public string ActiveConfigurationName { get; set; } = string.Empty;
 
         /// <summary>
         /// Last modified time of the project
@@ -59,7 +59,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Project description
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Custom project properties

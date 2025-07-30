@@ -21,12 +21,12 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Name of the test case
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the test case
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the test case
@@ -36,7 +36,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Name of the function under test
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Input variables for the test case
@@ -51,17 +51,17 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Additional expected outputs for the test case
         /// </summary>
-        public List<TestCaseVariableOutput> ExpectedOutputs { get; set; } = new List<TestCaseVariableOutput>();
+        public List<TestCaseVariableOutput> ActualOutputs { get; set; } = new List<TestCaseVariableOutput>();
 
         /// <summary>
         /// Expected return value
         /// </summary>
-        public string ExpectedReturnValue { get; set; }
+        public string ExpectedReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Actual return value
         /// </summary>
-        public string ActualReturnValue { get; set; }
+        public string ActualReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Status of the test case
@@ -81,7 +81,7 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Creator of the test case
         /// </summary>
-        public string Creator { get; set; }
+        public string Creator { get; set; } = string.Empty;
 
         /// <summary>
         /// Creation date of the test case
@@ -101,12 +101,12 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Setup code to run before the test case
         /// </summary>
-        public string SetupCode { get; set; }
+        public string SetupCode { get; set; } = string.Empty;
 
         /// <summary>
         /// Teardown code to run after the test case
         /// </summary>
-        public string TeardownCode { get; set; }
+        public string TeardownCode { get; set; } = string.Empty;
 
         /// <summary>
         /// Get a string representation of the test case
@@ -130,7 +130,7 @@ namespace C_TestForge.Models.TestCases
                 FunctionName = FunctionName,
                 InputVariables = InputVariables?.Select(v => v.Clone()).ToList() ?? new List<TestCaseVariableInput>(),
                 OutputVariables = OutputVariables?.Select(v => v.Clone()).ToList() ?? new List<TestCaseVariableOutput>(),
-                ExpectedOutputs = ExpectedOutputs?.Select(v => v.Clone()).ToList() ?? new List<TestCaseVariableOutput>(),
+                ActualOutputs = ActualOutputs?.Select(v => v.Clone()).ToList() ?? new List<TestCaseVariableOutput>(),
                 ExpectedReturnValue = ExpectedReturnValue,
                 ActualReturnValue = ActualReturnValue,
                 Status = Status,
@@ -157,7 +157,7 @@ namespace C_TestForge.Models.TestCases
                 Description = legacyTestCase.Description,
                 Type = legacyTestCase.Type,
                 FunctionName = legacyTestCase.FunctionName,
-                ExpectedOutputs = new List<TestCaseVariableOutput>(),
+                ActualOutputs = new List<TestCaseVariableOutput>(),
                 ExpectedReturnValue = legacyTestCase.ExpectedReturnValue,
                 ActualReturnValue = legacyTestCase.ActualReturnValue,
                 Status = legacyTestCase.Status,

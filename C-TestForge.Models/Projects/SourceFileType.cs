@@ -11,8 +11,26 @@ namespace C_TestForge.Models.Projects
     /// </summary>
     public enum SourceFileType
     {
+        /// <summary>
+        /// C header file (.h)
+        /// </summary>
         Header,
+        /// <summary>
+        /// C source file (.c)
+        /// </summary>
+        C,
         Implementation,
-        Unknown
+        // <summary>
+        /// Unknown file type
+        /// </summary>
+        Unknown,
+        /// <summary>
+        /// C++ source file (.cpp, .cc, .cxx)
+        /// </summary>
+        CPP,
+        /// <summary>
+        /// C++ header file (.hpp)
+        /// </summary>
+        CPPHeader
     }
 }

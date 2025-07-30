@@ -20,17 +20,17 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Name of the parameter
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the parameter
         /// </summary>
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
 
         /// <summary>
         /// Value of the parameter
         /// </summary>
-        public string Value { get; set; }
+        public string Value { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the parameter is an array

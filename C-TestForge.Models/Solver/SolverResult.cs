@@ -21,12 +21,12 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Name of the result
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Query that produced this result
         /// </summary>
-        public SolverQuery Query { get; set; }
+        public SolverQuery Query { get; set; } = new SolverQuery();
 
         /// <summary>
         /// Status of the solver
@@ -41,7 +41,7 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Error message if the solver encountered an error
         /// </summary>
-        public string ErrorMessage { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
 
         /// <summary>
         /// Start time of the solver

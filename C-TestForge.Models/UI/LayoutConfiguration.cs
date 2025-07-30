@@ -20,12 +20,12 @@ namespace C_TestForge.Models.UI
         /// <summary>
         /// Name of the layout
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the layout
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// List of panel layouts

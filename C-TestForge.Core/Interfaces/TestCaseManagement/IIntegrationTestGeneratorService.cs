@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -19,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="filePath">The file path</param>
         /// <param name="targetCoverage">The target coverage (0.0-1.0)</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateIntegrationTestsAsync(
+        Task<List<TestCase>> GenerateIntegrationTestsAsync(
             List<string> functionNames,
             string filePath,
             double targetCoverage = 0.9);
@@ -31,7 +32,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="filePath">The file path</param>
         /// <param name="depth">The maximum call depth to include</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateIntegrationTestsForCallGraphAsync(
+        Task<List<TestCase>> GenerateIntegrationTestsForCallGraphAsync(
             string rootFunctionName,
             string filePath,
             int depth = 3);
@@ -44,7 +45,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="framework">The test framework to use</param>
         /// <returns>The generated test code</returns>
         Task<string> GenerateIntegrationTestCodeAsync(
-            TestCaseModels testCase,
+            TestCase testCase,
             string filePath,
             string framework = "unity");
     }

@@ -20,7 +20,7 @@ namespace C_TestForge.Models.CodeAnalysis.BranchAnalysis
         /// <summary>
         /// Gets or sets the path condition
         /// </summary>
-        public string PathCondition { get; set; }
+        public string PathCondition { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets whether the path is feasible

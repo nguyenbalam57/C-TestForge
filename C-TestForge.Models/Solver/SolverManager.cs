@@ -12,7 +12,7 @@ namespace C_TestForge.Models.Solver
     public class SolverManager
     {
         // Singleton instance
-        private static SolverManager _instance;
+        private static SolverManager _instance = new SolverManager();
 
         // Z3 context (placeholder for actual Z3 implementation)
         private object _z3Context;
@@ -67,34 +67,33 @@ namespace C_TestForge.Models.Solver
                 query.TimeoutMs = _maxTimeoutMs;
             }
 
-            // Start time
-            var startTime = DateTime.Now;
+            // Create solver result
+            var result = new SolverResult
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = $"Result for {query.Name}",
+                Query = query,
+                StartTime = DateTime.Now,
+                Status = SolverStatus.Running,
+                Solutions = new List<SolverSolution>()
+            };
 
             // Add to active queries
             _activeQueries.Add(query);
 
             try
             {
-                // Create solver result
-                var result = new SolverResult
-                {
-                    QueryId = query.Id,
-                    IsSatisfiable = false,
-                    Solutions = new List<SolverSolution>()
-                };
-
                 // Simulate solver delay
                 await Task.Delay(100);
 
                 // Process constraints
                 // This would be implemented using the actual Z3 API
-                result.IsSatisfiable = true;
 
                 // Create a solution
                 var solution = new SolverSolution
                 {
-                    QueryId = query.Id,
-                    VariableValues = new Dictionary<string, string>(),
+                    Id = query.Id,
+                    Assignments = new Dictionary<string, string>(),
                     IsOptimal = true
                 };
 
@@ -102,32 +101,27 @@ namespace C_TestForge.Models.Solver
                 foreach (var variable in query.Variables)
                 {
                     // This would be replaced with actual Z3 results
-                    solution.VariableValues[variable.Name] = "0";
+                    solution.Assignments[variable.Name] = "0";
                 }
 
                 // Add solution to results
                 result.Solutions.Add(solution);
-
-                // Calculate time taken
-                result.TimeTaken = DateTime.Now - startTime;
+                result.Status = SolverStatus.Completed;
 
                 return result;
             }
             catch (Exception ex)
             {
-                // Create error result
-                var result = new SolverResult
-                {
-                    QueryId = query.Id,
-                    IsSatisfiable = false,
-                    ErrorMessage = ex.Message,
-                    TimeTaken = DateTime.Now - startTime
-                };
-
+                // Update result with error information
+                result.Status = SolverStatus.Failed;
+                result.ErrorMessage = ex.Message;
                 return result;
             }
             finally
             {
+                // Set end time
+                result.EndTime = DateTime.Now;
+
                 // Remove from active queries
                 _activeQueries.Remove(query);
             }

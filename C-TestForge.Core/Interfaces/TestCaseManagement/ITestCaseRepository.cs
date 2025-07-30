@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -15,27 +16,27 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <summary>
         /// Gets all test cases
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> GetAllAsync();
+        Task<IEnumerable<TestCase>> GetAllAsync();
 
         /// <summary>
         /// Gets test cases by function name
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> GetByFunctionNameAsync(string functionName);
+        Task<IEnumerable<TestCase>> GetByFunctionNameAsync(string functionName);
 
         /// <summary>
         /// Gets a test case by ID
         /// </summary>
-        Task<TestCaseModels> GetByIdAsync(int id);
+        Task<TestCase> GetByIdAsync(int id);
 
         /// <summary>
         /// Adds a new test case
         /// </summary>
-        Task<TestCaseModels> AddAsync(TestCaseModels testCase);
+        Task<TestCase> AddAsync(TestCase testCase);
 
         /// <summary>
         /// Updates an existing test case
         /// </summary>
-        Task<bool> UpdateAsync(TestCaseModels testCase);
+        Task<bool> UpdateAsync(TestCase testCase);
 
         /// <summary>
         /// Deletes a test case

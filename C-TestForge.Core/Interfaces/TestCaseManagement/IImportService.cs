@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -15,16 +16,16 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <summary>
         /// Imports test cases from a .tst file
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> ImportFromTstFileAsync(string filePath);
+        Task<IEnumerable<TestCase>> ImportFromTstFileAsync(string filePath);
 
         /// <summary>
         /// Imports test cases from a .csv file
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> ImportFromCsvFileAsync(string filePath);
+        Task<IEnumerable<TestCase>> ImportFromCsvFileAsync(string filePath);
 
         /// <summary>
         /// Imports test cases from an Excel file
         /// </summary>
-        Task<IEnumerable<TestCaseModels>> ImportFromExcelFileAsync(string filePath, string sheetName = null);
+        Task<IEnumerable<TestCase>> ImportFromExcelFileAsync(string filePath, string sheetName = null);
     }
 }

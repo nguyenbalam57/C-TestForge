@@ -20,22 +20,22 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Name of the variable
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the variable
         /// </summary>
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
 
         /// <summary>
         /// Expected value of the variable
         /// </summary>
-        public string ExpectedValue { get; set; }
+        public string ExpectedValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Actual value of the variable after execution
         /// </summary>
-        public string ActualValue { get; set; }
+        public string ActualValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the variable value matched the expected value

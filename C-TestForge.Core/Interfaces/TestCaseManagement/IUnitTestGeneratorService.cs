@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.TestCaseManagement
 {
@@ -19,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="filePath">The file path</param>
         /// <param name="targetCoverage">The target coverage (0.0-1.0)</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateUnitTestsAsync(
+        Task<List<TestCase>> GenerateUnitTestsAsync(
             string functionName,
             string filePath,
             double targetCoverage = 0.9);
@@ -32,7 +33,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="inputs">The input values</param>
         /// <param name="expectedOutputs">The expected output values</param>
         /// <returns>The generated test case</returns>
-        Task<TestCaseModels> GenerateUnitTestWithValuesAsync(
+        Task<TestCase> GenerateUnitTestWithValuesAsync(
             string functionName,
             string filePath,
             Dictionary<string, string> inputs,
@@ -46,7 +47,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="framework">The test framework to use</param>
         /// <returns>The generated test code</returns>
         Task<string> GenerateUnitTestCodeAsync(
-            TestCaseModels testCase,
+            TestCase testCase,
             string filePath,
             string framework = "unity");
     }

@@ -1,5 +1,7 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
-using C_TestForge.Models;
+using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -10,18 +12,25 @@ using System.Threading.Tasks;
 
 namespace C_TestForge.Parser
 {
-    #region MacroAnalysisService Implementation
-
     /// <summary>
-    /// Implementation of the macro analysis service
+    /// Implementation of the macro analysis service for analyzing macro relationships and dependencies
     /// </summary>
     public class MacroAnalysisService : IMacroAnalysisService
     {
         private readonly ILogger<MacroAnalysisService> _logger;
+        private readonly IFileService _fileService;
 
-        public MacroAnalysisService(ILogger<MacroAnalysisService> logger)
+        /// <summary>
+        /// Constructor for MacroAnalysisService
+        /// </summary>
+        /// <param name="logger">Logger instance</param>
+        /// <param name="fileService">File service for accessing project files</param>
+        public MacroAnalysisService(
+            ILogger<MacroAnalysisService> logger,
+            IFileService fileService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _fileService = fileService;
         }
 
         /// <inheritdoc/>
@@ -45,7 +54,7 @@ namespace C_TestForge.Parser
                     // Look for dependencies in the value
                     if (!string.IsNullOrEmpty(definition.Value))
                     {
-                        // This is a simplified approach - a real implementation would use a proper parser
+                        // Tokenize the value and check for references to other macros
                         string[] tokens = SplitIntoTokens(definition.Value);
 
                         foreach (var token in tokens)
@@ -64,42 +73,34 @@ namespace C_TestForge.Parser
                 {
                     _logger.LogDebug($"Analyzing dependencies for conditional directive at line {directive.LineNumber}");
 
-                    // Clear existing dependencies
-                    directive.Dependencies.Clear();
-
-                    // Extract dependencies from the condition
-                    if (!string.IsNullOrEmpty(directive.Condition))
+                    // Check all dependencies from the condition
+                    foreach (var dependency in directive.Dependencies)
                     {
-                        string[] tokens = SplitIntoTokens(directive.Condition);
-
-                        foreach (var token in tokens)
+                        if (definitionDict.TryGetValue(dependency, out var definition))
                         {
-                            // Skip keywords
-                            if (token == "defined" || IsNumeric(token))
-                            {
-                                continue;
-                            }
+                            _logger.LogDebug($"Conditional directive at line {directive.LineNumber} depends on definition {dependency}");
 
-                            if (definitionDict.ContainsKey(token))
-                            {
-                                _logger.LogDebug($"Conditional directive at line {directive.LineNumber} depends on {token}");
-                                directive.Dependencies.Add(token);
-                            }
+                            // We could update the conditional directive here if needed
                         }
                     }
                 }
 
-                // Check for circular dependencies
-                CheckForCircularDependencies(definitions);
-
-                _logger.LogInformation($"Completed analysis of macro relationships");
+                // Analyze each definition for circular dependencies
+                var circularDependencies = FindCircularDependencies(definitions);
+                if (circularDependencies.Count > 0)
+                {
+                    _logger.LogWarning($"Found {circularDependencies.Count} circular dependencies among macros");
+                    foreach (var cycle in circularDependencies)
+                    {
+                        _logger.LogWarning($"Circular dependency: {string.Join(" -> ", cycle)} -> {cycle[0]}");
+                    }
+                }
 
                 await Task.CompletedTask;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing macro relationships");
-                throw;
+                _logger.LogError(ex, $"Error analyzing macro relationships: {ex.Message}");
             }
         }
 
@@ -110,33 +111,34 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Extracting dependencies for macro: {definition.Name}");
 
-                if (definition == null)
-                {
-                    throw new ArgumentNullException(nameof(definition));
-                }
-
-                if (allDefinitions == null)
-                {
-                    throw new ArgumentNullException(nameof(allDefinitions));
-                }
-
                 var dependencies = new List<CDefinition>();
-                var visited = new HashSet<string>();
+                var dependencyNames = new HashSet<string>();
 
                 // Build a dictionary for quick lookup
                 var definitionDict = allDefinitions.ToDictionary(d => d.Name, d => d);
 
-                // Recursively extract dependencies
-                ExtractDependenciesRecursive(definition, definitionDict, dependencies, visited, 0);
+                // Add direct dependencies
+                foreach (var depName in definition.Dependencies)
+                {
+                    if (definitionDict.TryGetValue(depName, out var depDefinition) && !dependencyNames.Contains(depName))
+                    {
+                        dependencies.Add(depDefinition);
+                        dependencyNames.Add(depName);
+                    }
+                }
 
-                _logger.LogInformation($"Extracted {dependencies.Count} dependencies for macro: {definition.Name}");
+                // Add transitive dependencies (recursive)
+                var processedDefs = new HashSet<string> { definition.Name };
+                await AddTransitiveDependenciesAsync(dependencies, dependencyNames, definitionDict, processedDefs);
+
+                _logger.LogInformation($"Found {dependencies.Count} dependencies for macro {definition.Name}");
 
                 return dependencies;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting dependencies for macro: {definition.Name}");
-                throw;
+                _logger.LogError(ex, $"Error extracting macro dependencies for {definition.Name}: {ex.Message}");
+                return new List<CDefinition>();
             }
         }
 
@@ -147,49 +149,42 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Evaluating macro expression: {expression}");
 
-                if (string.IsNullOrEmpty(expression))
-                {
-                    return "";
-                }
-
-                if (activeDefinitions == null)
-                {
-                    throw new ArgumentNullException(nameof(activeDefinitions));
-                }
-
-                // Replace defined(X) with 1 or 0
-                string result = Regex.Replace(expression, @"defined\s*\(\s*(\w+)\s*\)", match =>
-                {
-                    string macroName = match.Groups[1].Value;
-                    return activeDefinitions.ContainsKey(macroName) ? "1" : "0";
-                });
-
-                // Replace defined X with 1 or 0
-                result = Regex.Replace(result, @"defined\s+(\w+)", match =>
+                // Replace defined() expressions
+                var definedRegex = new Regex(@"defined\s*\(\s*(\w+)\s*\)");
+                expression = definedRegex.Replace(expression, match =>
                 {
                     string macroName = match.Groups[1].Value;
                     return activeDefinitions.ContainsKey(macroName) ? "1" : "0";
                 });
 
                 // Replace macro names with their values
-                foreach (var macro in activeDefinitions)
+                foreach (var kvp in activeDefinitions)
                 {
-                    string pattern = $@"\b{Regex.Escape(macro.Key)}\b";
-                    string value = string.IsNullOrEmpty(macro.Value) ? "1" : macro.Value;
-                    result = Regex.Replace(result, pattern, value);
+                    // Only replace whole words, not parts of other words
+                    expression = Regex.Replace(expression, $@"\b{Regex.Escape(kvp.Key)}\b", kvp.Value);
                 }
 
-                // Replace remaining macro names (not in activeDefinitions) with 0
-                result = Regex.Replace(result, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b", "0");
+                // Replace any remaining macro names with 0 (assuming they're undefined)
+                expression = Regex.Replace(expression, @"\b[A-Za-z_]\w*\b", "0");
 
-                _logger.LogInformation($"Evaluated macro expression: {expression} to {result}");
+                // Handle common operators
+                expression = expression.Replace("&&", " && ").Replace("||", " || ");
+                expression = expression.Replace("==", " == ").Replace("!=", " != ");
+                expression = expression.Replace(">", " > ").Replace("<", " < ");
+                expression = expression.Replace(">=", " >= ").Replace("<=", " <= ");
+
+                // Evaluate the simplified expression
+                // This is a very basic evaluator, a real implementation would use a proper expression evaluator
+                string result = await EvaluateSimplifiedExpressionAsync(expression);
+
+                _logger.LogInformation($"Evaluated expression '{expression}' to '{result}'");
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error evaluating macro expression: {expression}");
-                throw;
+                _logger.LogError(ex, $"Error evaluating macro expression '{expression}': {ex.Message}");
+                return "0"; // Default to false for errors
             }
         }
 
@@ -200,164 +195,409 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Finding usages of macro: {definition.Name}");
 
-                if (definition == null)
+                if (projectContext == null || _fileService == null)
                 {
-                    throw new ArgumentNullException(nameof(definition));
+                    _logger.LogWarning("Cannot find macro usages: project context or file service is null");
+                    return new List<string>();
                 }
 
-                if (projectContext == null)
-                {
-                    throw new ArgumentNullException(nameof(projectContext));
-                }
+                var usageFiles = new List<string>();
 
-                var usages = new List<string>();
+                // Get all source files in the project
+                var sourceFiles = projectContext.SourceFiles;
 
-                // Check all source files in the project
-                foreach (var sourceFilePath in projectContext.SourceFiles)
+                foreach (var file in sourceFiles)
                 {
-                    if (File.Exists(sourceFilePath))
+                    string content = await _fileService.ReadFileAsync(file);
+
+                    // Check for macro usage
+                    if (IsMacroUsedInFile(definition, content))
                     {
-                        string content = await File.ReadAllTextAsync(sourceFilePath);
+                        usageFiles.Add(file);
+                    }
+                }
 
-                        // Check if the file contains the macro name
-                        var regex = new Regex($@"\b{Regex.Escape(definition.Name)}\b");
-                        if (regex.IsMatch(content))
+                _logger.LogInformation($"Found {usageFiles.Count} files that use macro {definition.Name}");
+
+                return usageFiles;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error finding macro usages for {definition.Name}: {ex.Message}");
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// Splits a string into tokens for analysis
+        /// </summary>
+        /// <param name="value">String to split</param>
+        /// <returns>Array of tokens</returns>
+        private string[] SplitIntoTokens(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return Array.Empty<string>();
+            }
+
+            // This is a very simplistic tokenizer for demonstration
+            // A real implementation would use a proper C tokenizer/parser
+
+            // Replace operators and punctuation with spaces
+            string normalized = value
+                .Replace("(", " ")
+                .Replace(")", " ")
+                .Replace("[", " ")
+                .Replace("]", " ")
+                .Replace("{", " ")
+                .Replace("}", " ")
+                .Replace("+", " ")
+                .Replace("-", " ")
+                .Replace("*", " ")
+                .Replace("/", " ")
+                .Replace("%", " ")
+                .Replace("=", " ")
+                .Replace("<", " ")
+                .Replace(">", " ")
+                .Replace("&", " ")
+                .Replace("|", " ")
+                .Replace("^", " ")
+                .Replace("!", " ")
+                .Replace("~", " ")
+                .Replace(",", " ")
+                .Replace(";", " ")
+                .Replace(":", " ");
+
+            // Split by whitespace and filter out empty strings and C keywords
+            return normalized.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Where(t => !IsKeywordOrLiteral(t))
+                .Where(t => !t.All(c => char.IsDigit(c))) // Filter out numeric literals
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Checks if a string is a C keyword or literal
+        /// </summary>
+        /// <param name="word">Word to check</param>
+        /// <returns>True if the word is a C keyword or literal, false otherwise</returns>
+        private bool IsKeywordOrLiteral(string word)
+        {
+            // List of common C keywords and literals
+            string[] keywords = new[]
+            {
+                "if", "else", "for", "while", "do", "switch", "case", "default",
+                "break", "continue", "return", "goto", "sizeof", "typedef", "struct",
+                "union", "enum", "void", "char", "short", "int", "long", "float",
+                "double", "signed", "unsigned", "const", "volatile", "auto", "register",
+                "static", "extern", "true", "false", "NULL"
+            };
+
+            return keywords.Contains(word);
+        }
+
+        /// <summary>
+        /// Finds circular dependencies among macro definitions
+        /// </summary>
+        /// <param name="definitions">List of macro definitions</param>
+        /// <returns>List of circular dependency chains</returns>
+        private List<List<string>> FindCircularDependencies(List<CDefinition> definitions)
+        {
+            var result = new List<List<string>>();
+            var definitionDict = definitions.ToDictionary(d => d.Name, d => d);
+
+            foreach (var definition in definitions)
+            {
+                var visited = new HashSet<string>();
+                var path = new List<string>();
+
+                FindCycles(definition.Name, definitionDict, visited, path, result);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Recursively finds cycles in the dependency graph using DFS
+        /// </summary>
+        /// <param name="current">Current macro name</param>
+        /// <param name="definitions">Dictionary of definitions</param>
+        /// <param name="visited">Set of visited macros in the current search</param>
+        /// <param name="path">Current path being explored</param>
+        /// <param name="cycles">List of found cycles</param>
+        private void FindCycles(
+            string current,
+            Dictionary<string, CDefinition> definitions,
+            HashSet<string> visited,
+            List<string> path,
+            List<List<string>> cycles)
+        {
+            if (!definitions.ContainsKey(current))
+            {
+                return;
+            }
+
+            if (visited.Contains(current))
+            {
+                // Found a cycle
+                int cycleStart = path.IndexOf(current);
+                if (cycleStart >= 0)
+                {
+                    var cycle = new List<string>();
+                    for (int i = cycleStart; i < path.Count; i++)
+                    {
+                        cycle.Add(path[i]);
+                    }
+
+                    // Check if this cycle is already in the result
+                    if (!cycles.Any(c =>
+                        c.Count == cycle.Count &&
+                        !c.Except(cycle).Any()))
+                    {
+                        cycles.Add(cycle);
+                    }
+                }
+                return;
+            }
+
+            visited.Add(current);
+            path.Add(current);
+
+            foreach (var dep in definitions[current].Dependencies)
+            {
+                FindCycles(dep, definitions, visited, path, cycles);
+            }
+
+            path.RemoveAt(path.Count - 1);
+            visited.Remove(current);
+        }
+
+        /// <summary>
+        /// Adds transitive dependencies to the dependency list
+        /// </summary>
+        /// <param name="dependencies">List of dependencies to update</param>
+        /// <param name="dependencyNames">Set of dependency names for quick lookup</param>
+        /// <param name="definitionDict">Dictionary of all definitions</param>
+        /// <param name="processedDefs">Set of already processed definitions to avoid cycles</param>
+        /// <returns>Task</returns>
+        private async Task AddTransitiveDependenciesAsync(
+            List<CDefinition> dependencies,
+            HashSet<string> dependencyNames,
+            Dictionary<string, CDefinition> definitionDict,
+            HashSet<string> processedDefs)
+        {
+            // Process all current dependencies
+            for (int i = 0; i < dependencies.Count; i++)
+            {
+                var dependency = dependencies[i];
+
+                // Skip if already processed to avoid cycles
+                if (processedDefs.Contains(dependency.Name))
+                {
+                    continue;
+                }
+
+                processedDefs.Add(dependency.Name);
+
+                // Add dependencies of this dependency
+                foreach (var subDepName in dependency.Dependencies)
+                {
+                    if (definitionDict.TryGetValue(subDepName, out var subDep) &&
+                        !dependencyNames.Contains(subDepName) &&
+                        !processedDefs.Contains(subDepName))
+                    {
+                        dependencies.Add(subDep);
+                        dependencyNames.Add(subDepName);
+                    }
+                }
+            }
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Evaluates a simplified preprocessor expression
+        /// </summary>
+        /// <param name="expression">Expression to evaluate</param>
+        /// <returns>Result of the evaluation</returns>
+        private async Task<string> EvaluateSimplifiedExpressionAsync(string expression)
+        {
+            try
+            {
+                // This is a very basic expression evaluator
+                // A real implementation would use a proper expression evaluator or parser
+
+                // Handle simple literals
+                if (int.TryParse(expression.Trim(), out int value))
+                {
+                    return value != 0 ? "1" : "0";
+                }
+
+                // Handle logical operations
+                if (expression.Contains("&&"))
+                {
+                    string[] parts = expression.Split(new[] { "&&" }, StringSplitOptions.None);
+                    bool result = true;
+
+                    foreach (var part in parts)
+                    {
+                        string partResult = await EvaluateSimplifiedExpressionAsync(part.Trim());
+                        if (partResult == "0")
                         {
-                            usages.Add(sourceFilePath);
+                            result = false;
+                            break;
+                        }
+                    }
+
+                    return result ? "1" : "0";
+                }
+
+                if (expression.Contains("||"))
+                {
+                    string[] parts = expression.Split(new[] { "||" }, StringSplitOptions.None);
+                    bool result = false;
+
+                    foreach (var part in parts)
+                    {
+                        string partResult = await EvaluateSimplifiedExpressionAsync(part.Trim());
+                        if (partResult != "0")
+                        {
+                            result = true;
+                            break;
+                        }
+                    }
+
+                    return result ? "1" : "0";
+                }
+
+                // Handle equality operations
+                if (expression.Contains("=="))
+                {
+                    string[] parts = expression.Split(new[] { "==" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        string left = await EvaluateSimplifiedExpressionAsync(parts[0].Trim());
+                        string right = await EvaluateSimplifiedExpressionAsync(parts[1].Trim());
+                        return left == right ? "1" : "0";
+                    }
+                }
+
+                if (expression.Contains("!="))
+                {
+                    string[] parts = expression.Split(new[] { "!=" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        string left = await EvaluateSimplifiedExpressionAsync(parts[0].Trim());
+                        string right = await EvaluateSimplifiedExpressionAsync(parts[1].Trim());
+                        return left != right ? "1" : "0";
+                    }
+                }
+
+                // Handle comparison operations
+                if (expression.Contains(">"))
+                {
+                    string[] parts = expression.Split(new[] { ">" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        if (int.TryParse(parts[0].Trim(), out int left) &&
+                            int.TryParse(parts[1].Trim(), out int right))
+                        {
+                            return left > right ? "1" : "0";
                         }
                     }
                 }
 
-                _logger.LogInformation($"Found {usages.Count} usages of macro: {definition.Name}");
+                if (expression.Contains("<"))
+                {
+                    string[] parts = expression.Split(new[] { "<" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        if (int.TryParse(parts[0].Trim(), out int left) &&
+                            int.TryParse(parts[1].Trim(), out int right))
+                        {
+                            return left < right ? "1" : "0";
+                        }
+                    }
+                }
 
-                return usages;
+                if (expression.Contains(">="))
+                {
+                    string[] parts = expression.Split(new[] { ">=" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        if (int.TryParse(parts[0].Trim(), out int left) &&
+                            int.TryParse(parts[1].Trim(), out int right))
+                        {
+                            return left >= right ? "1" : "0";
+                        }
+                    }
+                }
+
+                if (expression.Contains("<="))
+                {
+                    string[] parts = expression.Split(new[] { "<=" }, StringSplitOptions.None);
+                    if (parts.Length == 2)
+                    {
+                        if (int.TryParse(parts[0].Trim(), out int left) &&
+                            int.TryParse(parts[1].Trim(), out int right))
+                        {
+                            return left <= right ? "1" : "0";
+                        }
+                    }
+                }
+
+                // Handle logical not
+                if (expression.Trim().StartsWith("!"))
+                {
+                    string operand = expression.Trim().Substring(1);
+                    string result = await EvaluateSimplifiedExpressionAsync(operand);
+                    return result == "0" ? "1" : "0";
+                }
+
+                // Default to 0 for expressions we can't evaluate
+                return "0";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error finding usages of macro: {definition.Name}");
-                throw;
+                _logger.LogError(ex, $"Error evaluating simplified expression '{expression}': {ex.Message}");
+                return "0";
             }
         }
 
-        private string[] SplitIntoTokens(string text)
+        /// <summary>
+        /// Checks if a macro is used in a file
+        /// </summary>
+        /// <param name="definition">Macro definition</param>
+        /// <param name="fileContent">Content of the file</param>
+        /// <returns>True if the macro is used in the file, false otherwise</returns>
+        private bool IsMacroUsedInFile(CDefinition definition, string fileContent)
         {
-            // Split the text into tokens
-            // This is a simplified approach - a real implementation would use a proper tokenizer
-            var tokens = new List<string>();
-
-            // Replace operators with spaces to isolate identifiers
-            string sanitized = Regex.Replace(text, @"[!&|^~<>=\+\-\*/\(\)%]", " ");
-
-            // Split into tokens
-            string[] parts = sanitized.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var part in parts)
+            try
             {
-                // Skip numeric literals
-                if (!IsNumeric(part))
+                string name = definition.Name;
+
+                // Look for direct usage of the macro name
+                bool isDefined = Regex.IsMatch(fileContent, $@"#define\s+{Regex.Escape(name)}\b");
+                if (isDefined)
                 {
-                    // Only add valid C identifiers
-                    if (Regex.IsMatch(part, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
-                    {
-                        tokens.Add(part);
-                    }
+                    // Skip if it's the definition itself
+                    return false;
                 }
+
+                bool isUsedInIfdef = Regex.IsMatch(fileContent, $@"#ifdef\s+{Regex.Escape(name)}\b");
+                bool isUsedInIfndef = Regex.IsMatch(fileContent, $@"#ifndef\s+{Regex.Escape(name)}\b");
+                bool isUsedInIf = Regex.IsMatch(fileContent, $@"defined\s*\(\s*{Regex.Escape(name)}\s*\)");
+
+                // Check for usage in code (word boundaries to avoid partial matches)
+                bool isUsedInCode = Regex.IsMatch(fileContent, $@"\b{Regex.Escape(name)}\b");
+
+                return isUsedInIfdef || isUsedInIfndef || isUsedInIf || isUsedInCode;
             }
-
-            return tokens.ToArray();
-        }
-
-        private bool IsNumeric(string text)
-        {
-            // Check if the text is a numeric literal
-            return Regex.IsMatch(text, @"^[0-9]+$") ||
-                   Regex.IsMatch(text, @"^0x[0-9a-fA-F]+$") ||
-                   Regex.IsMatch(text, @"^0[0-7]+$") ||
-                   Regex.IsMatch(text, @"^[0-9]*\.[0-9]+$");
-        }
-
-        private void CheckForCircularDependencies(List<CDefinition> definitions)
-        {
-            foreach (var definition in definitions)
+            catch (Exception ex)
             {
-                var visited = new HashSet<string>();
-                var path = new Stack<string>();
-
-                if (HasCircularDependency(definition.Name, definitions, visited, path))
-                {
-                    _logger.LogWarning($"Circular dependency detected for macro: {definition.Name}. Path: {string.Join(" -> ", path)}");
-                }
-            }
-        }
-
-        private bool HasCircularDependency(string definitionName, List<CDefinition> definitions, HashSet<string> visited, Stack<string> path)
-        {
-            if (path.Contains(definitionName))
-            {
-                // Found a circular dependency
-                path.Push(definitionName);
-                return true;
-            }
-
-            if (visited.Contains(definitionName))
-            {
-                // Already visited this definition and it's not part of a cycle
+                _logger.LogError(ex, $"Error checking if macro {definition.Name} is used in file: {ex.Message}");
                 return false;
-            }
-
-            visited.Add(definitionName);
-            path.Push(definitionName);
-
-            var definition = definitions.FirstOrDefault(d => d.Name == definitionName);
-            if (definition != null)
-            {
-                foreach (var dependency in definition.Dependencies)
-                {
-                    if (HasCircularDependency(dependency, definitions, visited, path))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            path.Pop();
-            return false;
-        }
-
-        private void ExtractDependenciesRecursive(CDefinition definition, Dictionary<string, CDefinition> definitionDict,
-            List<CDefinition> dependencies, HashSet<string> visited, int depth)
-        {
-            // Avoid infinite recursion
-            if (depth > 100)
-            {
-                _logger.LogWarning($"Reached maximum recursion depth for macro dependency extraction: {definition.Name}");
-                return;
-            }
-
-            // Skip if already visited
-            if (visited.Contains(definition.Name))
-            {
-                return;
-            }
-
-            visited.Add(definition.Name);
-
-            // Process each dependency
-            foreach (var dependencyName in definition.Dependencies)
-            {
-                if (definitionDict.TryGetValue(dependencyName, out var dependencyDefinition))
-                {
-                    if (!dependencies.Any(d => d.Name == dependencyDefinition.Name))
-                    {
-                        dependencies.Add(dependencyDefinition);
-                    }
-
-                    // Recursively process this dependency's dependencies
-                    ExtractDependenciesRecursive(dependencyDefinition, definitionDict, dependencies, visited, depth + 1);
-                }
             }
         }
     }
-
-    #endregion
 }

@@ -1,4 +1,7 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Projects;
+using C_TestForge.Models.TestCase;
+using C_TestForge.Models.TestCases;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,7 +43,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="testSuite">Test suite to add to</param>
         /// <param name="testCase">Test case to add</param>
         /// <returns>Updated test suite</returns>
-        TestSuite AddTestCase(TestSuite testSuite, TestCaseModels testCase);
+        TestSuite AddTestCase(TestSuite testSuite, TestCase testCase);
 
         /// <summary>
         /// Removes a test case from a test suite

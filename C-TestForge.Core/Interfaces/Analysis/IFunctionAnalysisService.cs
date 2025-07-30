@@ -1,4 +1,6 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using ClangSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -9,7 +11,7 @@ using System.Threading.Tasks;
 namespace C_TestForge.Core.Interfaces.Analysis
 {
     /// <summary>
-    /// Interface for analyzing functions
+    /// Interface for the function analysis service
     /// </summary>
     public interface IFunctionAnalysisService
     {
@@ -28,28 +30,27 @@ namespace C_TestForge.Core.Interfaces.Analysis
         Task<List<FunctionRelationship>> AnalyzeFunctionRelationshipsAsync(List<CFunction> functions);
 
         /// <summary>
-        /// Extracts the control flow graph of a function
+        /// Extracts a control flow graph for a function
         /// </summary>
         /// <param name="function">Function to analyze</param>
-        /// <param name="sourceFile">Source file containing the function</param>
         /// <returns>Control flow graph</returns>
-        Task<ControlFlowGraph> ExtractControlFlowGraphAsync(CFunction function, SourceFile sourceFile);
+        Task<ControlFlowGraph> ExtractControlFlowGraphAsync(CFunction function);
 
         /// <summary>
         /// Analyzes the complexity of a function
         /// </summary>
         /// <param name="function">Function to analyze</param>
         /// <param name="sourceFile">Source file containing the function</param>
-        /// <returns>Complexity metrics</returns>
-        Task<FunctionComplexity> AnalyzeFunctionComplexityAsync(CFunction function, SourceFile sourceFile);
+        /// <returns>Task</returns>
+        Task AnalyzeFunctionComplexityAsync(CFunction function, SourceFile sourceFile);
 
         /// <summary>
-        /// Determines which variables are used in a function
+        /// Analyzes variable usage in a function
         /// </summary>
         /// <param name="function">Function to analyze</param>
-        /// <param name="allVariables">All available variables</param>
-        /// <returns>List of variables used in the function</returns>
-        Task<List<CVariable>> AnalyzeFunctionVariableUsageAsync(CFunction function, List<CVariable> allVariables);
+        /// <param name="allVariables">List of all available variables</param>
+        /// <returns>Dictionary mapping usage types to lists of variables</returns>
+        Task<Dictionary<string, List<CVariable>>> AnalyzeFunctionVariableUsageAsync(CFunction function, List<CVariable> allVariables);
     }
 
     /// <summary>

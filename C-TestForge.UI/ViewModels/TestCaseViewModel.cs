@@ -1,13 +1,11 @@
-﻿using C_TestForge.Core.Services;
+﻿using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Core.Interfaces.Solver;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Core.Services;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
 using C_TestForge.Parser;
-using C_TestForge.Parser.Services;
-using C_TestForge.Solver.Services;
-using C_TestForge.TestCase.Services;
-using CsvHelper;
 using Microsoft.Win32;
-using Microsoft.Z3;
-using OfficeOpenXml;
 using Prism.Commands;
 using Prism.Events;
 using Prism.Mvvm;
@@ -37,12 +35,12 @@ namespace C_TestForge.UI.ViewModels
         private readonly IZ3SolverService _solverService;
         private readonly IEventAggregator _eventAggregator;
 
-        private ObservableCollection<TestCaseUser> _testCases;
-        private TestCaseUser _selectedTestCase;
+        private ObservableCollection<TestCase> _testCases;
+        private TestCase _selectedTestCase;
         private string _statusMessage;
         private bool _isBusy;
         private bool _isComparisonMode;
-        private TestCaseUser _testCaseForComparison;
+        private TestCase _testCaseForComparison;
         private bool _showOnlyDifferences;
         private string _searchFilter;
         private bool _autoUpdateExpectedOutput;
@@ -54,7 +52,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Collection of test cases displayed in the UI
         /// </summary>
-        public ObservableCollection<TestCaseUser> TestCases
+        public ObservableCollection<TestCase> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
@@ -63,7 +61,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Currently selected test case
         /// </summary>
-        public TestCaseUser SelectedTestCase
+        public TestCase SelectedTestCase
         {
             get => _selectedTestCase;
             set
@@ -125,7 +123,7 @@ namespace C_TestForge.UI.ViewModels
         /// <summary>
         /// Test case used for comparison
         /// </summary>
-        public TestCaseUser TestCaseForComparison
+        public TestCase TestCaseForComparison
         {
             get => _testCaseForComparison;
             set => SetProperty(ref _testCaseForComparison, value);
@@ -203,7 +201,7 @@ namespace C_TestForge.UI.ViewModels
             _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
             // Initialize collections
-            _testCases = new ObservableCollection<TestCaseUser>();
+            _testCases = new ObservableCollection<TestCase>();
 
             // Initialize commands
             ImportTestCasesCommand = new DelegateCommand(ImportTestCases, CanExecuteCommand);
@@ -257,19 +255,19 @@ namespace C_TestForge.UI.ViewModels
                     var fileName = openFileDialog.FileName;
                     var extension = Path.GetExtension(fileName).ToLower();
 
-                    List<TestCaseUser> importedTestCases = new List<TestCaseUser>();
+                    List<TestCase> importedTestCases = new List<TestCase>();
 
                     switch (extension)
                     {
-                        case ".tst":
-                            importedTestCases = _testCaseService.ImportFromTstFile(fileName);
-                            break;
-                        case ".csv":
-                            importedTestCases = _testCaseService.ImportFromCsvFile(fileName);
-                            break;
-                        case ".xlsx":
-                            importedTestCases = _testCaseService.ImportFromExcelFile(fileName);
-                            break;
+                        //case ".tst":
+                        //    importedTestCases = _testCaseService.ImportFromTstFile(fileName);
+                        //    break;
+                        //case ".csv":
+                        //    importedTestCases = _testCaseService.ImportFromCsvFile(fileName);
+                        //    break;
+                        //case ".xlsx":
+                        //    importedTestCases = _testCaseService.ImportFromExcelFile(fileName);
+                        //    break;
                         default:
                             MessageBox.Show("Unsupported file format.", "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             break;
@@ -286,7 +284,7 @@ namespace C_TestForge.UI.ViewModels
                         StatusMessage = $"Successfully imported {importedTestCases.Count} test cases.";
 
                         // Notify any listeners that test cases have been imported
-                        _eventAggregator.GetEvent<TestCasesImportedEvent>().Publish(importedTestCases);
+                        //_eventAggregator.GetEvent<TestCasesImportedEvent>().Publish(importedTestCases);
                     }
                     else
                     {
@@ -338,15 +336,15 @@ namespace C_TestForge.UI.ViewModels
 
                     switch (extension)
                     {
-                        case ".tst":
-                            _testCaseService.ExportToTstFile(TestCases.ToList(), fileName);
-                            break;
-                        case ".csv":
-                            _testCaseService.ExportToCsvFile(TestCases.ToList(), fileName);
-                            break;
-                        case ".xlsx":
-                            _testCaseService.ExportToExcelFile(TestCases.ToList(), fileName);
-                            break;
+                        //case ".tst":
+                        //    _testCaseService.ExportToTstFile(TestCases.ToList(), fileName);
+                        //    break;
+                        //case ".csv":
+                        //    _testCaseService.ExportToCsvFile(TestCases.ToList(), fileName);
+                        //    break;
+                        //case ".xlsx":
+                        //    _testCaseService.ExportToExcelFile(TestCases.ToList(), fileName);
+                        //    break;
                         default:
                             MessageBox.Show("Unsupported file format.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             break;
@@ -402,15 +400,15 @@ namespace C_TestForge.UI.ViewModels
 
                     switch (format.ToLower())
                     {
-                        case "tst":
-                            _testCaseService.ExportToTstFile(TestCases.ToList(), fileName);
-                            break;
-                        case "csv":
-                            _testCaseService.ExportToCsvFile(TestCases.ToList(), fileName);
-                            break;
-                        case "xlsx":
-                            _testCaseService.ExportToExcelFile(TestCases.ToList(), fileName);
-                            break;
+                        //case "tst":
+                        //    _testCaseService.ExportToTstFile(TestCases.ToList(), fileName);
+                        //    break;
+                        //case "csv":
+                        //    _testCaseService.ExportToCsvFile(TestCases.ToList(), fileName);
+                        //    break;
+                        //case "xlsx":
+                        //    _testCaseService.ExportToExcelFile(TestCases.ToList(), fileName);
+                        //    break;
                         default:
                             MessageBox.Show("Unsupported file format.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             break;
@@ -445,36 +443,36 @@ namespace C_TestForge.UI.ViewModels
                 StatusMessage = "Adding new test case...";
 
                 // Create a new test case with default values
-                var newTestCase = new TestCaseUser
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"TestCase_{TestCases.Count + 1}",
-                    Description = "New test case",
-                    InputParameters = new Dictionary<string, string>(),
-                    ExpectedOutputs = new Dictionary<string, string>(),
-                    ActualOutputs = new Dictionary<string, string>(),
-                    IsEnabled = true,
-                    CreatedDate = DateTime.Now,
-                    ModifiedDate = DateTime.Now
-                };
+                //var newTestCase = new TestCase
+                //{
+                //    Id = Guid.NewGuid(),
+                //    Name = $"TestCase_{TestCases.Count + 1}",
+                //    Description = "New test case",
+                //    InputParameters = new Dictionary<string, string>(),
+                //    ExpectedOutputs = new Dictionary<string, string>(),
+                //    ActualOutputs = new Dictionary<string, string>(),
+                //    IsEnabled = true,
+                //    CreatedDate = DateTime.Now,
+                //    ModifiedDate = DateTime.Now
+                //};
 
-                // Show dialog to edit the new test case
-                var result = _eventAggregator.GetEvent<EditTestCaseEvent>().Publish(newTestCase);
+                //// Show dialog to edit the new test case
+                //var result = _eventAggregator.GetEvent<EditTestCaseEvent>().Publish(newTestCase);
 
                 // If the user confirmed the edit, add the test case
-                if (result)
-                {
-                    TestCases.Add(newTestCase);
-                    SelectedTestCase = newTestCase;
-                    StatusMessage = "New test case added.";
+                //if (result)
+                //{
+                //    TestCases.Add(newTestCase);
+                //    SelectedTestCase = newTestCase;
+                //    StatusMessage = "New test case added.";
 
-                    // Save the updated test cases
-                    SaveTestCases();
-                }
-                else
-                {
-                    StatusMessage = "Add test case cancelled.";
-                }
+                //    // Save the updated test cases
+                //    SaveTestCases();
+                //}
+                //else
+                //{
+                //    StatusMessage = "Add test case cancelled.";
+                //}
             }
             catch (Exception ex)
             {
@@ -548,31 +546,31 @@ namespace C_TestForge.UI.ViewModels
                 var testCaseCopy = SelectedTestCase.Clone();
 
                 // Show dialog to edit the test case
-                var result = _eventAggregator.GetEvent<EditTestCaseEvent>().Publish(testCaseCopy);
+                //var result = _eventAggregator.GetEvent<EditTestCaseEvent>().Publish(testCaseCopy);
 
-                // If the user confirmed the edit, update the test case
-                if (result)
-                {
-                    // Update the original test case with the edited values
-                    SelectedTestCase.Name = testCaseCopy.Name;
-                    SelectedTestCase.Description = testCaseCopy.Description;
-                    SelectedTestCase.Inputs = new Dictionary<string, string>(testCaseCopy.Inputs);
-                    SelectedTestCase.ExpectedOutputs = new Dictionary<string, string>(testCaseCopy.ExpectedOutputs);
-                    SelectedTestCase.IsEnabled = testCaseCopy.IsEnabled;
-                    SelectedTestCase.ModifiedDate = DateTime.Now;
+                //// If the user confirmed the edit, update the test case
+                //if (result)
+                //{
+                //    // Update the original test case with the edited values
+                //    SelectedTestCase.Name = testCaseCopy.Name;
+                //    SelectedTestCase.Description = testCaseCopy.Description;
+                //    SelectedTestCase.Inputs = new Dictionary<string, string>(testCaseCopy.Inputs);
+                //    SelectedTestCase.ExpectedOutputs = new Dictionary<string, string>(testCaseCopy.ExpectedOutputs);
+                //    SelectedTestCase.IsEnabled = testCaseCopy.IsEnabled;
+                //    SelectedTestCase.ModifiedDate = DateTime.Now;
 
-                    // Notify property changes
-                    RaisePropertyChanged(nameof(SelectedTestCase));
+                //    // Notify property changes
+                //    RaisePropertyChanged(nameof(SelectedTestCase));
 
-                    StatusMessage = "Test case updated.";
+                //    StatusMessage = "Test case updated.";
 
-                    // Save the updated test cases
-                    SaveTestCases();
-                }
-                else
-                {
-                    StatusMessage = "Edit cancelled.";
-                }
+                //    // Save the updated test cases
+                //    SaveTestCases();
+                //}
+                //else
+                //{
+                //    StatusMessage = "Edit cancelled.";
+                //}
             }
             catch (Exception ex)
             {
@@ -602,10 +600,10 @@ namespace C_TestForge.UI.ViewModels
                 var duplicatedTestCase = SelectedTestCase.Clone();
 
                 // Update the duplicated test case properties
-                duplicatedTestCase.Id = Guid.NewGuid();
-                duplicatedTestCase.Name = $"{SelectedTestCase.Name}_Copy";
-                duplicatedTestCase.CreatedDate = DateTime.Now;
-                duplicatedTestCase.ModifiedDate = DateTime.Now;
+                //duplicatedTestCase.Id = Guid.NewGuid();
+                //duplicatedTestCase.Name = $"{SelectedTestCase.Name}_Copy";
+                //duplicatedTestCase.CreatedDate = DateTime.Now;
+                //duplicatedTestCase.ModifiedDate = DateTime.Now;
 
                 // Add the duplicated test case to the collection
                 TestCases.Add(duplicatedTestCase);
@@ -638,38 +636,38 @@ namespace C_TestForge.UI.ViewModels
                 StatusMessage = "Generating test cases...";
 
                 // Show dialog to select a function for which to generate test cases
-                var selectedFunction = await _eventAggregator.GetEvent<SelectFunctionEvent>().PublishAsync();
+                //var selectedFunction = await _eventAggregator.GetEvent<SelectFunctionEvent>().PublishAsync();
 
-                if (selectedFunction != null)
-                {
-                    // Generate test cases for the selected function
-                    var generatedTestCases = await Task.Run(() =>
-                        _testCaseService.GenerateTestCasesForFunction(selectedFunction)
-                    );
+                //if (selectedFunction != null)
+                //{
+                //    // Generate test cases for the selected function
+                //    var generatedTestCases = await Task.Run(() =>
+                //       // _testCaseService.GenerateTestCasesForFunction(selectedFunction)
+                //    );
 
-                    if (generatedTestCases.Any())
-                    {
-                        // Add generated test cases to the collection
-                        foreach (var testCase in generatedTestCases)
-                        {
-                            TestCases.Add(testCase);
-                        }
+                //    if (generatedTestCases.Any())
+                //    {
+                //        // Add generated test cases to the collection
+                //        foreach (var testCase in generatedTestCases)
+                //        {
+                //            TestCases.Add(testCase);
+                //        }
 
-                        SelectedTestCase = generatedTestCases.First();
-                        StatusMessage = $"Successfully generated {generatedTestCases.Count} test cases.";
+                //        SelectedTestCase = generatedTestCases.First();
+                //        StatusMessage = $"Successfully generated {generatedTestCases.Count} test cases.";
 
-                        // Save the updated test cases
-                        SaveTestCases();
-                    }
-                    else
-                    {
-                        StatusMessage = "No test cases were generated.";
-                    }
-                }
-                else
-                {
-                    StatusMessage = "Test case generation cancelled.";
-                }
+                //        // Save the updated test cases
+                //        SaveTestCases();
+                //    }
+                //    else
+                //    {
+                //        StatusMessage = "No test cases were generated.";
+                //    }
+                //}
+                //else
+                //{
+                //    StatusMessage = "Test case generation cancelled.";
+                //}
             }
             catch (Exception ex)
             {
@@ -738,54 +736,54 @@ namespace C_TestForge.UI.ViewModels
                 StatusMessage = "Finding variable values...";
 
                 // Get the constraints for the test case
-                var constraints = await _eventAggregator.GetEvent<GetConstraintsEvent>().PublishAsync(SelectedTestCase);
+                //var constraints = await _eventAggregator.GetEvent<GetConstraintsEvent>().PublishAsync(SelectedTestCase);
 
-                if (constraints != null && constraints.Any())
-                {
-                    // Use Z3 solver to find values that satisfy the constraints
-                    var solverResult = await Task.Run(() =>
-                        _solverService.SolveConstraints(constraints)
-                    );
+                //if (constraints != null && constraints.Any())
+                //{
+                //    // Use Z3 solver to find values that satisfy the constraints
+                //    var solverResult = await Task.Run(() =>
+                //        _solverService.SolveConstraints(constraints)
+                //    );
 
-                    if (solverResult.IsSuccess)
-                    {
-                        // Update the test case with the found values
-                        foreach (var kvp in solverResult.VariableValues)
-                        {
-                            if (SelectedTestCase.Inputs.ContainsKey(kvp.Key))
-                            {
-                                SelectedTestCase.Inputs[kvp.Key] = kvp.Value;
-                            }
-                            else
-                            {
-                                SelectedTestCase.Inputs.Add(kvp.Key, kvp.Value);
-                            }
-                        }
+                //    if (solverResult.IsSuccess)
+                //    {
+                //        // Update the test case with the found values
+                //        foreach (var kvp in solverResult.VariableValues)
+                //        {
+                //            if (SelectedTestCase.Inputs.ContainsKey(kvp.Key))
+                //            {
+                //                SelectedTestCase.Inputs[kvp.Key] = kvp.Value;
+                //            }
+                //            else
+                //            {
+                //                SelectedTestCase.Inputs.Add(kvp.Key, kvp.Value);
+                //            }
+                //        }
 
-                        // Update expected outputs if auto-update is enabled
-                        if (AutoUpdateExpectedOutput)
-                        {
-                            await UpdateExpectedOutputs();
-                        }
+                //        // Update expected outputs if auto-update is enabled
+                //        if (AutoUpdateExpectedOutput)
+                //        {
+                //            await UpdateExpectedOutputs();
+                //        }
 
-                        // Notify property changes
-                        RaisePropertyChanged(nameof(SelectedTestCase));
+                //        // Notify property changes
+                //        RaisePropertyChanged(nameof(SelectedTestCase));
 
-                        StatusMessage = "Variable values found and applied.";
+                //        StatusMessage = "Variable values found and applied.";
 
-                        // Save the updated test cases
-                        SaveTestCases();
-                    }
-                    else
-                    {
-                        StatusMessage = $"Could not find variable values: {solverResult.ErrorMessage}";
-                        MessageBox.Show($"Could not find variable values: {solverResult.ErrorMessage}", "Solver Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                }
-                else
-                {
-                    StatusMessage = "No constraints were provided for solving.";
-                }
+                //        // Save the updated test cases
+                //        SaveTestCases();
+                //    }
+                //    else
+                //    {
+                //        StatusMessage = $"Could not find variable values: {solverResult.ErrorMessage}";
+                //        MessageBox.Show($"Could not find variable values: {solverResult.ErrorMessage}", "Solver Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                //    }
+                //}
+                //else
+                //{
+                //    StatusMessage = "No constraints were provided for solving.";
+                //}
             }
             catch (Exception ex)
             {
@@ -812,13 +810,13 @@ namespace C_TestForge.UI.ViewModels
                 IsBusy = true;
                 StatusMessage = "Loading test cases...";
 
-                var loadedTestCases = _testCaseService.LoadTestCases();
+                //var loadedTestCases = _testCaseService.LoadTestCases();
 
-                TestCases.Clear();
-                foreach (var testCase in loadedTestCases)
-                {
-                    TestCases.Add(testCase);
-                }
+                //TestCases.Clear();
+                //foreach (var testCase in loadedTestCases)
+                //{
+                //    TestCases.Add(testCase);
+                //}
 
                 SelectedTestCase = TestCases.FirstOrDefault();
 
@@ -842,7 +840,7 @@ namespace C_TestForge.UI.ViewModels
         {
             try
             {
-                _testCaseService.SaveTestCases(TestCases.ToList());
+                //_testCaseService.SaveTestCases(TestCases.ToList());
             }
             catch (Exception ex)
             {
@@ -868,19 +866,19 @@ namespace C_TestForge.UI.ViewModels
                 var filter = SearchFilter.ToLower();
 
                 // Apply filter
-                var filteredTestCases = _testCaseService.LoadTestCases().Where(tc =>
-                    tc.Name.ToLower().Contains(filter) ||
-                    tc.Description.ToLower().Contains(filter) ||
-                    tc.Inputs.Any(i => i.Key.ToLower().Contains(filter) || i.Value.ToLower().Contains(filter)) ||
-                    tc.ExpectedOutputs.Any(o => o.Key.ToLower().Contains(filter) || o.Value.ToLower().Contains(filter))
-                ).ToList();
+                //var filteredTestCases = _testCaseService.LoadTestCases().Where(tc =>
+                //    tc.Name.ToLower().Contains(filter) ||
+                //    tc.Description.ToLower().Contains(filter) ||
+                //    tc.Inputs.Any(i => i.Key.ToLower().Contains(filter) || i.Value.ToLower().Contains(filter)) ||
+                //    tc.ExpectedOutputs.Any(o => o.Key.ToLower().Contains(filter) || o.Value.ToLower().Contains(filter))
+                //).ToList();
 
                 // Update the collection
-                TestCases.Clear();
-                foreach (var testCase in filteredTestCases)
-                {
-                    TestCases.Add(testCase);
-                }
+                //TestCases.Clear();
+                //foreach (var testCase in filteredTestCases)
+                //{
+                //    TestCases.Add(testCase);
+                //}
 
                 SelectedTestCase = TestCases.FirstOrDefault();
 
@@ -903,24 +901,24 @@ namespace C_TestForge.UI.ViewModels
                     return;
 
                 // Get the function associated with the test case
-                var function = await _eventAggregator.GetEvent<GetFunctionForTestCaseEvent>().PublishAsync(SelectedTestCase);
+                //var function = await _eventAggregator.GetEvent<GetFunctionForTestCaseEvent>().PublishAsync(SelectedTestCase);
 
-                if (function != null)
-                {
-                    // Execute the function with the current inputs to get expected outputs
-                    var expectedOutputs = await Task.Run(() =>
-                        _testCaseService.CalculateExpectedOutputs(function, SelectedTestCase.Inputs)
-                    );
+                //if (function != null)
+                //{
+                //    // Execute the function with the current inputs to get expected outputs
+                //    var expectedOutputs = await Task.Run(() =>
+                //        _testCaseService.CalculateExpectedOutputs(function, SelectedTestCase.Inputs)
+                //    );
 
-                    if (expectedOutputs != null)
-                    {
-                        // Update the expected outputs
-                        SelectedTestCase.ExpectedOutputs = new Dictionary<string, string>(expectedOutputs);
+                //    if (expectedOutputs != null)
+                //    {
+                //        // Update the expected outputs
+                //        SelectedTestCase.ExpectedOutputs = new Dictionary<string, string>(expectedOutputs);
 
-                        // Notify property changes
-                        RaisePropertyChanged(nameof(SelectedTestCase));
-                    }
-                }
+                //        // Notify property changes
+                //        RaisePropertyChanged(nameof(SelectedTestCase));
+                //    }
+                //}
             }
             catch (Exception ex)
             {
@@ -934,7 +932,7 @@ namespace C_TestForge.UI.ViewModels
         private void SubscribeToEvents()
         {
             // Subscribe to code analysis completed event
-            _eventAggregator.GetEvent<CodeAnalysisCompletedEvent>().Subscribe(OnCodeAnalysisCompleted);
+            //_eventAggregator.GetEvent<CodeAnalysisCompletedEvent>().Subscribe(OnCodeAnalysisCompleted);
 
             // Subscribe to test execution completed event
             _eventAggregator.GetEvent<TestExecutionCompletedEvent>().Subscribe(OnTestExecutionCompleted);
@@ -944,41 +942,41 @@ namespace C_TestForge.UI.ViewModels
         /// Handler for code analysis completed event
         /// </summary>
         /// <param name="analysisResult">The result of the code analysis</param>
-        private void OnCodeAnalysisCompleted(CodeAnalysisResult analysisResult)
-        {
-            // Update test cases based on code analysis result
-            // For example, check if variables used in test cases are still valid
+        //private void OnCodeAnalysisCompleted(CodeAnalysisResult analysisResult)
+        //{
+        //    // Update test cases based on code analysis result
+        //    // For example, check if variables used in test cases are still valid
 
-            StatusMessage = "Code analysis completed. Checking test cases for compatibility...";
+        //    StatusMessage = "Code analysis completed. Checking test cases for compatibility...";
 
-            // Detect disabled variables
-            var disabledVariables = analysisResult.DisabledVariables ?? new List<string>();
+        //    // Detect disabled variables
+        //    var disabledVariables = analysisResult.DisabledVariables ?? new List<string>();
 
-            // Check each test case for disabled variables
-            foreach (var testCase in TestCases)
-            {
-                var usesDisabledVariables = testCase.Inputs.Keys
-                    .Intersect(disabledVariables, StringComparer.OrdinalIgnoreCase)
-                    .Any();
+        //    // Check each test case for disabled variables
+        //    foreach (var testCase in TestCases)
+        //    {
+        //        var usesDisabledVariables = testCase.Inputs.Keys
+        //            .Intersect(disabledVariables, StringComparer.OrdinalIgnoreCase)
+        //            .Any();
 
-                if (usesDisabledVariables)
-                {
-                    // Mark test case with warning
-                    testCase.HasWarning = true;
-                    testCase.WarningMessage = "Test case uses disabled variables.";
-                }
-                else
-                {
-                    testCase.HasWarning = false;
-                    testCase.WarningMessage = null;
-                }
-            }
+        //        if (usesDisabledVariables)
+        //        {
+        //            // Mark test case with warning
+        //            testCase.HasWarning = true;
+        //            testCase.WarningMessage = "Test case uses disabled variables.";
+        //        }
+        //        else
+        //        {
+        //            testCase.HasWarning = false;
+        //            testCase.WarningMessage = null;
+        //        }
+        //    }
 
-            // Notify UI of changes
-            RaisePropertyChanged(nameof(TestCases));
+        //    // Notify UI of changes
+        //    RaisePropertyChanged(nameof(TestCases));
 
-            StatusMessage = "Test cases updated based on code analysis.";
-        }
+        //    StatusMessage = "Test cases updated based on code analysis.";
+        //}
 
         /// <summary>
         /// Handler for test execution completed event
@@ -992,18 +990,18 @@ namespace C_TestForge.UI.ViewModels
             StatusMessage = "Updating test cases with execution results...";
 
             // Update actual outputs and test status
-            foreach (var testResult in testResults)
-            {
-                var testCase = TestCases.FirstOrDefault(tc => tc.Id == testResult.TestCaseId);
+            //foreach (var testResult in testResults)
+            //{
+            //    var testCase = TestCases.FirstOrDefault(tc => tc.Id == testResult.TestCaseId);
 
-                if (testCase != null)
-                {
-                    testCase.ActualOutputs = new Dictionary<string, string>(testResult.ActualOutputs);
-                    testCase.ExecutionStatus = testResult.Status;
-                    testCase.ExecutionMessage = testResult.Message;
-                    testCase.LastExecutionDate = testResult.ExecutionTime;
-                }
-            }
+            //    if (testCase != null)
+            //    {
+            //        testCase.ActualOutputs = new Dictionary<string, string>(testResult.ActualOutputs);
+            //        testCase.ExecutionStatus = testResult.Status;
+            //        testCase.ExecutionMessage = testResult.Message;
+            //        testCase.LastExecutionDate = testResult.ExecutionTime;
+            //    }
+            //}
 
             // Notify UI of changes
             RaisePropertyChanged(nameof(TestCases));
@@ -1077,12 +1075,12 @@ namespace C_TestForge.UI.ViewModels
     /// <summary>
     /// Event triggered when test cases are imported
     /// </summary>
-    public class TestCasesImportedEvent : PubSubEvent<List<TestCaseUser>> { }
+    public class TestCasesImportedEvent : PubSubEvent<List<TestCase>> { }
 
     /// <summary>
     /// Event triggered to edit a test case
     /// </summary>
-    public class EditTestCaseEvent : PubSubEvent<TestCaseUser> { }
+    public class EditTestCaseEvent : PubSubEvent<TestCase> { }
 
     /// <summary>
     /// Event triggered to select a function
@@ -1092,17 +1090,17 @@ namespace C_TestForge.UI.ViewModels
     /// <summary>
     /// Event triggered to get constraints for a test case
     /// </summary>
-    public class GetConstraintsEvent : PubSubEvent<TestCaseUser, List<Constraint>> { }
+    //public class GetConstraintsEvent : PubSubEvent<TestCase, List<Constraint>> { }
 
-    /// <summary>
-    /// Event triggered to get the function associated with a test case
-    /// </summary>
-    public class GetFunctionForTestCaseEvent : PubSubEvent<TestCaseUser, CFunction> { }
+    ///// <summary>
+    ///// Event triggered to get the function associated with a test case
+    ///// </summary>
+    //public class GetFunctionForTestCaseEvent : PubSubEvent<TestCase, CFunction> { }
 
     /// <summary>
     /// Event triggered when code analysis is completed
     /// </summary>
-    public class CodeAnalysisCompletedEvent : PubSubEvent<CodeAnalysisResult> { }
+    //public class CodeAnalysisCompletedEvent : PubSubEvent<CodeAnalysisResult> { }
 
     /// <summary>
     /// Event triggered when test execution is completed

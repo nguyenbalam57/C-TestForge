@@ -1,26 +1,20 @@
-﻿using System;
+﻿using C_TestForge.Core.Interfaces.Analysis;
+using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Parse;
+using C_TestForge.Models.Projects;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using ClangSharp;
-using ClangSharp.Interop;
-using C_TestForge.Core;
-using C_TestForge.Models;
-using Microsoft.Extensions.Logging;
-using C_TestForge.Core.Interfaces.TestCaseManagement;
-using C_TestForge.Core.Interfaces.Analysis;
-using C_TestForge.Core.Interfaces.Parser;
-using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Interfaces.Solver;
 
 namespace C_TestForge.Parser
 {
-    #region AnalysisService Implementation
-
     /// <summary>
-    /// Implementation of the analysis service
+    /// Implementation of the analysis service for analyzing C source code
     /// </summary>
     public class AnalysisService : IAnalysisService
     {
@@ -32,6 +26,9 @@ namespace C_TestForge.Parser
         private readonly IMacroAnalysisService _macroAnalysisService;
         private readonly IFileService _fileService;
 
+        /// <summary>
+        /// Constructor for AnalysisService
+        /// </summary>
         public AnalysisService(
             ILogger<AnalysisService> logger,
             IParserService parserService,
@@ -113,7 +110,7 @@ namespace C_TestForge.Parser
                     await PerformComprehensiveAnalysisAsync(result, sourceFile);
                 }
 
-                _logger.LogInformation($"Completed analysis of source file: {sourceFile.FilePath}");
+                _logger.LogInformation($"Analysis complete for source file: {sourceFile.FilePath}");
 
                 return result;
             }
@@ -129,7 +126,7 @@ namespace C_TestForge.Parser
         {
             try
             {
-                _logger.LogInformation($"Analyzing project: {project.Name}");
+                _logger.LogInformation($"Analyzing project with {project.SourceFiles.Count} source files");
 
                 if (project == null)
                 {
@@ -144,296 +141,89 @@ namespace C_TestForge.Parser
                 // Create a new analysis result
                 var result = new AnalysisResult();
 
-                // Load all source files
-                var sourceFiles = new List<SourceFile>();
+                // Analyze each source file
                 foreach (var sourceFilePath in project.SourceFiles)
                 {
-                    if (_fileService.FileExists(sourceFilePath))
+                    try
                     {
+                        // Load the source file
                         var sourceFile = await _sourceCodeService.LoadSourceFileAsync(sourceFilePath);
-                        sourceFiles.Add(sourceFile);
+
+                        // Analyze the source file
+                        var fileResult = await AnalyzeSourceFileAsync(sourceFile, options);
+
+                        // Merge results
+                        result.Definitions.AddRange(fileResult.Definitions);
+                        result.Variables.AddRange(fileResult.Variables);
+                        result.Functions.AddRange(fileResult.Functions);
+                        result.ConditionalDirectives.AddRange(fileResult.ConditionalDirectives);
+                        result.FunctionRelationships.AddRange(fileResult.FunctionRelationships);
+                        result.VariableConstraints.AddRange(fileResult.VariableConstraints);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _logger.LogWarning($"Source file not found: {sourceFilePath}");
+                        _logger.LogError(ex, $"Error analyzing source file: {sourceFilePath}");
+                        // Continue with the next file
                     }
                 }
-
-                // Analyze each source file
-                foreach (var sourceFile in sourceFiles)
-                {
-                    var fileResult = await AnalyzeSourceFileAsync(sourceFile, options);
-
-                    // Merge results
-                    result.Definitions.AddRange(fileResult.Definitions);
-                    result.Variables.AddRange(fileResult.Variables);
-                    result.Functions.AddRange(fileResult.Functions);
-                    result.ConditionalDirectives.AddRange(fileResult.ConditionalDirectives);
-                    result.FunctionRelationships.AddRange(fileResult.FunctionRelationships);
-                    result.VariableConstraints.AddRange(fileResult.VariableConstraints);
-                }
-
-                // Consolidate and deduplicate results
-                result.Definitions = result.Definitions.GroupBy(d => d.Name)
-                    .Select(g => g.First())
-                    .ToList();
-
-                result.Variables = result.Variables.GroupBy(v => v.Name)
-                    .Select(g => g.First())
-                    .ToList();
-
-                result.Functions = result.Functions.GroupBy(f => f.Name)
-                    .Select(g => g.First())
-                    .ToList();
 
                 // Analyze cross-file relationships
-                await AnalyzeCrossFileRelationshipsAsync(result, project);
+                if (options.AnalyzeCrossFileRelationships)
+                {
+                    await AnalyzeCrossFileRelationshipsAsync(result, project);
+                }
 
-                _logger.LogInformation($"Completed analysis of project: {project.Name}");
+                _logger.LogInformation($"Project analysis complete. Found {result.Functions.Count} functions, {result.Variables.Count} variables, and {result.Definitions.Count} macros");
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error analyzing project: {project.Name}");
+                _logger.LogError(ex, $"Error analyzing project: {ex.Message}");
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<AnalysisResult> AnalyzeFunctionAsync(CFunction function, Project projectContext, AnalysisOptions options)
+        public async Task<bool> IsSourceFileModifiedAsync(SourceFile sourceFile)
         {
             try
             {
-                _logger.LogInformation($"Analyzing function: {function.Name}");
-
-                if (function == null)
+                if (sourceFile == null)
                 {
-                    throw new ArgumentNullException(nameof(function));
+                    throw new ArgumentNullException(nameof(sourceFile));
                 }
 
-                if (projectContext == null)
+                if (string.IsNullOrEmpty(sourceFile.FilePath))
                 {
-                    throw new ArgumentNullException(nameof(projectContext));
+                    throw new ArgumentException("Source file path cannot be null or empty", nameof(sourceFile));
                 }
 
-                if (options == null)
+                if (!_fileService.FileExists(sourceFile.FilePath))
                 {
-                    throw new ArgumentNullException(nameof(options));
+                    _logger.LogWarning($"Source file not found: {sourceFile.FilePath}");
+                    return true; // Consider as modified if the file doesn't exist
                 }
 
-                // Create a new analysis result
-                var result = new AnalysisResult();
+                // Get the last modified time from the file system
+                DateTime lastModified = File.GetLastWriteTime(sourceFile.FilePath);
 
-                // Add the function to the result
-                result.Functions.Add(function);
-
-                // Find the source file that contains this function
-                string sourceFilePath = projectContext.SourceFiles.FirstOrDefault(
-                    path => _fileService.GetFileName(path) == function.SourceFile);
-
-                if (string.IsNullOrEmpty(sourceFilePath))
-                {
-                    _logger.LogWarning($"Source file not found for function: {function.Name}, SourceFile: {function.SourceFile}");
-                    return result;
-                }
-
-                // Load the source file
-                var sourceFile = await _sourceCodeService.LoadSourceFileAsync(sourceFilePath);
-
-                // Analyze the function's variables
-                var usedVariables = await _functionAnalysisService.AnalyzeFunctionVariableUsageAsync(
-                    function, result.Variables);
-
-                result.Variables.AddRange(usedVariables);
-
-                // Analyze the function's complexity
-                var complexity = await _functionAnalysisService.AnalyzeFunctionComplexityAsync(function, sourceFile);
-
-                // Analyze control flow
-                var controlFlow = await _functionAnalysisService.ExtractControlFlowGraphAsync(function, sourceFile);
-
-                // If requested, analyze called functions
-                if (options.AnalyzeFunctionRelationships)
-                {
-                    await AnalyzeCalledFunctionsAsync(function, projectContext, result, options);
-                }
-
-                _logger.LogInformation($"Completed analysis of function: {function.Name}");
-
-                return result;
+                // Compare with the last modified time stored in the source file object
+                return lastModified > sourceFile.LastModified;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error analyzing function: {function.Name}");
-                throw;
+                _logger.LogError(ex, $"Error checking if source file is modified: {sourceFile.FilePath}");
+                return true; // Consider as modified if there's an error
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<CallGraph> AnalyzeCallGraphAsync(CFunction function, Project projectContext, int maxDepth = 0)
-        {
-            try
-            {
-                _logger.LogInformation($"Analyzing call graph for function: {function.Name}");
-
-                if (function == null)
-                {
-                    throw new ArgumentNullException(nameof(function));
-                }
-
-                if (projectContext == null)
-                {
-                    throw new ArgumentNullException(nameof(projectContext));
-                }
-
-                // Create a new call graph
-                var graph = new CallGraph
-                {
-                    RootFunction = function.Name,
-                    Nodes = new List<CallGraphNode>(),
-                    Edges = new List<CallGraphEdge>()
-                };
-
-                // Add the root node
-                var rootNode = new CallGraphNode
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    FunctionName = function.Name,
-                    SourceFile = function.SourceFile,
-                    LineNumber = function.LineNumber,
-                    Depth = 0
-                };
-
-                graph.Nodes.Add(rootNode);
-
-                // Track visited functions to avoid cycles
-                var visited = new HashSet<string>();
-                visited.Add(function.Name);
-
-                // Analyze the call graph recursively
-                await BuildCallGraphAsync(function, projectContext, graph, rootNode.Id, visited, 1, maxDepth);
-
-                _logger.LogInformation($"Completed call graph analysis for function: {function.Name}, Nodes: {graph.Nodes.Count}, Edges: {graph.Edges.Count}");
-
-                return graph;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error analyzing call graph for function: {function.Name}");
-                throw;
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task<DataFlowGraph> AnalyzeDataFlowAsync(CFunction function, Project projectContext)
-        {
-            try
-            {
-                _logger.LogInformation($"Analyzing data flow for function: {function.Name}");
-
-                if (function == null)
-                {
-                    throw new ArgumentNullException(nameof(function));
-                }
-
-                if (projectContext == null)
-                {
-                    throw new ArgumentNullException(nameof(projectContext));
-                }
-
-                // Create a new data flow graph
-                var graph = new DataFlowGraph
-                {
-                    FunctionName = function.Name,
-                    Nodes = new List<DataFlowNode>(),
-                    Edges = new List<DataFlowEdge>()
-                };
-
-                // Find the source file that contains this function
-                string sourceFilePath = projectContext.SourceFiles.FirstOrDefault(
-                    path => _fileService.GetFileName(path) == function.SourceFile);
-
-                if (string.IsNullOrEmpty(sourceFilePath))
-                {
-                    _logger.LogWarning($"Source file not found for function: {function.Name}, SourceFile: {function.SourceFile}");
-                    return graph;
-                }
-
-                // Load the source file
-                var sourceFile = await _sourceCodeService.LoadSourceFileAsync(sourceFilePath);
-
-                // Get all variables used in the function
-                var allVariables = new List<CVariable>(function.Parameters);
-
-                // Add all variables used in the function
-                foreach (var variableName in function.UsedVariables)
-                {
-                    // Add as a placeholder if not already in the list
-                    if (!allVariables.Any(v => v.Name == variableName))
-                    {
-                        allVariables.Add(new CVariable
-                        {
-                            Name = variableName,
-                            TypeName = "unknown", // Placeholder
-                            VariableType = VariableType.Primitive, // Placeholder
-                            Scope = VariableScope.Local // Placeholder
-                        });
-                    }
-                }
-
-                // Analyze data flow for each variable
-                foreach (var variable in allVariables)
-                {
-                    var dataFlow = await _variableAnalysisService.AnalyzeVariableDataFlowAsync(
-                        variable, function, sourceFile);
-
-                    // Create nodes for each assignment
-                    foreach (var assignment in dataFlow.Assignments)
-                    {
-                        var node = new DataFlowNode
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            VariableName = variable.Name,
-                            LineNumber = assignment.LineNumber,
-                            NodeType = "Assignment"
-                        };
-
-                        graph.Nodes.Add(node);
-                    }
-
-                    // Create nodes for each usage
-                    foreach (var usage in dataFlow.Usages)
-                    {
-                        if (usage.UsageType == "Read")
-                        {
-                            var node = new DataFlowNode
-                            {
-                                Id = Guid.NewGuid().ToString(),
-                                VariableName = variable.Name,
-                                LineNumber = usage.LineNumber,
-                                NodeType = "Read"
-                            };
-
-                            graph.Nodes.Add(node);
-                        }
-                    }
-                }
-
-                // Create edges between nodes
-                CreateDataFlowEdges(graph);
-
-                _logger.LogInformation($"Completed data flow analysis for function: {function.Name}, Nodes: {graph.Nodes.Count}, Edges: {graph.Edges.Count}");
-
-                return graph;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error analyzing data flow for function: {function.Name}");
-                throw;
-            }
-        }
-
+        /// <summary>
+        /// Performs detailed analysis on a source file
+        /// </summary>
+        /// <param name="result">Analysis result to update</param>
+        /// <param name="sourceFile">Source file to analyze</param>
+        /// <returns>Task</returns>
         private async Task PerformDetailedAnalysisAsync(AnalysisResult result, SourceFile sourceFile)
         {
             // Perform more detailed analysis of the source file
@@ -454,6 +244,12 @@ namespace C_TestForge.Parser
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Performs comprehensive analysis on a source file
+        /// </summary>
+        /// <param name="result">Analysis result to update</param>
+        /// <param name="sourceFile">Source file to analyze</param>
+        /// <returns>Task</returns>
         private async Task PerformComprehensiveAnalysisAsync(AnalysisResult result, SourceFile sourceFile)
         {
             // Perform comprehensive analysis of the source file
@@ -461,7 +257,7 @@ namespace C_TestForge.Parser
             // Analyze control flow for each function
             foreach (var function in result.Functions)
             {
-                await _functionAnalysisService.ExtractControlFlowGraphAsync(function, sourceFile);
+                await _functionAnalysisService.ExtractControlFlowGraphAsync(function);
             }
 
             // Analyze data flow for each variable in each function
@@ -472,7 +268,10 @@ namespace C_TestForge.Parser
                     if (function.UsedVariables.Contains(variable.Name) ||
                         function.Parameters.Any(p => p.Name == variable.Name))
                     {
-                        await _variableAnalysisService.AnalyzeVariableDataFlowAsync(variable, function, sourceFile);
+                        await _variableAnalysisService.AnalyzeVariablesAsync(
+                            new List<CVariable> { variable },
+                            new List<CFunction> { function },
+                            result.Definitions);
                     }
                 }
             }
@@ -480,6 +279,12 @@ namespace C_TestForge.Parser
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Analyzes relationships between source files in a project
+        /// </summary>
+        /// <param name="result">Analysis result to update</param>
+        /// <param name="project">Project to analyze</param>
+        /// <returns>Task</returns>
         private async Task AnalyzeCrossFileRelationshipsAsync(AnalysisResult result, Project project)
         {
             // Analyze relationships between functions across files
@@ -496,242 +301,11 @@ namespace C_TestForge.Parser
                 }
             }
 
-            // Analyze macro dependencies across files
-            foreach (var definition in result.Definitions)
-            {
-                await _macroAnalysisService.ExtractMacroDependenciesAsync(definition, result.Definitions);
-            }
+            // Analyze macro relationships across files
+            await _macroAnalysisService.AnalyzeMacroRelationshipsAsync(result.Definitions, result.ConditionalDirectives);
 
             await Task.CompletedTask;
         }
-
-        private async Task AnalyzeCalledFunctionsAsync(CFunction function, Project projectContext, AnalysisResult result, AnalysisOptions options)
-        {
-            // Get all project files
-            var allSourceFiles = new List<string>(projectContext.SourceFiles);
-
-            // Track visited functions to avoid cycles
-            var visited = new HashSet<string>();
-            visited.Add(function.Name);
-
-            // Analyze called functions recursively
-            await AnalyzeCalledFunctionsRecursiveAsync(function, projectContext, allSourceFiles, result, visited, options);
-        }
-
-        private async Task AnalyzeCalledFunctionsRecursiveAsync(CFunction function, Project projectContext,
-            List<string> allSourceFiles, AnalysisResult result, HashSet<string> visited, AnalysisOptions options)
-        {
-            foreach (var calledFunctionName in function.CalledFunctions)
-            {
-                // Skip if already visited
-                if (visited.Contains(calledFunctionName))
-                {
-                    continue;
-                }
-
-                visited.Add(calledFunctionName);
-
-                // Find the called function
-                var calledFunction = result.Functions.FirstOrDefault(f => f.Name == calledFunctionName);
-
-                if (calledFunction == null)
-                {
-                    // Function not found, search for it in all source files
-                    calledFunction = await FindFunctionInSourceFilesAsync(calledFunctionName, allSourceFiles);
-                }
-
-                if (calledFunction != null)
-                {
-                    // Add the function to the result if not already there
-                    if (!result.Functions.Any(f => f.Name == calledFunction.Name))
-                    {
-                        result.Functions.Add(calledFunction);
-                    }
-
-                    // Add the relationship
-                    var relationship = new FunctionRelationship
-                    {
-                        CallerName = function.Name,
-                        CalleeName = calledFunction.Name,
-                        LineNumber = function.LineNumber, // Ideally, we would find the exact line number of the call
-                        SourceFile = function.SourceFile
-                    };
-
-                    if (!result.FunctionRelationships.Any(r =>
-                        r.CallerName == relationship.CallerName &&
-                        r.CalleeName == relationship.CalleeName))
-                    {
-                        result.FunctionRelationships.Add(relationship);
-                    }
-
-                    // Recursively analyze this function's called functions
-                    await AnalyzeCalledFunctionsRecursiveAsync(calledFunction, projectContext, allSourceFiles, result, visited, options);
-                }
-            }
-        }
-
-        private async Task<CFunction> FindFunctionInSourceFilesAsync(string functionName, List<string> sourceFiles)
-        {
-            foreach (var sourceFilePath in sourceFiles)
-            {
-                if (_fileService.FileExists(sourceFilePath))
-                {
-                    // Parse the source file
-                    var parseOptions = new ParseOptions
-                    {
-                        AnalyzeFunctions = true,
-                        AnalyzeVariables = false,
-                        ParsePreprocessorDefinitions = false
-                    };
-
-                    var parseResult = await _parserService.ParseSourceFileAsync(sourceFilePath, parseOptions);
-
-                    // Look for the function
-                    var function = parseResult.Functions.FirstOrDefault(f => f.Name == functionName);
-
-                    if (function != null)
-                    {
-                        return function;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private async Task BuildCallGraphAsync(CFunction function, Project projectContext, CallGraph graph,
-            string parentNodeId, HashSet<string> visited, int depth, int maxDepth)
-        {
-            // Stop if we've reached the maximum depth
-            if (maxDepth > 0 && depth > maxDepth)
-            {
-                return;
-            }
-
-            foreach (var calledFunctionName in function.CalledFunctions)
-            {
-                // Find the called function
-                var calledFunction = await FindFunctionAsync(calledFunctionName, projectContext);
-
-                if (calledFunction != null)
-                {
-                    // Create a node for the called function
-                    var nodeId = visited.Contains(calledFunctionName) ?
-                        graph.Nodes.First(n => n.FunctionName == calledFunctionName).Id :
-                        Guid.NewGuid().ToString();
-
-                    if (!visited.Contains(calledFunctionName))
-                    {
-                        var node = new CallGraphNode
-                        {
-                            Id = nodeId,
-                            FunctionName = calledFunctionName,
-                            SourceFile = calledFunction.SourceFile,
-                            LineNumber = calledFunction.LineNumber,
-                            Depth = depth
-                        };
-
-                        graph.Nodes.Add(node);
-                        visited.Add(calledFunctionName);
-                    }
-
-                    // Create an edge from the parent to this function
-                    var edge = new CallGraphEdge
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        SourceId = parentNodeId,
-                        TargetId = nodeId,
-                        LineNumber = function.LineNumber, // Ideally, we would find the exact line number of the call
-                        SourceFile = function.SourceFile
-                    };
-
-                    graph.Edges.Add(edge);
-
-                    // Recursively build the call graph for this function
-                    if (!visited.Contains(calledFunctionName))
-                    {
-                        await BuildCallGraphAsync(calledFunction, projectContext, graph, nodeId, visited, depth + 1, maxDepth);
-                    }
-                }
-            }
-        }
-
-        private async Task<CFunction> FindFunctionAsync(string functionName, Project projectContext)
-        {
-            // Parse all source files to find the function
-            foreach (var sourceFilePath in projectContext.SourceFiles)
-            {
-                if (_fileService.FileExists(sourceFilePath))
-                {
-                    // Parse the source file
-                    var parseOptions = new ParseOptions
-                    {
-                        AnalyzeFunctions = true,
-                        AnalyzeVariables = false,
-                        ParsePreprocessorDefinitions = false
-                    };
-
-                    var parseResult = await _parserService.ParseSourceFileAsync(sourceFilePath, parseOptions);
-
-                    // Look for the function
-                    var function = parseResult.Functions.FirstOrDefault(f => f.Name == functionName);
-
-                    if (function != null)
-                    {
-                        return function;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private void CreateDataFlowEdges(DataFlowGraph graph)
-        {
-            // Group nodes by variable name
-            var nodesByVariable = graph.Nodes.GroupBy(n => n.VariableName)
-                .ToDictionary(g => g.Key, g => g.OrderBy(n => n.LineNumber).ToList());
-
-            foreach (var variable in nodesByVariable.Keys)
-            {
-                var nodes = nodesByVariable[variable];
-
-                // Create edges between assignments and reads
-                for (int i = 0; i < nodes.Count; i++)
-                {
-                    var node = nodes[i];
-
-                    if (node.NodeType == "Assignment")
-                    {
-                        // Find all subsequent reads until the next assignment
-                        for (int j = i + 1; j < nodes.Count; j++)
-                        {
-                            var nextNode = nodes[j];
-
-                            if (nextNode.NodeType == "Read")
-                            {
-                                // Create an edge from the assignment to the read
-                                var edge = new DataFlowEdge
-                                {
-                                    Id = Guid.NewGuid().ToString(),
-                                    SourceId = node.Id,
-                                    TargetId = nextNode.Id,
-                                    EdgeType = "DataFlow"
-                                };
-
-                                graph.Edges.Add(edge);
-                            }
-                            else if (nextNode.NodeType == "Assignment")
-                            {
-                                // Stop at the next assignment
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
-    #endregion
 }

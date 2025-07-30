@@ -23,14 +23,24 @@ namespace C_TestForge.Models.Core
         public ConstraintType Type { get; set; }
 
         /// <summary>
+        /// Name of the variable
+        /// </summary>
+        public string VariableName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Value for exact constraints
+        /// </summary>
+        public string Value { get; set; } = string.Empty;
+
+        /// <summary>
         /// Minimum value of the variable
         /// </summary>
-        public string MinValue { get; set; }
+        public string MinValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Maximum value of the variable
         /// </summary>
-        public string MaxValue { get; set; }
+        public string MaxValue { get; set; } = string.Empty;
 
         /// <summary>
         /// List of allowed values for an enumeration
@@ -40,12 +50,12 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Custom constraint expression
         /// </summary>
-        public string Expression { get; set; }
+        public string Expression { get; set; } = string.Empty;
 
         /// <summary>
         /// Source of the constraint (e.g., function name, line number)
         /// </summary>
-        public string Source { get; set; }
+        public string Source { get; set; } = string.Empty;
 
         /// <summary>
         /// Get a string representation of the constraint

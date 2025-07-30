@@ -44,7 +44,11 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Solver was cancelled
         /// </summary>
-        Cancelled
+        Cancelled,
+        /// <summary>
+        /// The solver failed due to an error
+        /// </summary>
+        Failed,
     }
 
 }

@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:C_TestForge.UI.Views"
-             xmlns:models="clr-namespace:C_TestForge.TestCase.Models;assembly=C_TestForge.TestCase"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:converters="clr-namespace:C_TestForge.UI.Converters"
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
@@ -18,14 +17,16 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.DataGrid.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
+            <!--<converters:EnumToStringConverter x:Key="EnumToStringConverter" />-->
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
-            <ObjectDataProvider x:Key="TestCaseTypeValues" MethodName="GetValues" ObjectType="{x:Type System:Enum}">
+            <!--<ObjectDataProvider x:Key="TestCaseTypeValues" MethodName="GetValues" ObjectType="{x:Type System:Enum}">
                 <ObjectDataProvider.MethodParameters>
-                    <x:Type TypeName="models:TestCaseType" />
+                    -->
+            <!--<x:Type TypeName="models:TestCaseType" />-->
+            <!--
                 </ObjectDataProvider.MethodParameters>
-            </ObjectDataProvider>
+            </ObjectDataProvider>-->
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -48,7 +49,7 @@
 
             <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <TextBlock Text="Test Type:" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <ComboBox Width="150" ItemsSource="{Binding Source={StaticResource TestCaseTypeValues}}"
+                <!--<ComboBox Width="150" ItemsSource="{Binding Source={StaticResource TestCaseTypeValues}}"
                           SelectedItem="{Binding SelectedTestType}"
                           materialDesign:HintAssist.Hint="Select Test Type">
                     <ComboBox.ItemTemplate>
@@ -56,7 +57,7 @@
                             <TextBlock Text="{Binding Converter={StaticResource EnumToStringConverter}}" />
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
-                </ComboBox>
+                </ComboBox>-->
             </StackPanel>
         </Grid>
 

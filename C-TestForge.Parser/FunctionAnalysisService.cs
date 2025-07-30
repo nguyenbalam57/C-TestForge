@@ -1,24 +1,20 @@
-﻿using System;
+﻿using C_TestForge.Core.Interfaces.Analysis;
+using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
+using ClangSharp;
+using ClangSharp.Interop;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using ClangSharp;
-using ClangSharp.Interop;
-using C_TestForge.Core;
-using C_TestForge.Models;
-using Microsoft.Extensions.Logging;
-using C_TestForge.Core.Interfaces.TestCaseManagement;
-using C_TestForge.Core.Interfaces.Analysis;
-using C_TestForge.Core.Interfaces.Parser;
-using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Interfaces.Solver;
 
 namespace C_TestForge.Parser
 {
-    #region FunctionAnalysisService Implementation
-
     /// <summary>
     /// Implementation of the function analysis service
     /// </summary>
@@ -28,6 +24,12 @@ namespace C_TestForge.Parser
         private readonly ISourceCodeService _sourceCodeService;
         private readonly IFileService _fileService;
 
+        /// <summary>
+        /// Constructor for FunctionAnalysisService
+        /// </summary>
+        /// <param name="logger">Logger instance</param>
+        /// <param name="sourceCodeService">Source code service</param>
+        /// <param name="fileService">File service</param>
         public FunctionAnalysisService(
             ILogger<FunctionAnalysisService> logger,
             ISourceCodeService sourceCodeService,
@@ -57,384 +59,747 @@ namespace C_TestForge.Parser
                 cursor.Location.GetFileLocation(out file, out line, out column, out offset);
                 string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
-                // Get function return type
-                var type = cursor.Type;
-                var resultType = clang.getResultType(type);
-                var returnType = resultType.Spelling.ToString();
+                // Get return type
+                var returnType = cursor.ResultType;
+                string returnTypeName = returnType.Spelling.ToString();
 
-                // Check function attributes
-                bool isStatic = false;
-                bool isInline = false;
-                bool isExternal = false;
+                // Check function attributes using storage class
+                bool isStatic = IsStaticFunction(cursor);
+                bool isInline = IsInlineFunction(cursor);
+                bool isExternal = IsExternalFunction(cursor);
 
-                // Kiểm tra storage class bằng cách khác - sửa lỗi CXCursorKind.CXCursor_StorageClass
-                var storageClass = clang.Cursor_getStorageClass(cursor);
-                if (storageClass == CX_StorageClass.CX_SC_Static)
-                {
-                    isStatic = true;
-                }
-                else if (storageClass == CX_StorageClass.CX_SC_Extern)
-                {
-                    isExternal = true;
-                }
+                // Get function parameters
+                List<CVariable> parameters = ExtractParameters(cursor);
 
-                // Kiểm tra inline bằng cách phân tích token - sửa lỗi CXCursor_InlineAttr
-                // Kiểm tra inline bằng cách phân tích range text thay vì tokenize
-                // Sử dụng extent để lấy phạm vi của khai báo hàm
-                CXSourceRange range = cursor.Extent;
+                // Extract function body
+                string body = ExtractFunctionBody(cursor);
 
-                // Lấy translation unit từ cursor
-                CXTranslationUnit tu = cursor.TranslationUnit;
-
-                // Tokenize extent thay vì cursor
-                CXToken* tokens;
-                uint numTokens;
-                clang.tokenize(tu, range, &tokens, &numTokens);
-
-                // Kiểm tra từng token
-                try
-                {
-                    for (uint i = 0; i < numTokens; i++)
-                    {
-                        CXString spelling = clang.getTokenSpelling(tu, tokens[i]);
-                        string tokenText = spelling.ToString();
-                        clang.disposeString(spelling);
-
-                        if (tokenText == "inline")
-                        {
-                            isInline = true;
-                            break;
-                        }
-                    }
-                }
-                finally
-                {
-                    // Giải phóng tokens
-                    clang.disposeTokens(tu, tokens, numTokens);
-                }
+                // Extract called functions and used variables
+                var (calledFunctions, usedVariables) = ExtractFunctionCallsAndVariables(body);
 
                 // Create function object
                 var function = new CFunction
                 {
                     Name = functionName,
-                    ReturnType = returnType,
+                    ReturnType = returnTypeName,
+                    Parameters = parameters,
                     LineNumber = (int)line,
                     ColumnNumber = (int)column,
                     SourceFile = sourceFile,
                     IsStatic = isStatic,
                     IsInline = isInline,
                     IsExternal = isExternal,
-                    Parameters = new List<CVariable>(),
-                    CalledFunctions = new List<string>(),
-                    UsedVariables = new List<string>()
+                    Body = body,
+                    CalledFunctions = calledFunctions,
+                    UsedVariables = usedVariables
                 };
-
-                // Extract parameters
-                int paramCount = cursor.NumArguments;
-                for (uint i = 0; i < paramCount; i++)
-                {
-                    var paramCursor = cursor.GetArgument(i);
-                    var parameter = ExtractParameter(paramCursor);
-                    if (parameter != null)
-                    {
-                        function.Parameters.Add(parameter);
-                    }
-                }
-
-                // Extract function body if available
-                // Extract function body if available - sửa lỗi "CXCursor does not contain HasChildren"
-                // Kiểm tra cursor có con bằng cách đếm con hoặc kiểm tra phạm vi
-                bool hasChildren = false;
-                cursor.VisitChildren((child, parent, clientData) =>
-                {
-                    hasChildren = true;
-                    return CXChildVisitResult.CXChildVisit_Break;
-                }, default(CXClientData));
-
-                if (hasChildren)
-                {
-                    ExtractFunctionBody(cursor, function);
-                }
 
                 return function;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting function from cursor: {cursor.Spelling}");
+                _logger.LogError(ex, $"Error extracting function: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Checks if a function has static storage class
+        /// </summary>
+        /// <param name="cursor">Function cursor</param>
+        /// <returns>True if the function is static</returns>
+        private unsafe bool IsStaticFunction(CXCursor cursor)
+        {
+            // Check storage class using CX_StorageClass enum
+            var storageClass = clang.Cursor_getStorageClass(cursor);
+            return storageClass == CX_StorageClass.CX_SC_Static;
+        }
+
+        /// <summary>
+        /// Checks if a function is declared as inline
+        /// </summary>
+        /// <param name="cursor">Function cursor</param>
+        /// <returns>True if the function is inline</returns>
+        private unsafe bool IsInlineFunction(CXCursor cursor)
+        {
+            // First, check if the function has the inline keyword by examining tokens
+            bool isInline = false;
+            uint numTokens = 0;
+            CXToken* tokens = null;
+
+            // Get tokens for the function declaration
+            clang.tokenize(cursor.TranslationUnit, cursor.Extent, &tokens, &numTokens);
+
+            // Look for "inline" token
+            for (uint i = 0; i < numTokens; i++)
+            {
+                var token = tokens[i];
+                var spelling = clang.getTokenSpelling(cursor.TranslationUnit, token).ToString();
+                if (spelling == "inline")
+                {
+                    isInline = true;
+                    break;
+                }
+            }
+
+            // Free token memory
+            if (tokens != null && numTokens > 0)
+            {
+                clang.disposeTokens(cursor.TranslationUnit, tokens, numTokens);
+            }
+
+            return isInline;
+        }
+
+        /// <summary>
+        /// Checks if a function is declared as extern
+        /// </summary>
+        /// <param name="cursor">Function cursor</param>
+        /// <returns>True if the function is extern</returns>
+        private unsafe bool IsExternalFunction(CXCursor cursor)
+        {
+            // Check storage class
+            var storageClass = clang.Cursor_getStorageClass(cursor);
+            return storageClass == CX_StorageClass.CX_SC_Extern;
         }
 
         /// <inheritdoc/>
         public async Task<List<FunctionRelationship>> AnalyzeFunctionRelationshipsAsync(List<CFunction> functions)
         {
+            _logger.LogInformation($"Analyzing relationships between {functions.Count} functions");
+
+            var relationships = new List<FunctionRelationship>();
+
             try
             {
-                _logger.LogInformation($"Analyzing relationships between {functions.Count} functions");
-
-                var relationships = new List<FunctionRelationship>();
-
-                // Build a dictionary for quick lookup
+                // Build a dictionary of functions for quick lookup
                 var functionDict = functions.ToDictionary(f => f.Name, f => f);
 
-                // Analyze each function's relationships
+                // Analyze each function for calls to other functions
                 foreach (var function in functions)
                 {
-                    _logger.LogDebug($"Analyzing relationships for function: {function.Name}");
+                    _logger.LogDebug($"Analyzing function calls for: {function.Name}");
 
-                    // Find called functions
                     foreach (var calledFunctionName in function.CalledFunctions)
                     {
+                        // Check if the called function is in our list
                         if (functionDict.TryGetValue(calledFunctionName, out var calledFunction))
                         {
-                            _logger.LogDebug($"Function {function.Name} calls {calledFunctionName}");
-
+                            // Create a relationship
                             var relationship = new FunctionRelationship
                             {
                                 CallerName = function.Name,
                                 CalleeName = calledFunctionName,
-                                LineNumber = function.LineNumber, // Ideally, we would find the exact line number of the call
-                                SourceFile = function.SourceFile
+                                SourceFile = function.SourceFile,
+                                LineNumber = function.LineNumber
                             };
 
-                            relationships.Add(relationship);
+                            // Check if this relationship already exists
+                            if (!relationships.Any(r =>
+                                r.CallerName == relationship.CallerName &&
+                                r.CalleeName == relationship.CalleeName))
+                            {
+                                relationships.Add(relationship);
+                            }
                         }
                     }
                 }
 
-                // Identify complex relationships (e.g., recursive calls, mutual recursion)
-                IdentifyComplexRelationships(relationships, functions);
-
-                _logger.LogInformation($"Identified {relationships.Count} function relationships");
+                _logger.LogInformation($"Found {relationships.Count} function relationships");
 
                 return relationships;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing function relationships");
-                throw;
+                _logger.LogError(ex, $"Error analyzing function relationships: {ex.Message}");
+                return relationships;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<ControlFlowGraph> ExtractControlFlowGraphAsync(CFunction function, SourceFile sourceFile)
+        public async Task<ControlFlowGraph> ExtractControlFlowGraphAsync(CFunction function)
         {
+            _logger.LogInformation($"Extracting control flow graph for function: {function.Name}");
+
+            var graph = new ControlFlowGraph
+            {
+                FunctionName = function.Name
+            };
+
             try
             {
-                _logger.LogInformation($"Extracting control flow graph for function: {function.Name}");
-
-                if (function == null)
+                if (string.IsNullOrEmpty(function.Body))
                 {
-                    throw new ArgumentNullException(nameof(function));
-                }
-
-                if (sourceFile == null)
-                {
-                    throw new ArgumentNullException(nameof(sourceFile));
-                }
-
-                // Create a new control flow graph
-                var graph = new ControlFlowGraph
-                {
-                    FunctionName = function.Name,
-                    Nodes = new List<ControlFlowNode>(),
-                    Edges = new List<ControlFlowEdge>()
-                };
-
-                // Extract the function body lines
-                var functionBody = ExtractFunctionBodyLines(function, sourceFile);
-
-                if (functionBody.Count == 0)
-                {
-                    _logger.LogWarning($"Could not extract function body for {function.Name}");
                     return graph;
                 }
 
-                // Create the entry node
+                // Split the function body into lines for analysis
+                string[] lines = function.Body.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                // Create nodes for control structures (if, else, for, while, switch, etc.)
+                // This is a simplified approach; a real implementation would use the AST
+                int nodeId = 0;
+
+                // Entry node
                 var entryNode = new ControlFlowNode
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = $"node_{nodeId++}",
                     NodeType = "Entry",
                     LineNumber = function.LineNumber,
-                    Code = $"{function.ReturnType} {function.Name}(...)"
+                    Code = $"Entry: {function.Name}"
                 };
-
                 graph.Nodes.Add(entryNode);
 
-                // Create nodes for each statement in the function body
-                await ProcessFunctionBodyAsync(functionBody, function.LineNumber, graph, entryNode.Id);
+                // Exit node
+                var exitNode = new ControlFlowNode
+                {
+                    Id = $"node_{nodeId++}",
+                    NodeType = "Exit",
+                    LineNumber = function.LineNumber + lines.Length,
+                    Code = $"Exit: {function.Name}"
+                };
 
-                _logger.LogInformation($"Extracted control flow graph with {graph.Nodes.Count} nodes and {graph.Edges.Count} edges for function: {function.Name}");
+                // Process function body
+                var currentNode = entryNode;
+
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = lines[i].Trim();
+
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//") || line.StartsWith("/*"))
+                    {
+                        continue; // Skip comments and empty lines
+                    }
+
+                    // Detect control structures
+                    if (line.StartsWith("if ") || line.StartsWith("if("))
+                    {
+                        // If statement
+                        var ifNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Condition",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(ifNode);
+
+                        // Add edge from current node to if node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = ifNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = ifNode;
+                    }
+                    else if (line.StartsWith("else ") || line == "else")
+                    {
+                        // Else statement
+                        var elseNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Condition",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(elseNode);
+
+                        // Add edge from previous node to else node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = elseNode.Id,
+                            EdgeType = "False"
+                        });
+
+                        currentNode = elseNode;
+                    }
+                    else if (line.StartsWith("for ") || line.StartsWith("for("))
+                    {
+                        // For loop
+                        var forNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Loop",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(forNode);
+
+                        // Add edge from current node to for node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = forNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = forNode;
+                    }
+                    else if (line.StartsWith("while ") || line.StartsWith("while("))
+                    {
+                        // While loop
+                        var whileNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Loop",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(whileNode);
+
+                        // Add edge from current node to while node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = whileNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = whileNode;
+                    }
+                    else if (line.StartsWith("switch ") || line.StartsWith("switch("))
+                    {
+                        // Switch statement
+                        var switchNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Switch",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(switchNode);
+
+                        // Add edge from current node to switch node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = switchNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = switchNode;
+                    }
+                    else if (line.StartsWith("case ") || line.StartsWith("default:"))
+                    {
+                        // Case or default in switch
+                        var caseNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Case",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(caseNode);
+
+                        // Add edge from current node to case node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = caseNode.Id,
+                            EdgeType = "Case"
+                        });
+
+                        currentNode = caseNode;
+                    }
+                    else if (line.StartsWith("return ") || line == "return;")
+                    {
+                        // Return statement
+                        var returnNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Return",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(returnNode);
+
+                        // Add edge from current node to return node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = returnNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        // Add edge from return node to exit node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = returnNode.Id,
+                            TargetId = exitNode.Id,
+                            EdgeType = "Return"
+                        });
+
+                        currentNode = returnNode;
+                    }
+                    else if (line.StartsWith("break;") || line == "break")
+                    {
+                        // Break statement
+                        var breakNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Break",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(breakNode);
+
+                        // Add edge from current node to break node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = breakNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = breakNode;
+                    }
+                    else if (line.StartsWith("continue;") || line == "continue")
+                    {
+                        // Continue statement
+                        var continueNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Continue",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(continueNode);
+
+                        // Add edge from current node to continue node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = continueNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = continueNode;
+                    }
+                    else if (line.Contains("(") && !line.StartsWith("{") && !line.StartsWith("}"))
+                    {
+                        // Likely a function call or statement
+                        var statementNode = new ControlFlowNode
+                        {
+                            Id = $"node_{nodeId++}",
+                            NodeType = "Statement",
+                            LineNumber = function.LineNumber + i,
+                            Code = line
+                        };
+                        graph.Nodes.Add(statementNode);
+
+                        // Add edge from current node to statement node
+                        graph.Edges.Add(new ControlFlowEdge
+                        {
+                            Id = $"edge_{graph.Edges.Count}",
+                            SourceId = currentNode.Id,
+                            TargetId = statementNode.Id,
+                            EdgeType = "Unconditional"
+                        });
+
+                        currentNode = statementNode;
+                    }
+                }
+
+                // Add exit node if not already connected
+                if (!graph.Edges.Any(e => e.TargetId == exitNode.Id))
+                {
+                    graph.Nodes.Add(exitNode);
+
+                    // Add edge from last node to exit node
+                    graph.Edges.Add(new ControlFlowEdge
+                    {
+                        Id = $"edge_{graph.Edges.Count}",
+                        SourceId = currentNode.Id,
+                        TargetId = exitNode.Id,
+                        EdgeType = "Unconditional"
+                    });
+                }
+
+                _logger.LogInformation($"Generated control flow graph with {graph.Nodes.Count} nodes and {graph.Edges.Count} edges");
 
                 return graph;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting control flow graph for function: {function.Name}");
-                throw;
+                _logger.LogError(ex, $"Error extracting control flow graph for function {function.Name}: {ex.Message}");
+                return graph;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<FunctionComplexity> AnalyzeFunctionComplexityAsync(CFunction function, SourceFile sourceFile)
+        public async Task AnalyzeFunctionComplexityAsync(CFunction function, SourceFile sourceFile)
         {
+            _logger.LogInformation($"Analyzing complexity for function: {function.Name}");
+
             try
             {
-                _logger.LogInformation($"Analyzing complexity of function: {function.Name}");
-
-                if (function == null)
+                if (string.IsNullOrEmpty(function.Body))
                 {
-                    throw new ArgumentNullException(nameof(function));
+                    return;
                 }
 
-                if (sourceFile == null)
-                {
-                    throw new ArgumentNullException(nameof(sourceFile));
-                }
+                // Calculate cyclomatic complexity
+                int complexity = CalculateCyclomaticComplexity(function.Body);
+                _logger.LogDebug($"Cyclomatic complexity for function {function.Name}: {complexity}");
 
-                // Extract the function body lines
-                var functionBody = ExtractFunctionBodyLines(function, sourceFile);
+                // Calculate nesting depth
+                int maxNestingDepth = CalculateMaxNestingDepth(function.Body);
+                _logger.LogDebug($"Maximum nesting depth for function {function.Name}: {maxNestingDepth}");
 
-                if (functionBody.Count == 0)
-                {
-                    _logger.LogWarning($"Could not extract function body for {function.Name}");
-                    return new FunctionComplexity
-                    {
-                        FunctionName = function.Name,
-                        CyclomaticComplexity = 1,
-                        LinesOfCode = 0,
-                        ParameterCount = function.Parameters.Count,
-                        NestingDepth = 0,
-                        StatementCount = 0,
-                        ConditionCount = 0
-                    };
-                }
+                // Calculate lines of code
+                int linesOfCode = CountLinesOfCode(function.Body);
+                _logger.LogDebug($"Lines of code for function {function.Name}: {linesOfCode}");
 
-                // Calculate complexity metrics
-                int cyclomaticComplexity = CalculateCyclomaticComplexity(functionBody);
-                int nestingDepth = CalculateNestingDepth(functionBody);
-                int statementCount = CalculateStatementCount(functionBody);
-                int conditionCount = CalculateConditionCount(functionBody);
-
-                var complexity = new FunctionComplexity
-                {
-                    FunctionName = function.Name,
-                    CyclomaticComplexity = cyclomaticComplexity,
-                    LinesOfCode = functionBody.Count,
-                    ParameterCount = function.Parameters.Count,
-                    NestingDepth = nestingDepth,
-                    StatementCount = statementCount,
-                    ConditionCount = conditionCount
-                };
-
-                _logger.LogInformation($"Analyzed complexity of function: {function.Name}, Cyclomatic Complexity: {cyclomaticComplexity}, Nesting Depth: {nestingDepth}");
-
-                return complexity;
+                // Additional metrics could be added here
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error analyzing complexity of function: {function.Name}");
-                throw;
+                _logger.LogError(ex, $"Error analyzing complexity for function {function.Name}: {ex.Message}");
             }
         }
 
         /// <inheritdoc/>
-        public async Task<List<CVariable>> AnalyzeFunctionVariableUsageAsync(CFunction function, List<CVariable> allVariables)
+        public async Task<Dictionary<string, List<CVariable>>> AnalyzeFunctionVariableUsageAsync(CFunction function, List<CVariable> allVariables)
         {
+            _logger.LogInformation($"Analyzing variable usage for function: {function.Name}");
+
+            var variableUsage = new Dictionary<string, List<CVariable>>();
+
             try
             {
-                _logger.LogInformation($"Analyzing variable usage in function: {function.Name}");
-
-                if (function == null)
+                if (string.IsNullOrEmpty(function.Body))
                 {
-                    throw new ArgumentNullException(nameof(function));
+                    return variableUsage;
                 }
 
-                if (allVariables == null)
+                // Get all variables that might be used in this function
+                var potentialVariables = allVariables
+                    .Where(v => v.Scope == VariableScope.Global || v.Scope == VariableScope.Rom || v.Scope == VariableScope.Static)
+                    .ToList();
+
+                // Add function parameters
+                potentialVariables.AddRange(function.Parameters);
+
+                // Create a dictionary for quick lookup
+                var variableDict = potentialVariables.ToDictionary(v => v.Name, v => v);
+
+                // Analyze body for variable usage
+                foreach (var varName in function.UsedVariables)
                 {
-                    throw new ArgumentNullException(nameof(allVariables));
-                }
-
-                var usedVariables = new List<CVariable>();
-
-                // Check each used variable name
-                foreach (var variableName in function.UsedVariables)
-                {
-                    // Find the variable in the allVariables list
-                    var variable = allVariables.FirstOrDefault(v => v.Name == variableName);
-
-                    if (variable != null)
+                    if (variableDict.TryGetValue(varName, out var variable))
                     {
-                        usedVariables.Add(variable);
+                        string usageType = DetermineVariableUsageType(function.Body, varName);
 
-                        // Add the function to the variable's UsedByFunctions list
-                        if (!variable.UsedByFunctions.Contains(function.Name))
+                        if (!variableUsage.ContainsKey(usageType))
                         {
-                            variable.UsedByFunctions.Add(function.Name);
+                            variableUsage[usageType] = new List<CVariable>();
                         }
+
+                        variableUsage[usageType].Add(variable);
                     }
                 }
 
-                // Also add the function parameters
-                foreach (var parameter in function.Parameters)
-                {
-                    if (!usedVariables.Any(v => v.Name == parameter.Name))
-                    {
-                        usedVariables.Add(parameter);
+                _logger.LogInformation($"Analyzed usage for {function.UsedVariables.Count} variables in function {function.Name}");
 
-                        // Add the function to the parameter's UsedByFunctions list
-                        if (!parameter.UsedByFunctions.Contains(function.Name))
-                        {
-                            parameter.UsedByFunctions.Add(function.Name);
-                        }
-                    }
-                }
-
-                _logger.LogInformation($"Found {usedVariables.Count} variables used in function: {function.Name}");
-
-                return usedVariables;
+                return variableUsage;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error analyzing variable usage in function: {function.Name}");
-                throw;
+                _logger.LogError(ex, $"Error analyzing variable usage for function {function.Name}: {ex.Message}");
+                return variableUsage;
             }
         }
 
-        private CVariable ExtractParameter(CXCursor cursor)
+        /// <summary>
+        /// Extracts parameters from a function cursor
+        /// </summary>
+        /// <param name="cursor">Function cursor</param>
+        /// <returns>List of function parameters</returns>
+        private unsafe List<CVariable> ExtractParameters(CXCursor cursor)
         {
-            if (cursor.Kind != CXCursorKind.CXCursor_ParmDecl)
+            var parameters = new List<CVariable>();
+
+            try
             {
-                return null;
+                // Get the number of parameters
+                int numParams = clang.Cursor_getNumArguments(cursor);
+
+                for (uint i = 0; i < numParams; i++)
+                {
+                    var paramCursor = clang.Cursor_getArgument(cursor, i);
+                    string paramName = paramCursor.Spelling.ToString();
+
+                    // Get parameter location
+                    CXFile file;
+                    uint line, column, offset;
+                    paramCursor.Location.GetFileLocation(out file, out line, out column, out offset);
+                    string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
+
+                    // Get parameter type
+                    var type = paramCursor.Type;
+                    string typeName = type.Spelling.ToString();
+
+                    // Determine variable type
+                    VariableType variableType = DetermineVariableType(type);
+
+                    // Check attributes
+                    bool isConst = typeName.Contains("const");
+
+                    parameters.Add(new CVariable
+                    {
+                        Name = paramName,
+                        TypeName = typeName,
+                        VariableType = variableType,
+                        Scope = VariableScope.Parameter,
+                        LineNumber = (int)line,
+                        ColumnNumber = (int)column,
+                        SourceFile = sourceFile,
+                        IsConst = isConst
+                    });
+                }
+
+                return parameters;
             }
-
-            string paramName = cursor.Spelling.ToString();
-            var type = cursor.Type;
-            string typeName = type.Spelling.ToString();
-
-            // Get parameter location
-            cursor.Location.GetFileLocation(out CXFile file, out uint line, out uint column, out _);
-            string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
-
-            // Determine variable type
-            VariableType variableType = DetermineVariableType(type);
-
-            // Check attributes
-            bool isConst = typeName.Contains("const");
-
-            return new CVariable
+            catch (Exception ex)
             {
-                Name = paramName,
-                TypeName = typeName,
-                VariableType = variableType,
-                Scope = VariableScope.Parameter,
-                LineNumber = (int)line,
-                ColumnNumber = (int)column,
-                SourceFile = sourceFile,
-                IsConst = isConst
-            };
+                _logger.LogError(ex, $"Error extracting parameters: {ex.Message}");
+                return parameters;
+            }
         }
 
+        /// <summary>
+        /// Extracts the function body from a cursor
+        /// </summary>
+        /// <param name="cursor">Function cursor</param>
+        /// <returns>Function body as a string</returns>
+        private string ExtractFunctionBody(CXCursor cursor)
+        {
+            try
+            {
+                var extent = cursor.Extent;
+                string fullText = extent.ToString();
+
+                // Find the opening brace
+                int openBrace = fullText.IndexOf('{');
+                if (openBrace < 0)
+                {
+                    // No body, might be a declaration
+                    return string.Empty;
+                }
+
+                // Find the closing brace (matching the opening one)
+                int closeBrace = -1;
+                int braceCount = 0;
+
+                for (int i = openBrace; i < fullText.Length; i++)
+                {
+                    if (fullText[i] == '{')
+                    {
+                        braceCount++;
+                    }
+                    else if (fullText[i] == '}')
+                    {
+                        braceCount--;
+                        if (braceCount == 0)
+                        {
+                            closeBrace = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (closeBrace < 0)
+                {
+                    // Could not find matching closing brace
+                    return string.Empty;
+                }
+
+                // Extract the body (including braces)
+                return fullText.Substring(openBrace, closeBrace - openBrace + 1);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting function body: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Extracts function calls and variable uses from function body
+        /// </summary>
+        /// <param name="body">Function body</param>
+        /// <returns>Tuple of (called functions, used variables)</returns>
+        private (List<string> CalledFunctions, List<string> UsedVariables) ExtractFunctionCallsAndVariables(string body)
+        {
+            var calledFunctions = new List<string>();
+            var usedVariables = new List<string>();
+
+            try
+            {
+                if (string.IsNullOrEmpty(body))
+                {
+                    return (calledFunctions, usedVariables);
+                }
+
+                // Extract function calls
+                // This is a simplified approach that looks for identifiers followed by parentheses
+                var functionCallPattern = new Regex(@"(\w+)\s*\(");
+                var functionMatches = functionCallPattern.Matches(body);
+
+                foreach (Match match in functionMatches)
+                {
+                    string functionName = match.Groups[1].Value;
+
+                    // Skip C keywords and standard library functions
+                    if (!IsKeywordOrBuiltinFunction(functionName) && !calledFunctions.Contains(functionName))
+                    {
+                        calledFunctions.Add(functionName);
+                    }
+                }
+
+                // Extract variable uses
+                // This is a simplified approach that might pick up false positives
+                var variablePattern = new Regex(@"([a-zA-Z_]\w*)\b(?!\s*\()");
+                var variableMatches = variablePattern.Matches(body);
+
+                foreach (Match match in variableMatches)
+                {
+                    string variableName = match.Groups[1].Value;
+
+                    // Skip C keywords and literals
+                    if (!IsKeywordOrLiteral(variableName) && !usedVariables.Contains(variableName))
+                    {
+                        usedVariables.Add(variableName);
+                    }
+                }
+
+                return (calledFunctions, usedVariables);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting function calls and variables: {ex.Message}");
+                return (calledFunctions, usedVariables);
+            }
+        }
+
+        /// <summary>
+        /// Determines the variable type from a Clang type
+        /// </summary>
+        /// <param name="type">Clang type</param>
+        /// <returns>Variable type</returns>
         private VariableType DetermineVariableType(CXType type)
         {
             switch (type.kind)
@@ -449,812 +814,134 @@ namespace C_TestForge.Parser
                     return VariableType.Pointer;
 
                 case CXTypeKind.CXType_Record:
-                    return type.Spelling.ToString().Contains("struct") ? VariableType.Struct : VariableType.Union;
+                    return type.Spelling.ToString().Contains("struct") ?
+                        VariableType.Struct : VariableType.Union;
 
                 case CXTypeKind.CXType_Enum:
                     return VariableType.Enum;
 
+                case CXTypeKind.CXType_Float:
+                case CXTypeKind.CXType_Double:
+                case CXTypeKind.CXType_LongDouble:
+                    return VariableType.Float;
+
+                case CXTypeKind.CXType_Bool:
+                    return VariableType.Bool;
+
+                case CXTypeKind.CXType_Char_S:
+                case CXTypeKind.CXType_Char_U:
+                case CXTypeKind.CXType_SChar:
+                case CXTypeKind.CXType_UChar:
+                    return VariableType.Char;
+
                 default:
-                    return VariableType.Primitive;
-            }
-        }
-
-        private unsafe void ExtractFunctionBody(CXCursor cursor, CFunction function)
-        {
-            // Find the function body
-            CXCursor bodyStmt = default;
-
-            cursor.VisitChildren((child, parent, clientData) =>
-            {
-                if (child.Kind == CXCursorKind.CXCursor_CompoundStmt)
-                {
-                    bodyStmt = child;
-                    return CXChildVisitResult.CXChildVisit_Break;
-                }
-
-                return CXChildVisitResult.CXChildVisit_Continue;
-            }, default(CXClientData));
-
-            if (bodyStmt.Kind != CXCursorKind.CXCursor_CompoundStmt)
-            {
-                return;
-            }
-
-            // Extract the source code of the body
-            bodyStmt.Extent.Start.GetFileLocation(out CXFile startFile, out uint startLine, out uint startColumn, out _);
-            bodyStmt.Extent.End.GetFileLocation(out CXFile endFile, out uint endLine, out uint endColumn, out _);
-
-            if (startFile != null && endFile != null && startFile.Name.ToString() == endFile.Name.ToString())
-            {
-                function.Body = $"// Function body from line {startLine} to {endLine}";
-            }
-
-            // Find called functions and used variables
-            var usedVariables = new HashSet<string>();
-            var calledFunctions = new HashSet<string>();
-
-            bodyStmt.VisitChildren((child, parent, clientData) =>
-            {
-                if (child.Kind == CXCursorKind.CXCursor_DeclRefExpr)
-                {
-                    var referencedCursor = child.Referenced;
-                    if (referencedCursor.Kind == CXCursorKind.CXCursor_VarDecl)
+                    // Handle integer types
+                    if (type.kind >= CXTypeKind.CXType_Short && type.kind <= CXTypeKind.CXType_ULongLong)
                     {
-                        usedVariables.Add(referencedCursor.Spelling.ToString());
-                    }
-                    else if (referencedCursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
-                    {
-                        calledFunctions.Add(referencedCursor.Spelling.ToString());
-                    }
-                }
-
-                return CXChildVisitResult.CXChildVisit_Recurse;
-            }, default(CXClientData));
-
-            function.UsedVariables = usedVariables.ToList();
-            function.CalledFunctions = calledFunctions.ToList();
-        }
-
-        private void IdentifyComplexRelationships(List<FunctionRelationship> relationships, List<CFunction> functions)
-        {
-            // Find recursive calls
-            foreach (var function in functions)
-            {
-                if (function.CalledFunctions.Contains(function.Name))
-                {
-                    _logger.LogDebug($"Recursive call detected in function: {function.Name}");
-                }
-            }
-
-            // Find mutual recursion
-            foreach (var functionA in functions)
-            {
-                foreach (var functionB in functions)
-                {
-                    if (functionA.Name != functionB.Name &&
-                        functionA.CalledFunctions.Contains(functionB.Name) &&
-                        functionB.CalledFunctions.Contains(functionA.Name))
-                    {
-                        _logger.LogDebug($"Mutual recursion detected between functions: {functionA.Name} and {functionB.Name}");
-                    }
-                }
-            }
-        }
-
-        private List<string> ExtractFunctionBodyLines(CFunction function, SourceFile sourceFile)
-        {
-            var bodyLines = new List<string>();
-
-            // Find the function in the source file
-            bool foundFunction = false;
-            int braceCount = 0;
-
-            for (int i = function.LineNumber - 1; i < sourceFile.Lines.Count; i++)
-            {
-                string line = sourceFile.Lines[i];
-
-                if (!foundFunction)
-                {
-                    // Look for the function declaration
-                    if (line.Contains(function.Name) && (line.Contains('(') || line.Contains(')')))
-                    {
-                        foundFunction = true;
+                        return VariableType.Integer;
                     }
 
-                    continue;
-                }
-
-                // Count braces to find the function body
-                for (int j = 0; j < line.Length; j++)
-                {
-                    if (line[j] == '{')
-                    {
-                        braceCount++;
-
-                        if (braceCount == 1)
-                        {
-                            // Start of function body
-                            bodyLines.Add(line.Substring(j));
-                            break;
-                        }
-                    }
-                    else if (line[j] == '}')
-                    {
-                        braceCount--;
-
-                        if (braceCount == 0)
-                        {
-                            // End of function body
-                            bodyLines.Add(line.Substring(0, j + 1));
-                            return bodyLines;
-                        }
-                    }
-                }
-
-                if (braceCount > 0 && (!bodyLines.Contains(line)))
-                {
-                    bodyLines.Add(line);
-                }
+                    return VariableType.Unknown;
             }
-
-            return bodyLines;
         }
 
-        private async Task ProcessFunctionBodyAsync(List<string> functionBody, int baseLineNumber, ControlFlowGraph graph, string currentNodeId)
+        /// <summary>
+        /// Checks if a string is a C keyword or built-in function
+        /// </summary>
+        /// <param name="word">Word to check</param>
+        /// <returns>True if the word is a C keyword or built-in function, false otherwise</returns>
+        private bool IsKeywordOrBuiltinFunction(string word)
         {
-            // Process each line in the function body
-            for (int i = 0; i < functionBody.Count; i++)
+            // List of common C keywords and built-in functions
+            string[] keywords = new[]
             {
-                string line = functionBody[i].Trim();
-
-                // Skip empty lines and comments
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//") || line.StartsWith("/*"))
-                {
-                    continue;
-                }
-
-                // Check for control flow statements
-                if (line.StartsWith("if") || line.Contains(" if "))
-                {
-                    await ProcessIfStatementAsync(functionBody, i, baseLineNumber, graph, currentNodeId);
-                }
-                else if (line.StartsWith("for") || line.Contains(" for "))
-                {
-                    await ProcessLoopStatementAsync(functionBody, i, "for", baseLineNumber, graph, currentNodeId);
-                }
-                else if (line.StartsWith("while") || line.Contains(" while "))
-                {
-                    await ProcessLoopStatementAsync(functionBody, i, "while", baseLineNumber, graph, currentNodeId);
-                }
-                else if (line.StartsWith("do") || line.Contains(" do "))
-                {
-                    await ProcessDoWhileStatementAsync(functionBody, i, baseLineNumber, graph, currentNodeId);
-                }
-                else if (line.StartsWith("switch") || line.Contains(" switch "))
-                {
-                    await ProcessSwitchStatementAsync(functionBody, i, baseLineNumber, graph, currentNodeId);
-                }
-                else if (line.StartsWith("return") || line.Contains(" return "))
-                {
-                    await ProcessReturnStatementAsync(line, baseLineNumber + i, graph, currentNodeId);
-                }
-                else
-                {
-                    // Regular statement
-                    var statementNode = new ControlFlowNode
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        NodeType = "Statement",
-                        LineNumber = baseLineNumber + i,
-                        Code = line
-                    };
-
-                    graph.Nodes.Add(statementNode);
-
-                    // Add edge from current node to this statement
-                    graph.Edges.Add(new ControlFlowEdge
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        SourceId = currentNodeId,
-                        TargetId = statementNode.Id,
-                        EdgeType = "Sequential",
-                        //SourceFile = null // Would need to get this from somewhere
-                    });
-
-                    // Update current node
-                    currentNodeId = statementNode.Id;
-                }
-            }
-
-            // Add an exit node if there isn't a return statement
-            if (!graph.Nodes.Any(n => n.NodeType == "Return"))
-            {
-                var exitNode = new ControlFlowNode
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    NodeType = "Exit",
-                    LineNumber = baseLineNumber + functionBody.Count,
-                    Code = "// Function exit"
-                };
-
-                graph.Nodes.Add(exitNode);
-
-                // Add edge from current node to exit
-                graph.Edges.Add(new ControlFlowEdge
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    SourceId = currentNodeId,
-                    TargetId = exitNode.Id,
-                    EdgeType = "Sequential",
-                    //SourceFile = null // Would need to get this from somewhere
-                });
-            }
-
-            await Task.CompletedTask;
-        }
-
-        private async Task ProcessIfStatementAsync(List<string> functionBody, int lineIndex, int baseLineNumber, ControlFlowGraph graph, string currentNodeId)
-        {
-            string line = functionBody[lineIndex].Trim();
-
-            // Extract the condition
-            string condition = ExtractCondition(line, "if");
-
-            // Create a condition node
-            var conditionNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "Condition",
-                LineNumber = baseLineNumber + lineIndex,
-                Code = $"if ({condition})"
+                "if", "else", "for", "while", "do", "switch", "case", "default",
+                "break", "continue", "return", "goto", "sizeof", "typedef", "struct",
+                "union", "enum", "void", "char", "short", "int", "long", "float",
+                "double", "signed", "unsigned", "const", "volatile", "auto", "register",
+                "static", "extern", "printf", "scanf", "malloc", "free", "memset", "memcpy",
+                "strcpy", "strlen", "strcmp", "strcat", "fopen", "fclose", "fread", "fwrite"
             };
 
-            graph.Nodes.Add(conditionNode);
+            return keywords.Contains(word);
+        }
 
-            // Add edge from current node to condition
-            graph.Edges.Add(new ControlFlowEdge
+        /// <summary>
+        /// Checks if a string is a C keyword or literal
+        /// </summary>
+        /// <param name="word">Word to check</param>
+        /// <returns>True if the word is a C keyword or literal, false otherwise</returns>
+        private bool IsKeywordOrLiteral(string word)
+        {
+            // List of common C keywords and literals
+            string[] keywords = new[]
             {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = currentNodeId,
-                TargetId = conditionNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the 'then' branch
-            var thenBodyLines = ExtractBlock(functionBody, lineIndex);
-
-            // Create a node for the 'then' branch
-            var thenNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "ThenBranch",
-                LineNumber = baseLineNumber + lineIndex + 1,
-                Code = "// Then branch"
+                "if", "else", "for", "while", "do", "switch", "case", "default",
+                "break", "continue", "return", "goto", "sizeof", "typedef", "struct",
+                "union", "enum", "void", "char", "short", "int", "long", "float",
+                "double", "signed", "unsigned", "const", "volatile", "auto", "register",
+                "static", "extern", "true", "false", "NULL"
             };
 
-            graph.Nodes.Add(thenNode);
+            return keywords.Contains(word);
+        }
 
-            // Add edge from condition to 'then' branch
-            graph.Edges.Add(new ControlFlowEdge
+        /// <summary>
+        /// Calculates the cyclomatic complexity of a function
+        /// </summary>
+        /// <param name="body">Function body</param>
+        /// <returns>Cyclomatic complexity</returns>
+        private int CalculateCyclomaticComplexity(string body)
+        {
+            try
             {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = conditionNode.Id,
-                TargetId = thenNode.Id,
-                EdgeType = "True",
-                Condition = condition,
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the 'then' branch recursively
-            await ProcessFunctionBodyAsync(thenBodyLines, baseLineNumber + lineIndex + 1, graph, thenNode.Id);
-
-            // Check for 'else' branch
-            int elseIndex = FindElseBranch(functionBody, lineIndex + thenBodyLines.Count);
-
-            if (elseIndex >= 0)
-            {
-                // Process the 'else' branch
-                var elseBodyLines = ExtractBlock(functionBody, elseIndex);
-
-                // Create a node for the 'else' branch
-                var elseNode = new ControlFlowNode
+                if (string.IsNullOrEmpty(body))
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    NodeType = "ElseBranch",
-                    LineNumber = baseLineNumber + elseIndex + 1,
-                    Code = "// Else branch"
-                };
-
-                graph.Nodes.Add(elseNode);
-
-                // Add edge from condition to 'else' branch
-                graph.Edges.Add(new ControlFlowEdge
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    SourceId = conditionNode.Id,
-                    TargetId = elseNode.Id,
-                    EdgeType = "False",
-                    Condition = $"!({condition})",
-                    //SourceFile = null // Would need to get this from somewhere
-                });
-
-                // Process the 'else' branch recursively
-                await ProcessFunctionBodyAsync(elseBodyLines, baseLineNumber + elseIndex + 1, graph, elseNode.Id);
-            }
-        }
-
-        private async Task ProcessLoopStatementAsync(List<string> functionBody, int lineIndex, string loopType, int baseLineNumber, ControlFlowGraph graph, string currentNodeId)
-        {
-            string line = functionBody[lineIndex].Trim();
-
-            // Extract the condition
-            string condition = ExtractCondition(line, loopType);
-
-            // Create a loop node
-            var loopNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = loopType == "for" ? "ForLoop" : "WhileLoop",
-                LineNumber = baseLineNumber + lineIndex,
-                Code = $"{loopType} ({condition})"
-            };
-
-            graph.Nodes.Add(loopNode);
-
-            // Add edge from current node to loop
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = currentNodeId,
-                TargetId = loopNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the loop body
-            var loopBodyLines = ExtractBlock(functionBody, lineIndex);
-
-            // Create a node for the loop body
-            var loopBodyNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "LoopBody",
-                LineNumber = baseLineNumber + lineIndex + 1,
-                Code = "// Loop body"
-            };
-
-            graph.Nodes.Add(loopBodyNode);
-
-            // Add edge from loop to loop body
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = loopNode.Id,
-                TargetId = loopBodyNode.Id,
-                EdgeType = "True",
-                Condition = condition,
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the loop body recursively
-            await ProcessFunctionBodyAsync(loopBodyLines, baseLineNumber + lineIndex + 1, graph, loopBodyNode.Id);
-
-            // Add edge from loop body back to loop
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = loopBodyNode.Id,
-                TargetId = loopNode.Id,
-                EdgeType = "Loop",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Create a node for the loop exit
-            var loopExitNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "LoopExit",
-                LineNumber = baseLineNumber + lineIndex + loopBodyLines.Count,
-                Code = "// Loop exit"
-            };
-
-            graph.Nodes.Add(loopExitNode);
-
-            // Add edge from loop to loop exit
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = loopNode.Id,
-                TargetId = loopExitNode.Id,
-                EdgeType = "False",
-                Condition = $"!({condition})",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Update current node
-            currentNodeId = loopExitNode.Id;
-        }
-
-        private async Task ProcessDoWhileStatementAsync(List<string> functionBody, int lineIndex, int baseLineNumber, ControlFlowGraph graph, string currentNodeId)
-        {
-            // Create a do-while node
-            var doWhileNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "DoWhileLoop",
-                LineNumber = baseLineNumber + lineIndex,
-                Code = "do"
-            };
-
-            graph.Nodes.Add(doWhileNode);
-
-            // Add edge from current node to do-while
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = currentNodeId,
-                TargetId = doWhileNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the do-while body
-            var loopBodyLines = ExtractBlock(functionBody, lineIndex);
-
-            // Process the loop body recursively
-            await ProcessFunctionBodyAsync(loopBodyLines, baseLineNumber + lineIndex + 1, graph, doWhileNode.Id);
-
-            // Find the while condition
-            int whileIndex = FindWhileCondition(functionBody, lineIndex + loopBodyLines.Count);
-            string condition = "true"; // Default if not found
-
-            if (whileIndex >= 0)
-            {
-                string line = functionBody[whileIndex].Trim();
-                condition = ExtractCondition(line, "while");
-            }
-
-            // Create a condition node for the while part
-            var conditionNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "Condition",
-                LineNumber = baseLineNumber + whileIndex,
-                Code = $"while ({condition})"
-            };
-
-            graph.Nodes.Add(conditionNode);
-
-            // Add edge from loop body to condition
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = doWhileNode.Id,
-                TargetId = conditionNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Add edge from condition back to do-while if true
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = conditionNode.Id,
-                TargetId = doWhileNode.Id,
-                EdgeType = "True",
-                Condition = condition,
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Create a node for the loop exit
-            var loopExitNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "LoopExit",
-                LineNumber = baseLineNumber + whileIndex + 1,
-                Code = "// Loop exit"
-            };
-
-            graph.Nodes.Add(loopExitNode);
-
-            // Add edge from condition to loop exit if false
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = conditionNode.Id,
-                TargetId = loopExitNode.Id,
-                EdgeType = "False",
-                Condition = $"!({condition})",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Update current node
-            currentNodeId = loopExitNode.Id;
-        }
-
-        private async Task ProcessSwitchStatementAsync(List<string> functionBody, int lineIndex, int baseLineNumber, ControlFlowGraph graph, string currentNodeId)
-        {
-            string line = functionBody[lineIndex].Trim();
-
-            // Extract the switch expression
-            string switchExpr = ExtractCondition(line, "switch");
-
-            // Create a switch node
-            var switchNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "Switch",
-                LineNumber = baseLineNumber + lineIndex,
-                Code = $"switch ({switchExpr})"
-            };
-
-            graph.Nodes.Add(switchNode);
-
-            // Add edge from current node to switch
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = currentNodeId,
-                TargetId = switchNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Extract the switch body
-            var switchBodyLines = ExtractBlock(functionBody, lineIndex);
-
-            // Create a simple merged case body for now
-            // A more sophisticated implementation would separate each case
-            var caseBodyNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "SwitchBody",
-                LineNumber = baseLineNumber + lineIndex + 1,
-                Code = "// Switch body"
-            };
-
-            graph.Nodes.Add(caseBodyNode);
-
-            // Add edge from switch to case body
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = switchNode.Id,
-                TargetId = caseBodyNode.Id,
-                EdgeType = "Switch",
-                Condition = switchExpr,
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Process the switch body recursively
-            await ProcessFunctionBodyAsync(switchBodyLines, baseLineNumber + lineIndex + 1, graph, caseBodyNode.Id);
-
-            // Create a node for the switch exit
-            var switchExitNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "SwitchExit",
-                LineNumber = baseLineNumber + lineIndex + switchBodyLines.Count,
-                Code = "// Switch exit"
-            };
-
-            graph.Nodes.Add(switchExitNode);
-
-            // Add edge from case body to switch exit
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = caseBodyNode.Id,
-                TargetId = switchExitNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            // Update current node
-            currentNodeId = switchExitNode.Id;
-        }
-
-        private async Task ProcessReturnStatementAsync(string line, int lineNumber, ControlFlowGraph graph, string currentNodeId)
-        {
-            // Extract the return value
-            string returnValue = null;
-            if (line.Contains("return"))
-            {
-                int index = line.IndexOf("return") + "return".Length;
-                returnValue = line.Substring(index).Trim();
-
-                // Remove trailing semicolon
-                if (returnValue.EndsWith(";"))
-                {
-                    returnValue = returnValue.Substring(0, returnValue.Length - 1).Trim();
-                }
-            }
-
-            // Create a return node
-            var returnNode = new ControlFlowNode
-            {
-                Id = Guid.NewGuid().ToString(),
-                NodeType = "Return",
-                LineNumber = lineNumber,
-                Code = returnValue != null ? $"return {returnValue}" : "return"
-            };
-
-            graph.Nodes.Add(returnNode);
-
-            // Add edge from current node to return
-            graph.Edges.Add(new ControlFlowEdge
-            {
-                Id = Guid.NewGuid().ToString(),
-                SourceId = currentNodeId,
-                TargetId = returnNode.Id,
-                EdgeType = "Sequential",
-                //SourceFile = null // Would need to get this from somewhere
-            });
-
-            await Task.CompletedTask;
-        }
-
-        private string ExtractCondition(string line, string keyword)
-        {
-            int startIndex = line.IndexOf(keyword) + keyword.Length;
-            int openParenIndex = line.IndexOf('(', startIndex);
-
-            if (openParenIndex < 0)
-            {
-                return "";
-            }
-
-            int closeParenIndex = FindMatchingCloseParen(line, openParenIndex);
-
-            if (closeParenIndex < 0)
-            {
-                return "";
-            }
-
-            return line.Substring(openParenIndex + 1, closeParenIndex - openParenIndex - 1).Trim();
-        }
-
-        private int FindMatchingCloseParen(string line, int openParenIndex)
-        {
-            int parenCount = 1;
-
-            for (int i = openParenIndex + 1; i < line.Length; i++)
-            {
-                if (line[i] == '(')
-                {
-                    parenCount++;
-                }
-                else if (line[i] == ')')
-                {
-                    parenCount--;
-
-                    if (parenCount == 0)
-                    {
-                        return i;
-                    }
-                }
-            }
-
-            return -1;
-        }
-
-        private List<string> ExtractBlock(List<string> functionBody, int startLineIndex)
-        {
-            // Skip to the opening brace
-            int i = startLineIndex;
-            while (i < functionBody.Count && !functionBody[i].Contains('{'))
-            {
-                i++;
-            }
-
-            if (i >= functionBody.Count)
-            {
-                // No opening brace found, assume the next line is the body
-                if (startLineIndex + 1 < functionBody.Count)
-                {
-                    return new List<string> { functionBody[startLineIndex + 1] };
+                    return 1; // Minimum complexity
                 }
 
-                return new List<string>();
+                // Count the number of decision points (if, for, while, case, etc.) and logical operators (&&, ||)
+                int complexity = 1; // Base complexity
+
+                // Count decision structures
+                complexity += Regex.Matches(body, @"\bif\b").Count;
+                complexity += Regex.Matches(body, @"\bfor\b").Count;
+                complexity += Regex.Matches(body, @"\bwhile\b").Count;
+                complexity += Regex.Matches(body, @"\bcase\b").Count;
+                complexity += Regex.Matches(body, @"\bcatch\b").Count;
+
+                // Count logical operators
+                complexity += Regex.Matches(body, @"&&").Count;
+                complexity += Regex.Matches(body, @"\|\|").Count;
+                complexity += Regex.Matches(body, @"\?").Count; // Ternary operator
+
+                return complexity;
             }
-
-            // Found opening brace, extract the block
-            int braceCount = 0;
-            int startIndex = i;
-
-            for (int j = i; j < functionBody.Count; j++)
+            catch (Exception ex)
             {
-                string line = functionBody[j];
-
-                for (int k = 0; k < line.Length; k++)
-                {
-                    if (line[k] == '{')
-                    {
-                        braceCount++;
-                    }
-                    else if (line[k] == '}')
-                    {
-                        braceCount--;
-
-                        if (braceCount == 0)
-                        {
-                            // Found matching closing brace
-                            return functionBody.GetRange(startIndex, j - startIndex + 1);
-                        }
-                    }
-                }
+                _logger.LogError(ex, $"Error calculating cyclomatic complexity: {ex.Message}");
+                return 1;
             }
-
-            // No matching closing brace found
-            return functionBody.GetRange(startIndex, functionBody.Count - startIndex);
         }
 
-        private int FindElseBranch(List<string> functionBody, int startLineIndex)
+        /// <summary>
+        /// Calculates the maximum nesting depth of a function
+        /// </summary>
+        /// <param name="body">Function body</param>
+        /// <returns>Maximum nesting depth</returns>
+        private int CalculateMaxNestingDepth(string body)
         {
-            for (int i = startLineIndex; i < functionBody.Count; i++)
+            try
             {
-                string line = functionBody[i].Trim();
-
-                if (line.StartsWith("else") || line == "else")
+                if (string.IsNullOrEmpty(body))
                 {
-                    return i;
+                    return 0;
                 }
 
-                // If we find any non-whitespace line that's not 'else',
-                // then there's no else branch
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    return -1;
-                }
-            }
+                int maxDepth = 0;
+                int currentDepth = 0;
 
-            return -1;
-        }
-
-        private int FindWhileCondition(List<string> functionBody, int startLineIndex)
-        {
-            for (int i = startLineIndex; i < functionBody.Count; i++)
-            {
-                string line = functionBody[i].Trim();
-
-                if (line.StartsWith("while") || line.Contains(" while "))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        private int CalculateCyclomaticComplexity(List<string> functionBody)
-        {
-            // Start with 1 for the entry point
-            int complexity = 1;
-
-            foreach (string line in functionBody)
-            {
-                // Count branching statements
-                if (line.Contains("if") || line.Contains("else if") ||
-                    line.Contains("while") || line.Contains("for") ||
-                    line.Contains("case") || line.Contains("catch") ||
-                    line.Contains("&&") || line.Contains("||"))
-                {
-                    complexity++;
-                }
-            }
-
-            return complexity;
-        }
-
-        private int CalculateNestingDepth(List<string> functionBody)
-        {
-            int maxDepth = 0;
-            int currentDepth = 0;
-
-            foreach (string line in functionBody)
-            {
-                foreach (char c in line)
+                foreach (char c in body)
                 {
                     if (c == '{')
                     {
@@ -1266,91 +953,114 @@ namespace C_TestForge.Parser
                         currentDepth--;
                     }
                 }
-            }
 
-            return maxDepth;
+                return maxDepth;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error calculating nesting depth: {ex.Message}");
+                return 0;
+            }
         }
 
-        private int CalculateStatementCount(List<string> functionBody)
+        /// <summary>
+        /// Counts the lines of code in a function body
+        /// </summary>
+        /// <param name="body">Function body</param>
+        /// <returns>Number of lines of code (excluding comments and blank lines)</returns>
+        private int CountLinesOfCode(string body)
         {
-            int count = 0;
-
-            foreach (string line in functionBody)
+            try
             {
-                string trimmedLine = line.Trim();
-
-                // Skip empty lines, comments, and control structures
-                if (string.IsNullOrWhiteSpace(trimmedLine) ||
-                    trimmedLine.StartsWith("//") ||
-                    trimmedLine.StartsWith("/*") ||
-                    trimmedLine.StartsWith("*/") ||
-                    trimmedLine.StartsWith("{") ||
-                    trimmedLine.StartsWith("}") ||
-                    trimmedLine.StartsWith("if") ||
-                    trimmedLine.StartsWith("else") ||
-                    trimmedLine.StartsWith("for") ||
-                    trimmedLine.StartsWith("while") ||
-                    trimmedLine.StartsWith("do") ||
-                    trimmedLine.StartsWith("switch") ||
-                    trimmedLine.StartsWith("case") ||
-                    trimmedLine.StartsWith("default"))
+                if (string.IsNullOrEmpty(body))
                 {
-                    continue;
+                    return 0;
                 }
 
-                // Count statements (lines ending with semicolon)
-                if (trimmedLine.EndsWith(";"))
+                // Split into lines
+                string[] lines = body.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                // Count non-empty, non-comment lines
+                int count = 0;
+                foreach (string line in lines)
                 {
-                    count++;
+                    string trimmed = line.Trim();
+                    if (!string.IsNullOrWhiteSpace(trimmed) &&
+                        !trimmed.StartsWith("//") &&
+                        !trimmed.StartsWith("/*") &&
+                        !trimmed.EndsWith("*/"))
+                    {
+                        count++;
+                    }
                 }
+
+                return count;
             }
-
-            return count;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error counting lines of code: {ex.Message}");
+                return 0;
+            }
         }
 
-        private int CalculateConditionCount(List<string> functionBody)
+        /// <summary>
+        /// Determines how a variable is used in a function
+        /// </summary>
+        /// <param name="body">Function body</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>Usage type: "read", "write", or "read/write"</returns>
+        private string DetermineVariableUsageType(string body, string variableName)
         {
-            int count = 0;
-
-            foreach (string line in functionBody)
+            try
             {
-                string trimmedLine = line.Trim();
-
-                // Count if, else if, while, for, switch, case statements
-                if (trimmedLine.StartsWith("if") ||
-                    trimmedLine.StartsWith("else if") ||
-                    trimmedLine.StartsWith("while") ||
-                    trimmedLine.StartsWith("for") ||
-                    trimmedLine.StartsWith("switch") ||
-                    trimmedLine.StartsWith("case"))
+                if (string.IsNullOrEmpty(body))
                 {
-                    count++;
+                    return "unknown";
                 }
 
-                // Count logical operators within conditions
-                int andCount = CountOccurrences(trimmedLine, "&&");
-                int orCount = CountOccurrences(trimmedLine, "||");
+                // Check for writes (assignments)
+                bool isWritten = Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*\+=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*-=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*\*=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*/=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*%=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*<<=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*>>=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*&=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*\|=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*\^=") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\+\+") ||
+                                Regex.IsMatch(body, $@"{Regex.Escape(variableName)}--") ||
+                                Regex.IsMatch(body, $@"\+\+{Regex.Escape(variableName)}") ||
+                                Regex.IsMatch(body, $@"--{Regex.Escape(variableName)}");
 
-                count += andCount + orCount;
+                // Check for reads (uses)
+                bool isRead = Regex.IsMatch(body, $@"\b{Regex.Escape(variableName)}\b") &&
+                             !Regex.IsMatch(body, $@"{Regex.Escape(variableName)}\s*=\s*[^=]"); // Exclude simple assignments
+
+                if (isRead && isWritten)
+                {
+                    return "read/write";
+                }
+                else if (isRead)
+                {
+                    return "read";
+                }
+                else if (isWritten)
+                {
+                    return "write";
+                }
+                else
+                {
+                    return "unknown";
+                }
             }
-
-            return count;
-        }
-
-        private int CountOccurrences(string text, string pattern)
-        {
-            int count = 0;
-            int index = 0;
-
-            while ((index = text.IndexOf(pattern, index)) >= 0)
+            catch (Exception ex)
             {
-                count++;
-                index += pattern.Length;
+                _logger.LogError(ex, $"Error determining variable usage type: {ex.Message}");
+                return "unknown";
             }
-
-            return count;
         }
     }
-
-    #endregion
 }

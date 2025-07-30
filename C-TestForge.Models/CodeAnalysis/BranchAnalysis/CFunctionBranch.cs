@@ -18,7 +18,7 @@
         /// <summary>
         /// Gets or sets the branch condition
         /// </summary>
-        public string Condition { get; set; }
+        public string Condition { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the true branch target

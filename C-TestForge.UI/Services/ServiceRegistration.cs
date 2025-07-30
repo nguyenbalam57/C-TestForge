@@ -1,41 +1,45 @@
-﻿using C_TestForge.Core.Interfaces;
+﻿using System;
 using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Services;
-using Microsoft.Extensions.DependencyInjection;
+using C_TestForge.Models.Projects;
 using C_TestForge.Parser;
-using Prism.Services.Dialogs;
-using System;
-using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.UI.Services;
+using C_TestForge.UI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace C_TestForge.UI.Services
 {
     /// <summary>
-    /// Provides extension methods for registering C-TestForge services with the dependency injection container
+    /// Service registration for the application
     /// </summary>
     public static class ServiceRegistration
     {
         /// <summary>
-        /// Registers services for Phase 1 (Core Parsing and Analysis)
+        /// Registers all services for the application
         /// </summary>
-        /// <param name="services">The service collection to add services to</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <exception cref="ArgumentNullException">Thrown if services is null</exception>
-        public static IServiceCollection RegisterPhase1Services(this IServiceCollection services)
+        /// <param name="services">Service collection</param>
+        /// <returns>Service collection</returns>
+        public static IServiceCollection RegisterServices(this IServiceCollection services)
         {
             if (services == null)
                 throw new ArgumentNullException(nameof(services));
 
-            // Register parser services
-            services.AddSingleton<IClangSharpParserService, ClangSharpParserService>();
-            services.AddSingleton<IPreprocessorService, PreprocessorService>();
+            // Register logging
+            services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                builder.AddDebug();
+            });
+
+            // Register core services
+            services.AddSingleton<IFileService, FileService>();
             services.AddSingleton<ISourceCodeService, SourceCodeService>();
 
-            // Register project management services
-            services.AddSingleton<IProjectService, ProjectService>();
-            services.AddSingleton<IFileService, FileService>();
-            services.AddSingleton<IConfigurationService, ConfigurationService>();
+            // Register parser services
+            services.AddSingleton<IParserService, ClangSharpParserService>();
+            services.AddSingleton<IPreprocessorService, PreprocessorService>();
 
             // Register analysis services
             services.AddSingleton<IAnalysisService, AnalysisService>();
@@ -43,109 +47,113 @@ namespace C_TestForge.UI.Services
             services.AddSingleton<IVariableAnalysisService, VariableAnalysisService>();
             services.AddSingleton<IMacroAnalysisService, MacroAnalysisService>();
 
-            return services;
-        }
-
-        /// <summary>
-        /// Registers services for Phase 2 (TestCase Management)
-        /// </summary>
-        /// <param name="services">The service collection to add services to</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <exception cref="ArgumentNullException">Thrown if services is null</exception>
-        public static IServiceCollection RegisterPhase2Services(this IServiceCollection services)
-        {
-            if (services == null)
-                throw new ArgumentNullException(nameof(services));
-
-            // Register TestCase management services
-            services.AddSingleton<ITestCaseService, TestCaseService>();
-            services.AddSingleton<ITestCaseRepository, TestCaseRepository>();
-            services.AddSingleton<ITestCaseComparisonService, TestCaseComparisonService>();
-
-            // Register import/export services
-            services.AddSingleton<IImportService, ImportService>();
-            services.AddSingleton<IExportService, ExportService>();
-            services.AddSingleton<IExcelService, ExcelService>();
-            services.AddSingleton<ICsvService, CsvService>();
-
-            // Register UI related services
-            services.AddSingleton<ITestCaseViewModelFactory, TestCaseViewModelFactory>();
-            services.AddSingleton<ISourceCodeHighlightService, SourceCodeHighlightService>();
-
-            // Register UI customization services
-            services.AddSingleton<IUILayoutService, UILayoutService>();
-            services.AddSingleton<IUIThemeService, UIThemeService>();
-            services.AddSingleton<IColumnVisibilityService, ColumnVisibilityService>();
-
-            // Register search and filter services
-            services.AddSingleton<ITestCaseFilterService, TestCaseFilterService>();
-            services.AddSingleton<ITestCaseSearchService, TestCaseSearchService>();
-
-            return services;
-        }
-
-        /// <summary>
-        /// Registers services for Phase 3 (Advanced Test Generation)
-        /// </summary>
-        /// <param name="services">The service collection to add services to</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <exception cref="ArgumentNullException">Thrown if services is null</exception>
-        public static IServiceCollection RegisterPhase3Services(this IServiceCollection services)
-        {
-            if (services == null)
-                throw new ArgumentNullException(nameof(services));
-
-            // Register Z3 Solver services
-            services.AddSingleton<IZ3SolverService, Z3SolverService>();
-            services.AddSingleton<IVariableValueFinderService, VariableValueFinderService>();
-
-            // Register Test Generation services
-            services.AddSingleton<IStubGeneratorService, StubGeneratorService>();
-            services.AddSingleton<IUnitTestGeneratorService, UnitTestGeneratorService>();
-            services.AddSingleton<IIntegrationTestGeneratorService, IntegrationTestGeneratorService>();
-            services.AddSingleton<ITestCodeGeneratorService, TestCodeGeneratorService>();
-
-            // Register advanced analysis services
-            services.AddSingleton<IBranchAnalysisService, BranchAnalysisService>();
-            services.AddSingleton<IFunctionCallGraphService, FunctionCallGraphService>();
-            services.AddSingleton<ICodeCoverageService, CodeCoverageService>();
-
-            // Register reporting and analysis services
-            services.AddSingleton<ITestResultAnalysisService, TestResultAnalysisService>();
-            services.AddSingleton<ITestReportGeneratorService, TestReportGeneratorService>();
-
-            // Register optimization services
-            services.AddSingleton<ITestCaseOptimizationService, TestCaseOptimizationService>();
-
-            return services;
-        }
-
-        /// <summary>
-        /// Registers all services from all phases
-        /// </summary>
-        /// <param name="services">The service collection to add services to</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <exception cref="ArgumentNullException">Thrown if services is null</exception>
-        public static IServiceCollection RegisterAllServices(this IServiceCollection services)
-        {
-            if (services == null)
-                throw new ArgumentNullException(nameof(services));
-
-            // Register Phase 1 services
-            services.RegisterPhase1Services();
-
-            // Register Phase 2 services
-            services.RegisterPhase2Services();
-
-            // Register Phase 3 services
-            services.RegisterPhase3Services();
-
-            // Register common services used across all phases
-            services.AddSingleton<ILogService, LogService>();
-            services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
-            services.AddSingleton<IUserSettingsService, UserSettingsService>();
+            // Register ViewModels
+            services.AddSingleton<SourceAnalysisViewModel>();
 
             return services;
         }
     }
+
+    /// <summary>
+    /// Simple file service implementation
+    /// </summary>
+    public class FileService : IFileService
+    {
+        /// <summary>
+        /// Checks if a file exists
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>True if the file exists, false otherwise</returns>
+        public bool FileExists(string filePath)
+        {
+            return System.IO.File.Exists(filePath);
+        }
+
+        /// <summary>
+        /// Gets the file name from a path
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>File name</returns>
+        public string GetFileName(string filePath)
+        {
+            return System.IO.Path.GetFileName(filePath);
+        }
+
+        /// <summary>
+        /// Reads a file asynchronously
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>File content</returns>
+        public async Task<string> ReadFileAsync(string filePath)
+        {
+            return await System.IO.File.ReadAllTextAsync(filePath);
+        }
+
+        /// <summary>
+        /// Writes a file asynchronously
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <param name="content">Content to write</param>
+        /// <returns>Task</returns>
+        public async Task WriteFileAsync(string filePath, string content)
+        {
+            await System.IO.File.WriteAllTextAsync(filePath, content);
+        }
+
+        /// <summary>
+        /// Gets the directory name from a path
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>Directory name</returns>
+        public string GetDirectoryName(string filePath)
+        {
+            return System.IO.Path.GetDirectoryName(filePath);
+        }
+    }
+}
+
+namespace C_TestForge.Core.Interfaces.ProjectManagement
+{
+    /// <summary>
+    /// Interface for file operations
+    /// </summary>
+    public interface IFileService
+    {
+        /// <summary>
+        /// Checks if a file exists
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>True if the file exists, false otherwise</returns>
+        bool FileExists(string filePath);
+
+        /// <summary>
+        /// Gets the file name from a path
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>File name</returns>
+        string GetFileName(string filePath);
+
+        /// <summary>
+        /// Gets the directory name from a path
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>Directory name</returns>
+        string GetDirectoryName(string filePath);
+
+        /// <summary>
+        /// Reads a file asynchronously
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>File content</returns>
+        Task<string> ReadFileAsync(string filePath);
+
+        /// <summary>
+        /// Writes a file asynchronously
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <param name="content">Content to write</param>
+        /// <returns>Task</returns>
+        Task WriteFileAsync(string filePath, string content);
+    }
+
 }

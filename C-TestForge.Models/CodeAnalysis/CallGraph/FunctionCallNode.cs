@@ -13,16 +13,16 @@
         /// <summary>
         /// Gets or sets the function name
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the file path
         /// </summary>
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the depth in the call graph
         /// </summary>
-        public int Depth { get; set; }
+        public int Depth { get; set; } = 0;
     }
 }

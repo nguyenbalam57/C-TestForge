@@ -17,12 +17,12 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Name of the function to stub
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Return type of the function
         /// </summary>
-        public string ReturnType { get; set; }
+        public string ReturnType { get; set; } = string.Empty;
 
         /// <summary>
         /// Parameters of the function
@@ -32,12 +32,12 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Body of the stub implementation
         /// </summary>
-        public string StubBody { get; set; }
+        public string StubBody { get; set; } = string.Empty;
 
         /// <summary>
         /// Return value to use in the stub
         /// </summary>
-        public string ReturnValue { get; set; }
+        public string ReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Expected call count for this stub

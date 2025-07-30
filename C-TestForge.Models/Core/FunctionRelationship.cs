@@ -16,12 +16,12 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Name of the caller function
         /// </summary>
-        public string CallerName { get; set; }
+        public string CallerName { get; set; } = string.Empty;
 
         /// <summary>
         /// Name of the callee function
         /// </summary>
-        public string CalleeName { get; set; }
+        public string CalleeName { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number in the caller function
@@ -31,7 +31,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Source file where the call occurs
         /// </summary>
-        public string SourceFile { get; set; }
+        public string SourceFile { get; set; } = string.Empty;
 
         /// <summary>
         /// Get a string representation of the function relationship

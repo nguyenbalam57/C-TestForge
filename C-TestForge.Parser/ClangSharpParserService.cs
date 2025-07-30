@@ -1,14 +1,22 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Models;
+using C_TestForge.Models.CodeAnalysis.Functions;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Parse;
+using ClangSharp;
 using ClangSharp.Interop;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace C_TestForge.Parser
 {
-    #region ClangSharpParserService Implementation
-
     /// <summary>
     /// Implementation of the parser service using ClangSharp
     /// </summary>
@@ -21,6 +29,9 @@ namespace C_TestForge.Parser
         private readonly IMacroAnalysisService _macroAnalysisService;
         private readonly IFileService _fileService;
 
+        /// <summary>
+        /// Constructor for ClangSharpParserService
+        /// </summary>
         public ClangSharpParserService(
             ILogger<ClangSharpParserService> logger,
             IPreprocessorService preprocessorService,
@@ -69,6 +80,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
+        // Fixed version for the ParseSourceCodeAsync method:
         public async Task<ParseResult> ParseSourceCodeAsync(string sourceCode, string fileName, ParseOptions options)
         {
             if (string.IsNullOrEmpty(sourceCode))
@@ -78,389 +90,346 @@ namespace C_TestForge.Parser
 
             if (string.IsNullOrEmpty(fileName))
             {
-                throw new ArgumentException("File name cannot be null or empty", nameof(fileName));
+                fileName = "inline.c";
             }
 
             try
             {
-                _logger.LogInformation($"Starting parse of source code for: {fileName}");
+                _logger.LogInformation($"Parsing source code for {fileName}");
 
                 var result = new ParseResult
                 {
-                    SourceFilePath = fileName,
-                    Definitions = new List<CDefinition>(),
-                    Variables = new List<CVariable>(),
-                    Functions = new List<CFunction>(),
-                    ConditionalDirectives = new List<ConditionalDirective>(),
-                    ParseErrors = new List<ParseError>()
+                    SourceFilePath = fileName
                 };
 
-                // Create a temporary file to store the source code
-                string tempPath = Path.GetTempFileName();
+                // Khai báo biến ở phạm vi ngoài cùng để có thể truy cập từ khối finally
+                CXIndex index = default;
+                CXTranslationUnit translationUnit = default;
+                List<IntPtr> allocatedPointers = new List<IntPtr>();
+                CXCursor rootCursor = default;
+
                 try
                 {
-                    await _fileService.WriteFileAsync(tempPath, sourceCode);
+                    unsafe
+                    {
+                        // Khởi tạo CXIndex
+                        index = (CXIndex)clang.createIndex(1, 1);
 
-                    // Create Clang index
-                    using var index = CXIndex.Create();
+                        // Set compilation options
+                        CXTranslationUnit_Flags flags = CXTranslationUnit_Flags.CXTranslationUnit_DetailedPreprocessingRecord |
+                                                      CXTranslationUnit_Flags.CXTranslationUnit_IncludeAttributedTypes |
+                                                      CXTranslationUnit_Flags.CXTranslationUnit_VisitImplicitAttributes |
+                                                      CXTranslationUnit_Flags.CXTranslationUnit_KeepGoing;
 
-                    // Prepare command-line arguments for clang
-                    var clangArgs = PrepareClangArguments(options);
+                        // Standard include paths
+                        var args = new List<string>
+                {
+                    "-I/usr/include",
+                    "-I/usr/local/include",
+                    "-std=c99"
+                };
 
-                    // Parse the translation unit
-                    var translationFlags = CXTranslationUnit_Flags.CXTranslationUnit_DetailedPreprocessingRecord |
-                                          CXTranslationUnit_Flags.CXTranslationUnit_KeepGoing;
+                        // Parse the translation unit
+                        // Convert filename and source code to byte arrays
+                        byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(fileName + "\0");
+                        byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceCode);
 
-                    // Sửa lỗi: Thay đổi cách tạo translation unit
-                    CXTranslationUnit translationUnit = CXTranslationUnit.Parse(
+                        // Allocate memory for arguments
+                        var argPtrs = new List<IntPtr>();
+                        foreach (var arg in args)
+                        {
+                            IntPtr ptr = Marshal.StringToHGlobalAnsi(arg);
+                            argPtrs.Add(ptr);
+                            allocatedPointers.Add(ptr); // Track for cleanup
+                        }
+
+                        fixed (byte* fileNamePtr = fileNameBytes)
+                        fixed (byte* sourceCodePtr = sourceCodeBytes)
+                        {
+                            // Create unsaved file for in-memory parsing
+                            var unsavedFile = new CXUnsavedFile
+                            {
+                                Filename = (sbyte*)fileNamePtr,
+                                Contents = (sbyte*)sourceCodePtr,
+                                Length = (nuint)sourceCode.Length
+                            };
+
+                            // Lấy con trỏ trực tiếp thay vì sử dụng khối fixed thứ hai
+                            CXUnsavedFile* unsavedFilePtr = &unsavedFile;
+
+                            // Convert the managed array to a native array of pointers
+                            sbyte** argArray = stackalloc sbyte*[args.Count];
+                            for (int i = 0; i < args.Count; i++)
+                            {
+                                argArray[i] = (sbyte*)argPtrs[i].ToPointer();
+                            }
+
+                            translationUnit = clang.parseTranslationUnit(
                         index,
-                        tempPath,
-                        clangArgs,
-                        Array.Empty<CXUnsavedFile>(),
-                        translationFlags);
+                        (sbyte*)fileNamePtr,
+                        argArray,
+                        args.Count,
+                        unsavedFilePtr,
+                        1,
+                        (uint)flags);
 
-                    // Kiểm tra lỗi
-                    if (translationUnit.Handle == IntPtr.Zero)
-                    {
-                        _logger.LogError($"Failed to parse source code for: {fileName}");
-                        result.ParseErrors.Add(new ParseError
-                        {
-                            Message = "Failed to parse source code. Could not create translation unit.",
-                            Severity = ErrorSeverity.Critical,
-                            FileName = fileName
-                        });
-                        return result;
-                    }
-
-                    using (translationUnit)
-                    {
-                        // Process diagnostics and collect any errors
-                        CollectDiagnostics(translationUnit, result);
-
-                        if (result.HasCriticalErrors)
-                        {
-                            _logger.LogError($"Critical errors found during parsing: {fileName}");
-                            return result;
+                            if (translationUnit.Handle == IntPtr.Zero)
+                            {
+                                throw new Exception("Failed to parse translation unit");
+                            }
                         }
 
-                        var cursor = translationUnit.Cursor;
-
-                        // Process preprocessor definitions
-                        if (options.ParsePreprocessorDefinitions)
+                        // Process diagnostics
+                        uint numDiagnostics = clang.getNumDiagnostics(translationUnit);
+                        for (uint i = 0; i < numDiagnostics; i++)
                         {
-                            await ProcessPreprocessorDefinitions(translationUnit, fileName, result, options);
+                            var diagnostic = clang.getDiagnostic(translationUnit, i);
+                            var severity = clang.getDiagnosticSeverity(diagnostic);
+                            var text = clang.getDiagnosticSpelling(diagnostic).ToString();
+                            var location = clang.getDiagnosticLocation(diagnostic);
+
+                            CXFile file;
+                            uint line, column, offset;
+                            location.GetFileLocation(out file, out line, out column, out offset);
+
+                            var parseError = new ParseError
+                            {
+                                Message = text,
+                                LineNumber = (int)line,
+                                ColumnNumber = (int)column,
+                                Severity = ConvertSeverity(severity)
+                            };
+
+                            result.ParseErrors.Add(parseError);
                         }
 
-                        // Traverse the AST to extract variables and functions
-                        await TraverseASTAsync(cursor, fileName, result, options);
+                        // Lấy cursor từ translation unit trong khối unsafe
+                        rootCursor = clang.getTranslationUnitCursor(translationUnit);
                     }
 
-                    _logger.LogInformation($"Completed parsing source code for: {fileName}");
-                    _logger.LogInformation($"Found {result.Definitions.Count} definitions, {result.Variables.Count} variables, {result.Functions.Count} functions");
+                    // Extract preprocessor definitions
+                    if (options.ParsePreprocessorDefinitions)
+                    {
+                        await ExtractPreprocessorDefinitionsAsync(translationUnit, fileName, result);
+                    }
+
+                    // Extract functions and variables from the AST - sử dụng rootCursor đã lấy từ khối unsafe
+                    if (options.AnalyzeFunctions || options.AnalyzeVariables)
+                    {
+                        await TraverseASTAsync(rootCursor, fileName, result, options);
+                    }
+
+                    _logger.LogInformation($"Successfully parsed {fileName}: {result.Functions.Count} functions, {result.Variables.Count} variables, {result.Definitions.Count} definitions");
 
                     return result;
                 }
                 finally
                 {
-                    // Clean up the temporary file
-                    if (File.Exists(tempPath))
+                    unsafe
                     {
-                        File.Delete(tempPath);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error parsing source code for: {fileName}");
-                throw;
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task<ParseResult> ParseMultipleSourceFilesAsync(IEnumerable<string> filePaths, ParseOptions options)
-        {
-            if (filePaths == null)
-            {
-                throw new ArgumentNullException(nameof(filePaths));
-            }
-
-            try
-            {
-                _logger.LogInformation($"Starting parse of multiple source files");
-
-                var result = new ParseResult
-                {
-                    SourceFilePath = "Multiple Files",
-                    Definitions = new List<CDefinition>(),
-                    Variables = new List<CVariable>(),
-                    Functions = new List<CFunction>(),
-                    ConditionalDirectives = new List<ConditionalDirective>(),
-                    ParseErrors = new List<ParseError>()
-                };
-
-                // Parse each file and merge the results
-                foreach (var filePath in filePaths)
-                {
-                    try
-                    {
-                        var fileResult = await ParseSourceFileAsync(filePath, options);
-                        result.Merge(fileResult);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Error parsing file: {filePath}");
-                        result.ParseErrors.Add(new ParseError
+                        // Clean up Clang resources
+                        if (translationUnit.Handle != IntPtr.Zero)
                         {
-                            Message = $"Error parsing file: {ex.Message}",
-                            Severity = ErrorSeverity.Error,
-                            FileName = filePath
-                        });
+                            clang.disposeTranslationUnit(translationUnit);
+                        }
+
+                        if (index.Handle != IntPtr.Zero)
+                        {
+                            clang.disposeIndex(index);
+                        }
+                    }
+
+                    // Free allocated memory
+                    foreach (var ptr in allocatedPointers)
+                    {
+                        Marshal.FreeHGlobal(ptr);
                     }
                 }
-
-                _logger.LogInformation($"Completed parsing multiple source files");
-                _logger.LogInformation($"Found {result.Definitions.Count} definitions, {result.Variables.Count} variables, {result.Functions.Count} functions");
-
-                return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error parsing multiple source files");
+                _logger.LogError(ex, $"Error parsing source code: {ex.Message}");
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<ParseResult> ParseHeaderFileAsync(string headerPath, ParseOptions options)
+        public async Task<List<string>> GetIncludedFilesAsync(string filePath)
         {
-            if (string.IsNullOrEmpty(headerPath))
+            if (string.IsNullOrEmpty(filePath))
             {
-                throw new ArgumentException("Header path cannot be null or empty", nameof(headerPath));
+                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
             }
 
-            if (!_fileService.FileExists(headerPath))
+            if (!_fileService.FileExists(filePath))
             {
-                throw new FileNotFoundException($"Header file not found: {headerPath}");
+                throw new FileNotFoundException($"Source file not found: {filePath}");
             }
 
             try
             {
-                _logger.LogInformation($"Starting parse of header file: {headerPath}");
+                _logger.LogInformation($"Getting included files for: {filePath}");
 
-                // Create a temporary C file that includes the header
-                string tempPath = Path.GetTempFileName() + ".c";
-                try
+                // Read the source file
+                string sourceCode = await _fileService.ReadFileAsync(filePath);
+                string fileName = _fileService.GetFileName(filePath);
+
+                // Parse the source code with minimal options
+                var options = new ParseOptions
                 {
-                    string headerName = _fileService.GetFileName(headerPath);
-                    string headerDir = _fileService.GetDirectoryName(headerPath);
+                    ParsePreprocessorDefinitions = true,
+                    AnalyzeFunctions = false,
+                    AnalyzeVariables = false
+                };
 
-                    // Create a simple C file that includes the header
-                    string sourceCode = $"#include \"{headerName}\"\n";
-                    await _fileService.WriteFileAsync(tempPath, sourceCode);
+                var result = await ParseSourceCodeAsync(sourceCode, fileName, options);
 
-                    // Add the header directory to include paths
-                    var headerOptions = options.Clone();
-                    if (!headerOptions.IncludePaths.Contains(headerDir))
+                // Extract include directives
+                var includes = result.ConditionalDirectives
+                    .OfType<IncludeDirective>()
+                    .Select(i => i.FilePath)
+                    .ToList();
+
+                _logger.LogInformation($"Found {includes.Count} included files in {filePath}");
+
+                return includes;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting included files: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Extracts preprocessor definitions from a translation unit
+        /// </summary>
+        /// <param name="translationUnit">Translation unit to process</param>
+        /// <param name="sourceFileName">Name of the source file</param>
+        /// <param name="result">Parse result to update</param>
+        /// <returns>Task</returns>
+        private async Task ExtractPreprocessorDefinitionsAsync(CXTranslationUnit translationUnit, string sourceFileName, ParseResult result)
+        {
+            try
+            {
+                _logger.LogInformation($"Extracting preprocessor definitions from {sourceFileName}");
+
+                // Use the preprocessor service to extract definitions
+                var preprocessorResult = await _preprocessorService.ExtractPreprocessorDefinitionsAsync(translationUnit, sourceFileName);
+
+                // Add the results to the parse result
+                result.Definitions.AddRange(preprocessorResult.Definitions);
+                result.ConditionalDirectives.AddRange(preprocessorResult.ConditionalDirectives);
+
+                // Analyze macro relationships and dependencies
+                await _macroAnalysisService.AnalyzeMacroRelationshipsAsync(result.Definitions, result.ConditionalDirectives);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting preprocessor definitions: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Traverses the AST of a translation unit to extract functions and variables
+        /// </summary>
+        /// <param name="cursor">Root cursor of the translation unit</param>
+        /// <param name="sourceFileName">Name of the source file</param>
+        /// <param name="result">Parse result to update</param>
+        /// <param name="options">Parse options</param>
+        /// <returns>Task</returns>
+        private async Task TraverseASTAsync(CXCursor cursor, string sourceFileName, ParseResult result, ParseOptions options)
+        {
+            try
+            {
+                _logger.LogInformation($"Traversing AST for {sourceFileName}");
+
+                // Create a visitor to process the AST
+                var visitor = new ASTVisitor(
+                    sourceFileName,
+                    _variableAnalysisService,
+                    _functionAnalysisService,
+                    options);
+
+                // Visit all the children of the translation unit
+                unsafe
+                {
+                    cursor.VisitChildren((child, parent, clientData) =>
                     {
-                        headerOptions.IncludePaths.Add(headerDir);
-                    }
-
-                    // Parse the temporary file
-                    var result = await ParseSourceFileAsync(tempPath, headerOptions);
-                    result.SourceFilePath = headerPath;
-
-                    return result;
+                        visitor.Visit(child, parent);
+                        return CXChildVisitResult.CXChildVisit_Continue;
+                    }, default(CXClientData));
                 }
-                finally
+
+                // Get the extracted data from the visitor
+                result.Variables.AddRange(visitor.Variables);
+                result.Functions.AddRange(visitor.Functions);
+
+                // Analyze variable relationships and constraints
+                if (options.AnalyzeVariables && result.Variables.Count > 0)
                 {
-                    // Clean up the temporary file
-                    if (File.Exists(tempPath))
+                    var constraints = await _variableAnalysisService.AnalyzeVariablesAsync(
+                        result.Variables, result.Functions, result.Definitions);
+
+                    // Associate constraints with variables
+                    foreach (var constraint in constraints)
                     {
-                        File.Delete(tempPath);
+                        if (!string.IsNullOrEmpty(constraint.VariableName))
+                        {
+                            var variable = result.Variables.FirstOrDefault(v => v.Name == constraint.VariableName);
+                            if (variable != null && !variable.Constraints.Any(c => c.Id == constraint.Id))
+                            {
+                                variable.Constraints.Add(constraint);
+                            }
+                        }
+                    }
+                }
+
+                // Analyze function relationships
+                if (options.AnalyzeFunctions && result.Functions.Count > 0)
+                {
+                    var relationships = await _functionAnalysisService.AnalyzeFunctionRelationshipsAsync(result.Functions);
+
+                    // Add function relationships to the result
+                    foreach (var relationship in relationships)
+                    {
+                        result.FunctionRelationships.Add(relationship);
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error parsing header file: {headerPath}");
-                throw;
+                _logger.LogError(ex, $"Error traversing AST: {ex.Message}");
             }
         }
 
-        private string[] PrepareClangArguments(ParseOptions options)
-        {
-            var args = new List<string>();
-
-            // Add include paths
-            foreach (var includePath in options.IncludePaths)
-            {
-                args.Add($"-I{includePath}");
-            }
-
-            // Add macro definitions
-            foreach (var define in options.MacroDefinitions)
-            {
-                args.Add($"-D{define.Key}={define.Value}");
-            }
-
-            // Add standard C options
-            args.Add("-std=c99"); // Default to C99, can be made configurable
-
-            // Add additional clang arguments
-            args.AddRange(options.AdditionalClangArguments);
-
-            return args.ToArray();
-        }
-
-        private void CollectDiagnostics(CXTranslationUnit translationUnit, ParseResult result)
-        {
-            uint diagnosticCount = translationUnit.NumDiagnostics;
-
-            for (uint i = 0; i < diagnosticCount; i++)
-            {
-                using var diagnostic = translationUnit.GetDiagnostic(i);
-                var severity = diagnostic.Severity;
-                var message = diagnostic.Spelling.ToString();
-
-                diagnostic.Location.GetFileLocation(out CXFile file, out uint line, out uint column, out _);
-
-                var parseError = new ParseError
-                {
-                    Message = message,
-                    LineNumber = (int)line,
-                    ColumnNumber = (int)column,
-                    FileName = file != null ? file.Name.ToString() : string.Empty,
-                    Severity = ConvertSeverity(severity)
-                };
-
-                result.ParseErrors.Add(parseError);
-
-                if (severity >= CXDiagnosticSeverity.CXDiagnostic_Error)
-                {
-                    _logger.LogError($"Error in {parseError.FileName} at {parseError.LineNumber}:{parseError.ColumnNumber}: {message}");
-                }
-                else if (severity == CXDiagnosticSeverity.CXDiagnostic_Warning)
-                {
-                    _logger.LogWarning($"Warning in {parseError.FileName} at {parseError.LineNumber}:{parseError.ColumnNumber}: {message}");
-                }
-            }
-        }
-
+        /// <summary>
+        /// Converts a Clang diagnostic severity to an error severity
+        /// </summary>
+        /// <param name="severity">Clang diagnostic severity</param>
+        /// <returns>Error severity</returns>
         private ErrorSeverity ConvertSeverity(CXDiagnosticSeverity severity)
         {
             switch (severity)
             {
-                case CXDiagnosticSeverity.CXDiagnostic_Fatal:
-                    return ErrorSeverity.Critical;
-                case CXDiagnosticSeverity.CXDiagnostic_Error:
-                    return ErrorSeverity.Error;
+                case CXDiagnosticSeverity.CXDiagnostic_Ignored:
+                    return ErrorSeverity.Info;
+                case CXDiagnosticSeverity.CXDiagnostic_Note:
+                    return ErrorSeverity.Info;
                 case CXDiagnosticSeverity.CXDiagnostic_Warning:
                     return ErrorSeverity.Warning;
-                case CXDiagnosticSeverity.CXDiagnostic_Note:
-                case CXDiagnosticSeverity.CXDiagnostic_Ignored:
+                case CXDiagnosticSeverity.CXDiagnostic_Error:
+                    return ErrorSeverity.Error;
+                case CXDiagnosticSeverity.CXDiagnostic_Fatal:
+                    return ErrorSeverity.Critical;
                 default:
                     return ErrorSeverity.Info;
             }
         }
 
-        private async Task ProcessPreprocessorDefinitions(CXTranslationUnit translationUnit, string sourceFileName, ParseResult result, ParseOptions options)
-        {
-            var preprocessorResult = await _preprocessorService.ExtractPreprocessorDefinitionsAsync(translationUnit, sourceFileName);
-
-            foreach (var definition in preprocessorResult.Definitions)
-            {
-                // Check if definition is enabled according to the configuration
-                if (_preprocessorService.IsDefinitionEnabled(definition, options.MacroDefinitions))
-                {
-                    result.Definitions.Add(definition);
-                }
-            }
-
-            // Add conditional directives
-            result.ConditionalDirectives = preprocessorResult.ConditionalDirectives;
-
-            // Analyze macros for dependencies and usages
-            await _macroAnalysisService.AnalyzeMacroRelationshipsAsync(result.Definitions, result.ConditionalDirectives);
-        }
-
-        private async Task TraverseASTAsync(CXCursor cursor, string sourceFileName, ParseResult result, ParseOptions options)
-        {
-            // Create a visitor to process the AST
-            var visitor = new ASTVisitor(
-                sourceFileName,
-                _variableAnalysisService,
-                _functionAnalysisService,
-                options);
-
-            // Visit all the children of the translation unit
-            unsafe 
-            {
-                cursor.VisitChildren((child, parent, clientData) =>
-                {
-                    visitor.Visit(child, parent);
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, default(CXClientData));
-            }
-            
-
-            // Get the extracted data from the visitor
-            result.Variables.AddRange(visitor.Variables);
-            result.Functions.AddRange(visitor.Functions);
-
-            // Analyze variable relationships and constraints
-            if (options.AnalyzeVariables && result.Variables.Count > 0)
-            {
-                var constraints = await _variableAnalysisService.AnalyzeVariablesAsync(result.Variables, result.Functions, result.Definitions);
-
-                // Associate constraints with variables
-                foreach (var constraint in constraints)
-                {
-                    if (constraint.Source != null && constraint.Source.StartsWith("Variable:"))
-                    {
-                        string variableName = constraint.Source.Substring("Variable:".Length);
-                        var variable = result.Variables.FirstOrDefault(v => v.Name == variableName);
-                        if (variable != null && !variable.Constraints.Any(c => c.Id == constraint.Id))
-                        {
-                            variable.Constraints.Add(constraint);
-                        }
-                    }
-                }
-            }
-
-            // Analyze function relationships
-            if (options.AnalyzeFunctions && result.Functions.Count > 0)
-            {
-                var relationships = await _functionAnalysisService.AnalyzeFunctionRelationshipsAsync(result.Functions);
-
-                // Build function relationships based on called functions
-                foreach (var function in result.Functions)
-                {
-                    foreach (var calledFunctionName in function.CalledFunctions)
-                    {
-                        var calledFunction = result.Functions.FirstOrDefault(f => f.Name == calledFunctionName);
-                        if (calledFunction != null)
-                        {
-                            var relationship = new FunctionRelationship
-                            {
-                                CallerName = function.Name,
-                                CalleeName = calledFunctionName,
-                                SourceFile = function.SourceFile,
-                                LineNumber = function.LineNumber
-                            };
-
-                            if (!relationships.Any(r => r.CallerName == relationship.CallerName && r.CalleeName == relationship.CalleeName))
-                            {
-                                relationships.Add(relationship);
-                            }
-                        }
-                    }
-                }
-            }
-
-            await Task.CompletedTask;
-        }
-
-        // Helper class to visit the AST and collect variables and functions
+        /// <summary>
+        /// Helper class to visit the AST and collect variables and functions
+        /// </summary>
         private class ASTVisitor
         {
             private readonly string _sourceFileName;
@@ -468,9 +437,23 @@ namespace C_TestForge.Parser
             private readonly IFunctionAnalysisService _functionAnalysisService;
             private readonly ParseOptions _options;
 
+            /// <summary>
+            /// List of variables found during traversal
+            /// </summary>
             public List<CVariable> Variables { get; } = new List<CVariable>();
+
+            /// <summary>
+            /// List of functions found during traversal
+            /// </summary>
             public List<CFunction> Functions { get; } = new List<CFunction>();
 
+            /// <summary>
+            /// Constructor for ASTVisitor
+            /// </summary>
+            /// <param name="sourceFileName">Name of the source file</param>
+            /// <param name="variableAnalysisService">Variable analysis service</param>
+            /// <param name="functionAnalysisService">Function analysis service</param>
+            /// <param name="options">Parse options</param>
             public ASTVisitor(
                 string sourceFileName,
                 IVariableAnalysisService variableAnalysisService,
@@ -483,140 +466,334 @@ namespace C_TestForge.Parser
                 _options = options;
             }
 
+            /// <summary>
+            /// Visit a cursor in the AST
+            /// </summary>
+            /// <param name="cursor">Current cursor</param>
+            /// <param name="parent">Parent cursor</param>
             public void Visit(CXCursor cursor, CXCursor parent)
             {
-                // Skip if not from the main file
-                if (!IsFromMainFile(cursor))
+                try
                 {
-                    return;
-                }
+                    // Get the cursor's location
+                    CXFile file;
+                    uint line, column, offset;
+                    cursor.Location.GetFileLocation(out file, out line, out column, out offset);
 
-                switch (cursor.Kind)
-                {
-                    case CXCursorKind.CXCursor_VarDecl:
-                        if (_options.AnalyzeVariables)
-                        {
-                            ProcessVariableDeclaration(cursor);
-                        }
-                        break;
-
-                    case CXCursorKind.CXCursor_FunctionDecl:
-                        if (_options.AnalyzeFunctions)
-                        {
-                            ProcessFunctionDeclaration(cursor);
-                        }
-                        break;
-
-                    // Handle other relevant cursor kinds as needed
-                    case CXCursorKind.CXCursor_EnumDecl:
-                        if (_options.AnalyzeVariables)
-                        {
-                            ProcessEnumDeclaration(cursor);
-                        }
-                        break;
-
-                    case CXCursorKind.CXCursor_StructDecl:
-                        if (_options.AnalyzeVariables)
-                        {
-                            ProcessStructDeclaration(cursor);
-                        }
-                        break;
-
-                    case CXCursorKind.CXCursor_TypedefDecl:
-                        if (_options.AnalyzeVariables)
-                        {
-                            ProcessTypedefDeclaration(cursor);
-                        }
-                        break;
-                }
-            }
-
-            private bool IsFromMainFile(CXCursor cursor)
-            {
-                var location = cursor.Location;
-                if (location.IsFromMainFile)
-                {
-                    return true;
-                }
-
-                // Check if the file matches our source file name
-                // Đồng thời thay thế dấu * bằng out _ (out discard)
-                location.GetFileLocation(out CXFile file, out _, out _, out _);
-                if (file != null)
-                {
-                    var fileName = Path.GetFileName(file.Name.ToString());
-                    return string.Equals(fileName, _sourceFileName, StringComparison.OrdinalIgnoreCase);
-                }
-
-                return false;
-            }
-
-            private void ProcessVariableDeclaration(CXCursor cursor)
-            {
-                var variable = _variableAnalysisService.ExtractVariable(cursor);
-                if (variable != null)
-                {
-                    Variables.Add(variable);
-                }
-            }
-
-            private void ProcessFunctionDeclaration(CXCursor cursor)
-            {
-                var function = _functionAnalysisService.ExtractFunction(cursor);
-                if (function != null)
-                {
-                    Functions.Add(function);
-                }
-            }
-
-            private unsafe void ProcessEnumDeclaration(CXCursor cursor)
-            {
-                // Process enum declaration and its constants
-                cursor.VisitChildren((child, parent, clientData) =>
-                {
-                    if (child.Kind == CXCursorKind.CXCursor_EnumConstantDecl)
+                    // Skip if the cursor is not from the source file we're analyzing
+                    if (file.Handle != IntPtr.Zero)
                     {
-                        string name = child.Spelling.ToString();
-                        var value = child.EnumConstantDeclValue.ToString();
-
-                        child.Location.GetFileLocation(out var file, out uint line, out uint column, out _);
-                        string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : _sourceFileName;
-
-                        // Create a variable for the enum constant
-                        var enumConstant = new CVariable
+                        string cursorFile = file.Name.ToString();
+                        if (!cursorFile.EndsWith(_sourceFileName))
                         {
-                            Name = name,
-                            TypeName = "enum " + parent.Spelling.ToString(),
-                            VariableType = VariableType.Enum,
-                            Scope = VariableScope.Global,
-                            DefaultValue = value,
-                            LineNumber = (int)line,
-                            ColumnNumber = (int)column,
-                            SourceFile = sourceFile,
-                            IsConst = true,
-                            IsReadOnly = true
-                        };
-
-                        Variables.Add(enumConstant);
+                            return;
+                        }
                     }
 
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, default(CXClientData));
+                    // Process variable declarations
+                    if (_options.AnalyzeVariables && cursor.Kind == CXCursorKind.CXCursor_VarDecl)
+                    {
+                        var variable = _variableAnalysisService.ExtractVariable(cursor);
+                        if (variable != null)
+                        {
+                            Variables.Add(variable);
+                        }
+                    }
+
+                    // Process function declarations
+                    if (_options.AnalyzeFunctions && cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
+                    {
+                        var function = _functionAnalysisService.ExtractFunction(cursor);
+                        if (function != null)
+                        {
+                            Functions.Add(function);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but continue processing
+                    // In a real implementation, we would want to properly log this
+                    Console.Error.WriteLine($"Error visiting AST node: {ex.Message}");
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<FunctionAnalysisResult> AnalyzeFunctionAsync(string functionName, string filePath)
+        {
+            if (string.IsNullOrEmpty(functionName))
+            {
+                throw new ArgumentException("Function name cannot be null or empty", nameof(functionName));
             }
 
-            private void ProcessStructDeclaration(CXCursor cursor)
+            if (string.IsNullOrEmpty(filePath))
             {
-                // Process struct members as needed
-                // This is a placeholder - in a real implementation, you would extract struct members
+                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
             }
 
-            private void ProcessTypedefDeclaration(CXCursor cursor)
+            if (!_fileService.FileExists(filePath))
             {
-                // Process typedef declarations as needed
-                // This is a placeholder - in a real implementation, you would extract typedef information
+                throw new FileNotFoundException($"Source file not found: {filePath}");
+            }
+
+            try
+            {
+                _logger.LogInformation($"Analyzing function {functionName} in file: {filePath}");
+
+                // Parse the source file first
+                var options = new ParseOptions
+                {
+                    AnalyzeFunctions = true,
+                    AnalyzeVariables = true,
+                    ParsePreprocessorDefinitions = true
+                };
+
+                var parseResult = await ParseSourceFileAsync(filePath, options);
+
+                // Find the function in the parse result
+                var function = parseResult.Functions.FirstOrDefault(f => f.Name == functionName);
+                if (function == null)
+                {
+                    throw new InvalidOperationException($"Function '{functionName}' not found in file: {filePath}");
+                }
+
+                // Create a new FunctionAnalysisResult
+                var result = new FunctionAnalysisResult
+                {
+                    FunctionName = function.Name,
+                    FilePath = filePath,
+                    ReturnType = function.ReturnType,
+                    StartLine = function.StartLineNumber,
+                    EndLine = function.EndLineNumber,
+                    Body = function.Body,
+                    CalledFunctions = function.CalledFunctions,
+                    CyclomaticComplexity = CalculateCyclomaticComplexity(function)
+                };
+
+                // Map parameters
+                foreach (var param in function.Parameters)
+                {
+                    result.Parameters.Add(new FunctionParameter
+                    {
+                        Name = param.Name,
+                        Type = param.TypeName,
+                        IsPointer = param.IsPointer,
+                        IsArray = param.IsArray
+                    });
+                }
+
+                // Analyze branches and paths
+                await AnalyzeBranchesAndPathsAsync(function, result, parseResult);
+
+                // Extract variables
+                ExtractFunctionVariables(function, result, parseResult);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error analyzing function {functionName}: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Calculates the cyclomatic complexity of a function
+        /// </summary>
+        private int CalculateCyclomaticComplexity(CFunction function)
+        {
+            // Basic complexity is 1
+            int complexity = 1;
+
+            // Count decision points in the body (if, for, while, switch statements)
+            // This is a simple implementation - a real one would parse the AST
+            string body = function.Body.ToLower();
+            complexity += CountOccurrences(body, "if ");
+            complexity += CountOccurrences(body, "for ");
+            complexity += CountOccurrences(body, "while ");
+            complexity += CountOccurrences(body, "case ");
+            complexity += CountOccurrences(body, "&&");
+            complexity += CountOccurrences(body, "||");
+
+            return complexity;
+        }
+
+        /// <summary>
+        /// Counts occurrences of a substring in a string
+        /// </summary>
+        private int CountOccurrences(string text, string pattern)
+        {
+            int count = 0;
+            int position = 0;
+
+            while ((position = text.IndexOf(pattern, position)) != -1)
+            {
+                count++;
+                position += pattern.Length;
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Analyzes branches and paths in a function
+        /// </summary>
+        private async Task AnalyzeBranchesAndPathsAsync(CFunction function, FunctionAnalysisResult result, ParseResult parseResult)
+        {
+            // In a real implementation, this would analyze the AST to find branches and paths
+            // For this example, we'll create some placeholder branches based on if statements
+
+            string[] lines = function.Body.Split('\n');
+            int lineNumber = function.StartLineNumber;
+            int blockId = 0;
+
+            foreach (var line in lines)
+            {
+                string trimmedLine = line.Trim();
+
+                if (trimmedLine.StartsWith("if ") || trimmedLine.Contains(" if "))
+                {
+                    // Extract condition from if statement
+                    int startIndex = trimmedLine.IndexOf("if ") + 3;
+                    int endIndex = trimmedLine.IndexOf(')', startIndex);
+
+                    if (endIndex > startIndex)
+                    {
+                        string condition = trimmedLine.Substring(startIndex, endIndex - startIndex + 1);
+
+                        // Create a branch
+                        var branch = new FunctionBranch
+                        {
+                            LineNumber = lineNumber,
+                            Condition = condition,
+                            TrueBlockId = ++blockId,
+                            FalseBlockId = blockId + 1,
+                            BranchType = BranchType.If
+                        };
+
+                        result.Branches.Add(branch);
+                        blockId++; // Increment for the false block
+                    }
+                }
+
+                lineNumber++;
+            }
+
+            // Create some basic paths
+            if (result.Branches.Count > 0)
+            {
+                // Create a path for each branch
+                foreach (var branch in result.Branches)
+                {
+                    // True path
+                    var truePath = new FunctionPath
+                    {
+                        PathCondition = branch.Condition,
+                        IsExecutable = true,
+                        BlockSequence = new List<int> { branch.TrueBlockId }
+                    };
+
+                    // False path
+                    var falsePath = new FunctionPath
+                    {
+                        PathCondition = $"!({branch.Condition})",
+                        IsExecutable = true,
+                        BlockSequence = new List<int> { branch.FalseBlockId }
+                    };
+
+                    result.Paths.Add(truePath);
+                    result.Paths.Add(falsePath);
+                }
+            }
+            else
+            {
+                // If no branches, create a single path
+                var path = new FunctionPath
+                {
+                    PathCondition = "true",
+                    IsExecutable = true,
+                    BlockSequence = new List<int> { 0 }
+                };
+
+                result.Paths.Add(path);
+            }
+        }
+
+        /// <summary>
+        /// Extracts variables used in a function
+        /// </summary>
+        private void ExtractFunctionVariables(CFunction function, FunctionAnalysisResult result, ParseResult parseResult)
+        {
+            // Add parameters as variables
+            foreach (var param in function.Parameters)
+            {
+                var variable = new FunctionVariable
+                {
+                    Name = param.Name,
+                    Type = param.TypeName,
+                    IsPointer = param.IsPointer,
+                    IsArray = param.IsArray,
+                    Scope = VariableScope.Parameter,
+                    LineNumber = function.StartLineNumber
+                };
+
+                result.Variables.Add(variable);
+            }
+
+            // Extract local variables from the function body
+            // This would be better done using the AST, but for the example we'll use a simple approach
+            string[] lines = function.Body.Split('\n');
+            int lineNumber = function.StartLineNumber;
+
+            foreach (var line in lines)
+            {
+                string trimmedLine = line.Trim();
+
+                // Check for variable declarations (simplistic approach)
+                if (!trimmedLine.StartsWith("//") && !trimmedLine.StartsWith("/*") &&
+                    !trimmedLine.StartsWith("*") && !trimmedLine.StartsWith("*/"))
+                {
+                    // Simple check for variable declarations like "int x = 5;"
+                    foreach (var type in new[] { "int", "char", "float", "double", "long", "short", "bool", "unsigned" })
+                    {
+                        if ((trimmedLine.StartsWith(type + " ") || trimmedLine.Contains(" " + type + " ")) &&
+                            trimmedLine.Contains("=") && trimmedLine.EndsWith(";"))
+                        {
+                            string afterType = trimmedLine.Substring(trimmedLine.IndexOf(type) + type.Length).Trim();
+                            string varName = afterType.Split('=')[0].Trim();
+                            string initialValue = afterType.Split('=')[1].Trim().TrimEnd(';');
+
+                            var variable = new FunctionVariable
+                            {
+                                Name = varName,
+                                Type = type,
+                                InitialValue = initialValue,
+                                LineNumber = lineNumber,
+                                Scope = VariableScope.Local,
+                                IsPointer = varName.Contains("*"),
+                                IsArray = varName.Contains("[")
+                            };
+
+                            // Clean up name if it's a pointer or array
+                            if (variable.IsPointer)
+                            {
+                                variable.Name = variable.Name.Replace("*", "").Trim();
+                            }
+
+                            if (variable.IsArray)
+                            {
+                                variable.Name = variable.Name.Split('[')[0].Trim();
+                            }
+
+                            result.Variables.Add(variable);
+                        }
+                    }
+                }
+
+                lineNumber++;
             }
         }
     }
 
-    #endregion
 }

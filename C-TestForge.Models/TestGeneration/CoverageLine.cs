@@ -20,7 +20,7 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Source file
         /// </summary>
-        public string SourceFile { get; set; }
+        public string SourceFile { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number
@@ -30,12 +30,12 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Function name
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Line content
         /// </summary>
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the line is executable

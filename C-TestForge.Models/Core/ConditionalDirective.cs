@@ -26,7 +26,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Condition of the directive
         /// </summary>
-        public string Condition { get; set; }
+        public string Condition { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number in the source file
@@ -41,13 +41,13 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Source file where the directive is defined
         /// </summary>
-        public string SourceFile { get; set; }
+        public string SourceFile { get; set; } = string.Empty;
 
         /// <summary>
         /// Parent directive (for else/elif)
         /// </summary>
         [JsonIgnore]
-        public ConditionalDirective ParentDirective { get; set; }
+        public ConditionalDirective ParentDirective { get; set; } = new ConditionalDirective();
 
         /// <summary>
         /// List of branch directives (else/elif)

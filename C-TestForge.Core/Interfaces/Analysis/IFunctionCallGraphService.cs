@@ -1,9 +1,9 @@
-﻿using System;
+﻿using C_TestForge.Models.CodeAnalysis.CallGraph;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using C_TestForge.Models.Interface;
 
 namespace C_TestForge.Core.Interfaces.Analysis
 {

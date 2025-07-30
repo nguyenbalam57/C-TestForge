@@ -15,17 +15,17 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Name of the variable
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the variable in Z3 (Int, Real, Bool, etc.)
         /// </summary>
-        public string Z3Type { get; set; }
+        public string Z3Type { get; set; } = string.Empty;
 
         /// <summary>
         /// Original C type of the variable
         /// </summary>
-        public string CType { get; set; }
+        public string CType { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the variable is an array

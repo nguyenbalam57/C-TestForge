@@ -11,7 +11,7 @@ namespace C_TestForge.UI.ViewModels
 {
     public class EditTestCaseDialogViewModel : BindableBase, ITestCaseEditorDialogViewModel
     {
-        private TestCaseUser _originalTestCase;
+        private TestCase _originalTestCase;
 
         #region Properties
 
@@ -50,43 +50,43 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _status, value);
         }
 
-        private ObservableCollection<TestCaseInput> _inputs;
-        public ObservableCollection<TestCaseInput> Inputs
+        private ObservableCollection<TestCaseVariableInput> _inputs;
+        public ObservableCollection<TestCaseVariableInput> Inputs
         {
             get => _inputs;
             set => SetProperty(ref _inputs, value);
         }
 
-        private TestCaseInput _selectedInput;
-        public TestCaseInput SelectedInput
+        private TestCaseVariableInput _selectedInput;
+        public TestCaseVariableInput SelectedInput
         {
             get => _selectedInput;
             set => SetProperty(ref _selectedInput, value, () => RemoveInputCommand.RaiseCanExecuteChanged());
         }
 
-        private ObservableCollection<TestCaseOutput> _expectedOutputs;
-        public ObservableCollection<TestCaseOutput> ExpectedOutputs
+        private ObservableCollection<TestCaseVariableOutput> _expectedOutputs;
+        public ObservableCollection<TestCaseVariableOutput> ExpectedOutputs
         {
             get => _expectedOutputs;
             set => SetProperty(ref _expectedOutputs, value);
         }
 
-        private TestCaseOutput _selectedExpectedOutput;
-        public TestCaseOutput SelectedExpectedOutput
+        private TestCaseVariableOutput _selectedExpectedOutput;
+        public TestCaseVariableOutput SelectedExpectedOutput
         {
             get => _selectedExpectedOutput;
             set => SetProperty(ref _selectedExpectedOutput, value, () => RemoveExpectedOutputCommand.RaiseCanExecuteChanged());
         }
 
-        private ObservableCollection<TestCaseOutput> _actualOutputs;
-        public ObservableCollection<TestCaseOutput> ActualOutputs
+        private ObservableCollection<TestCaseVariableOutput> _actualOutputs;
+        public ObservableCollection<TestCaseVariableOutput> ActualOutputs
         {
             get => _actualOutputs;
             set => SetProperty(ref _actualOutputs, value);
         }
 
-        private TestCaseOutput _selectedActualOutput;
-        public TestCaseOutput SelectedActualOutput
+        private TestCaseVariableOutput _selectedActualOutput;
+        public TestCaseVariableOutput SelectedActualOutput
         {
             get => _selectedActualOutput;
             set => SetProperty(ref _selectedActualOutput, value, () => RemoveActualOutputCommand.RaiseCanExecuteChanged());
@@ -110,12 +110,12 @@ namespace C_TestForge.UI.ViewModels
 
         #endregion
 
-        public EditTestCaseDialogViewModel(TestCaseUser testCase = null)
+        public EditTestCaseDialogViewModel(TestCase testCase = null)
         {
             // Initialize collections
-            Inputs = new ObservableCollection<TestCaseInput>();
-            ExpectedOutputs = new ObservableCollection<TestCaseOutput>();
-            ActualOutputs = new ObservableCollection<TestCaseOutput>();
+            Inputs = new ObservableCollection<TestCaseVariableInput>();
+            ExpectedOutputs = new ObservableCollection<TestCaseVariableOutput>();
+            ActualOutputs = new ObservableCollection<TestCaseVariableOutput>();
 
             // Initialize commands
             AddInputCommand = new DelegateCommand(ExecuteAddInput);
@@ -128,7 +128,7 @@ namespace C_TestForge.UI.ViewModels
 
             // Set default values
             Type = TestCaseType.UnitTest;
-            Status = TestCaseStatus.NotExecuted;
+            Status = TestCaseStatus.NotRun;
 
             // Load test case if provided
             if (testCase != null)
@@ -142,13 +142,13 @@ namespace C_TestForge.UI.ViewModels
 
         private void ExecuteAddInput()
         {
-            var input = new TestCaseInput
+            var input = new TestCaseVariableInput
             {
-                Id = Guid.NewGuid(),
-                VariableName = $"input{Inputs.Count + 1}",
-                VariableType = "int",
+                Id = Guid.NewGuid().ToString(),
+                Name = $"input{Inputs.Count + 1}",
+                Type = "int",
                 Value = "0",
-                IsStub = false
+                IsStubParameter = false
             };
 
             Inputs.Add(input);
@@ -170,11 +170,11 @@ namespace C_TestForge.UI.ViewModels
 
         private void ExecuteAddExpectedOutput()
         {
-            var output = new TestCaseOutput
+            var output = new TestCaseVariableOutput
             {
-                Id = Guid.NewGuid(),
-                VariableName = $"output{ExpectedOutputs.Count + 1}",
-                VariableType = "int",
+                Id = Guid.NewGuid().ToString(),
+                Name = $"output{ExpectedOutputs.Count + 1}",
+                Type = "int",
                 Value = "0"
             };
 
@@ -197,11 +197,11 @@ namespace C_TestForge.UI.ViewModels
 
         private void ExecuteAddActualOutput()
         {
-            var output = new TestCaseOutput
+            var output = new TestCaseVariableOutput
             {
-                Id = Guid.NewGuid(),
-                VariableName = $"output{ActualOutputs.Count + 1}",
-                VariableType = "int",
+                Id = Guid.NewGuid().ToString(),
+                Name = $"output{ActualOutputs.Count + 1}",
+                Type = "int",
                 Value = "0"
             };
 
@@ -235,7 +235,7 @@ namespace C_TestForge.UI.ViewModels
                 Description = string.Empty;
                 FunctionName = string.Empty;
                 Type = TestCaseType.UnitTest;
-                Status = TestCaseStatus.NotExecuted;
+                Status = TestCaseStatus.NotRun;
                 Inputs.Clear();
                 ExpectedOutputs.Clear();
                 ActualOutputs.Clear();
@@ -246,7 +246,7 @@ namespace C_TestForge.UI.ViewModels
 
         #region Helper Methods
 
-        private void LoadTestCase(TestCaseUser testCase)
+        private void LoadTestCase(TestCase testCase)
         {
             // Basic properties
             Name = testCase.Name;
@@ -257,13 +257,13 @@ namespace C_TestForge.UI.ViewModels
 
             // Clear and reload collections
             Inputs.Clear();
-            foreach (var input in testCase.Inputs)
+            foreach (var input in testCase.InputVariables)
             {
                 Inputs.Add(CloneTestCaseInput(input));
             }
 
             ExpectedOutputs.Clear();
-            foreach (var output in testCase.ExpectedOutputs)
+            foreach (var output in testCase.OutputVariables)
             {
                 ExpectedOutputs.Add(CloneTestCaseOutput(output));
             }
@@ -275,35 +275,35 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        private TestCaseInput CloneTestCaseInput(TestCaseInput input)
+        private TestCaseVariableInput CloneTestCaseInput(TestCaseVariableInput input)
         {
-            return new TestCaseInput
+            return new TestCaseVariableInput
             {
                 Id = input.Id,
-                VariableName = input.VariableName,
-                VariableType = input.VariableType,
+                Name = input.Name,
+                Type = input.Type,
                 Value = input.Value,
-                IsStub = input.IsStub
+                IsStubParameter = input.IsStubParameter
             };
         }
 
-        private TestCaseOutput CloneTestCaseOutput(TestCaseOutput output)
+        private TestCaseVariableOutput CloneTestCaseOutput(TestCaseVariableOutput output)
         {
-            return new TestCaseOutput
+            return new TestCaseVariableOutput
             {
                 Id = output.Id,
-                VariableName = output.VariableName,
-                VariableType = output.VariableType,
+                Name = output.Name,
+                Type = output.Type,
                 Value = output.Value
             };
         }
 
-        public TestCaseUser GetUpdatedTestCase()
+        public TestCase GetUpdatedTestCase()
         {
-            TestCaseUser testCase = _originalTestCase ?? new TestCaseUser
+            TestCase testCase = _originalTestCase ?? new TestCase
             {
-                Id = Guid.NewGuid(),
-                CreatedDate = DateTime.Now
+                Id = Guid.NewGuid().ToString(),
+                CreationDate = DateTime.Now
             };
 
             // Update basic properties
@@ -312,11 +312,11 @@ namespace C_TestForge.UI.ViewModels
             testCase.FunctionName = FunctionName;
             testCase.Type = Type;
             testCase.Status = Status;
-            testCase.ModifiedDate = DateTime.Now;
+            testCase.LastModifiedDate = DateTime.Now;
 
             // Update collections
-            testCase.Inputs = Inputs.ToList();
-            testCase.ExpectedOutputs = ExpectedOutputs.ToList();
+            testCase.InputVariables = Inputs.ToList();
+            testCase.OutputVariables = ExpectedOutputs.ToList();
             testCase.ActualOutputs = ActualOutputs.ToList();
 
             return testCase;

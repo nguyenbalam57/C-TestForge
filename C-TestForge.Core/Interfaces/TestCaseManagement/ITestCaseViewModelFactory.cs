@@ -12,14 +12,14 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
     /// </summary>
     public interface ITestCaseViewModelFactory
     {
-        /// <summary>
-        /// Creates a view model for a test case
-        /// </summary>
-        TestCaseViewModel CreateViewModel(TestCaseModels testCase);
+        ///// <summary>
+        ///// Creates a view model for a test case
+        ///// </summary>
+        //TestCaseViewModel CreateViewModel(TestCaseModels testCase);
 
-        /// <summary>
-        /// Creates view models for multiple test cases
-        /// </summary>
-        IEnumerable<TestCaseViewModel> CreateViewModels(IEnumerable<TestCaseModels> testCases);
+        ///// <summary>
+        ///// Creates view models for multiple test cases
+        ///// </summary>
+        //IEnumerable<TestCaseViewModel> CreateViewModels(IEnumerable<TestCaseModels> testCases);
     }
 }

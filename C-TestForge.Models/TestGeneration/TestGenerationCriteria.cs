@@ -16,12 +16,12 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Name of the criteria
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the criteria
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Strategy for generating test cases

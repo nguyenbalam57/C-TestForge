@@ -19,12 +19,12 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Name of the generation result
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the generation result
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Configuration used for generation

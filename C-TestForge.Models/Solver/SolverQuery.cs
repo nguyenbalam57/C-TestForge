@@ -17,12 +17,12 @@ namespace C_TestForge.Models.Solver
         /// <summary>
         /// Name of the query
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the query
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Variables involved in the query

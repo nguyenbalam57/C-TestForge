@@ -1,4 +1,6 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.TestCases;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="function">Function to generate test cases for</param>
         /// <param name="options">Generation options</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateTestCasesAsync(CFunction function, TestGenerationOptions options);
+        Task<List<TestCase>> GenerateTestCasesAsync(CFunction function, TestGenerationOptions options);
 
         /// <summary>
         /// Generates test cases for multiple functions
@@ -26,7 +28,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="functions">Functions to generate test cases for</param>
         /// <param name="options">Generation options</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateMultipleTestCasesAsync(List<CFunction> functions, TestGenerationOptions options);
+        Task<List<TestCase>> GenerateMultipleTestCasesAsync(List<CFunction> functions, TestGenerationOptions options);
 
         /// <summary>
         /// Generates integration test cases for a set of functions
@@ -34,7 +36,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="functions">Functions to generate test cases for</param>
         /// <param name="options">Generation options</param>
         /// <returns>List of generated test cases</returns>
-        Task<List<TestCaseModels>> GenerateIntegrationTestCasesAsync(List<CFunction> functions, TestGenerationOptions options);
+        Task<List<TestCase>> GenerateIntegrationTestCasesAsync(List<CFunction> functions, TestGenerationOptions options);
 
         /// <summary>
         /// Generates values for a variable based on its constraints
@@ -50,7 +52,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <param name="testCase">Test case to compute expected outputs for</param>
         /// <param name="function">Function to analyze</param>
         /// <returns>Updated test case with expected outputs</returns>
-        Task<TestCaseModels> ComputeExpectedOutputsAsync(TestCaseModels testCase, CFunction function);
+        Task<TestCase> ComputeExpectedOutputsAsync(TestCase testCase, CFunction function);
     }
 
     /// <summary>

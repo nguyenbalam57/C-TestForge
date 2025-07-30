@@ -1,5 +1,6 @@
 ﻿using C_TestForge.Infrastructure.ViewModels;
 using C_TestForge.Models;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;

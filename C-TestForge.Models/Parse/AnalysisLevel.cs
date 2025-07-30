@@ -5,9 +5,18 @@
     /// </summary>
     public enum AnalysisLevel
     {
-        Basic,
-        Normal,
+        /// <summary>
+        /// Basic analysis
+        /// </summary>
+        Basic = 0,
+        /// <summary>
+        /// Detailed analysis
+        /// </summary>
         Detailed,
-        Comprehensive
+        /// <summary>
+        /// Comprehensive analysis
+        /// </summary>
+        Comprehensive,
+        Normal,
     }
 }

@@ -20,7 +20,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Error message
         /// </summary>
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number in the source file
@@ -35,7 +35,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Source file where the error occurred
         /// </summary>
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
 
         /// <summary>
         /// Severity of the error

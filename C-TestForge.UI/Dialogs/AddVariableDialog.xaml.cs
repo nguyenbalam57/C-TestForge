@@ -1,4 +1,4 @@
-﻿using C_TestForge.Models;
+﻿using C_TestForge.Models.Core;
 using System.Windows;
 
 namespace C_TestForge.UI.Dialogs
@@ -44,11 +44,11 @@ namespace C_TestForge.UI.Dialogs
                 Variable = new CVariable
                 {
                     Name = txtName.Text,
-                    Type = txtType.Text,
+                    TypeName = txtType.Text,
                     DefaultValue = txtValue.Text,
                     IsPointer = chkPointer.IsChecked == true,
                     IsArray = chkArray.IsChecked == true,
-                    ArraySize = arraySize
+                    Size = arraySize
                 };
 
                 DialogResult = true;

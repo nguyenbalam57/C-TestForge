@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,12 +21,12 @@ namespace C_TestForge.UI.Dialogs
     /// </summary>
     public partial class OpenProjectDialog : Window
     {
-        public OpenProjectDialog(List<TestProject> projects)
+        public OpenProjectDialog(List<Project> projects)
         {
             InitializeComponent();
 
             // Order by modified date descending
-            projectsListView.ItemsSource = projects.OrderByDescending(p => p.ModifiedDate);
+            projectsListView.ItemsSource = projects.OrderByDescending(p => p.LastModified);
 
             if (projects.Any())
             {
@@ -33,7 +34,7 @@ namespace C_TestForge.UI.Dialogs
             }
         }
 
-        public string SelectedProjectId => ((TestProject)projectsListView.SelectedItem)?.Id;
+        public string SelectedProjectId => ((Project)projectsListView.SelectedItem)?.Id;
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {

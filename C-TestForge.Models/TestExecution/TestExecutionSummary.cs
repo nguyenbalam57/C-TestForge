@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models.Base;
+using C_TestForge.Models.TestGeneration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,12 +22,12 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Name of the execution run
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Description of the execution run
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Status of the test execution

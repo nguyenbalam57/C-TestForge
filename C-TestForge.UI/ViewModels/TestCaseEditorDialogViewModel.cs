@@ -1,6 +1,7 @@
-﻿using C_TestForge.Models;
+﻿using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Models;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
-using C_TestForge.TestCase.Services;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
@@ -14,7 +15,7 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
 
         private string _title;
-        private TestCaseUser _testCase;
+        private TestCase _testCase;
         private List<CFunction> _functions;
         private string _mode;
 
@@ -24,7 +25,7 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _title, value);
         }
 
-        public TestCaseUser TestCase
+        public TestCase TestCase
         {
             get => _testCase;
             set => SetProperty(ref _testCase, value);
@@ -56,7 +57,7 @@ namespace C_TestForge.UI.ViewModels
                 {
                     if (_mode == "Add")
                     {
-                        await _testCaseService.CreateTestCaseAsync(TestCase);
+                        await _testCaseService.AddTestCaseAsync(TestCase);
                     }
                     else if (_mode == "Edit")
                     {
@@ -109,11 +110,11 @@ namespace C_TestForge.UI.ViewModels
 
             if (parameters.ContainsKey("TestCase"))
             {
-                TestCase = parameters.GetValue<TestCaseUser>("TestCase").Clone();
+                TestCase = parameters.GetValue<TestCase>("TestCase").Clone();
             }
             else
             {
-                TestCase = new TestCaseUser();
+                TestCase = new TestCase();
             }
 
             if (parameters.ContainsKey("Functions"))

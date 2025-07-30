@@ -1,15 +1,16 @@
-﻿using System;
+﻿using C_TestForge.Models.Base;
+using C_TestForge.Models.Parse;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
-using C_TestForge.Models.Parse;
 
 namespace C_TestForge.Models.Projects
 {
     /// <summary>
     /// Represents a source file
     /// </summary>
-    public class SourceFile
+    public class SourceFile : IModelObject
     {
         /// <summary>
         /// Unique identifier
@@ -19,17 +20,17 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Path to the source file
         /// </summary>
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
 
         /// <summary>
         /// Name of the source file
         /// </summary>
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
 
         /// <summary>
         /// Content of the source file
         /// </summary>
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// Lines of the source file
@@ -39,7 +40,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Hash of the content for change detection
         /// </summary>
-        public string ContentHash { get; set; }
+        public string ContentHash { get; set; } = string.Empty;
 
         /// <summary>
         /// Type of the source file
@@ -60,7 +61,7 @@ namespace C_TestForge.Models.Projects
         /// Parse result for this source file
         /// </summary>
         [JsonIgnore]
-        public ParseResult ParseResult { get; set; }
+        public ParseResult ParseResult { get; set; } = new ParseResult();
 
         /// <summary>
         /// Whether the file has been modified since the last save

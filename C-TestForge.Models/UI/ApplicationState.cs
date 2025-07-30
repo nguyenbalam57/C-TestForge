@@ -21,27 +21,27 @@ namespace C_TestForge.Models.UI
         /// <summary>
         /// Current project
         /// </summary>
-        public Project CurrentProject { get; set; }
+        public Project CurrentProject { get; set; } = new Project();
 
         /// <summary>
         /// Currently active source file
         /// </summary>
-        public string ActiveSourceFile { get; set; }
+        public string ActiveSourceFile { get; set; } = string.Empty;
 
         /// <summary>
         /// Currently active test case
         /// </summary>
-        public string ActiveTestCaseId { get; set; }
+        public string ActiveTestCaseId { get; set; } = string.Empty;
 
         /// <summary>
         /// Currently active function
         /// </summary>
-        public string ActiveFunction { get; set; }
+        public string ActiveFunction { get; set; } = string.Empty;
 
         /// <summary>
         /// Currently active layout configuration
         /// </summary>
-        public string ActiveLayoutId { get; set; }
+        public string ActiveLayoutId { get; set; } = string.Empty;
 
         /// <summary>
         /// List of open source files

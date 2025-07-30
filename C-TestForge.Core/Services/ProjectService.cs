@@ -2,6 +2,8 @@
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models;
+using C_TestForge.Models.Parse;
+using C_TestForge.Models.Projects;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;

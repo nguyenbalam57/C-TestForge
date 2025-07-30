@@ -1,5 +1,5 @@
-﻿using C_TestForge.Infrastructure.ViewModels;
-using C_TestForge.TestCase.Services;
+﻿using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Infrastructure.ViewModels;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
@@ -18,7 +18,7 @@ namespace C_TestForge.UI.ViewModels
         private ObservableCollection<Models.TestCases.TestCase> _testCases;
         private Models.TestCases.TestCase _testCase1;
         private Models.TestCases.TestCase _testCase2;
-        private ObservableCollection<Models.TestCases.TestCaseDifference> _differences;
+        //private ObservableCollection<Models.TestCases.TestCaseDifference> _differences;
         private bool _isComparing;
 
         public string Title
@@ -57,11 +57,11 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        public ObservableCollection<Models.TestCases.TestCaseDifference> Differences
-        {
-            get => _differences;
-            set => SetProperty(ref _differences, value);
-        }
+        //public ObservableCollection<Models.TestCases.TestCaseDifference> Differences
+        //{
+        //    get => _differences;
+        //    set => SetProperty(ref _differences, value);
+        //}
 
         public bool IsComparing
         {
@@ -76,7 +76,7 @@ namespace C_TestForge.UI.ViewModels
             _testCaseService = testCaseService;
 
             CloseCommand = new DelegateCommand(ExecuteClose);
-            Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>();
+            //Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>();
         }
 
         private void ExecuteClose()
@@ -91,19 +91,19 @@ namespace C_TestForge.UI.ViewModels
 
             IsComparing = true;
 
-            try
-            {
-                var result = await _testCaseService.CompareTestCasesAsync(TestCase1, TestCase2);
-                Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>(result.Differences);
-            }
-            catch (Exception)
-            {
-                Differences.Clear();
-            }
-            finally
-            {
-                IsComparing = false;
-            }
+            //try
+            //{
+            //    var result = await _testCaseService.CompareTestCasesAsync(TestCase1, TestCase2);
+            //    Differences = new ObservableCollection<Models.TestCases.TestCaseDifference>(result.Differences);
+            //}
+            //catch (Exception)
+            //{
+            //    Differences.Clear();
+            //}
+            //finally
+            //{
+            //    IsComparing = false;
+            //}
         }
 
         public bool CanCloseDialog()

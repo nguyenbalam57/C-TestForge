@@ -11,9 +11,9 @@ namespace C_TestForge.UI.Dialogs
     {
         public TestCaseViewModel ViewModel { get; private set; }
 
-        public TestCaseUser TestCase { get; private set; }
+        public TestCase TestCase { get; private set; }
 
-        public EditTestCaseDialog(TestCaseUser testCase = null)
+        public EditTestCaseDialog(TestCase testCase = null)
         {
             InitializeComponent();
 
@@ -22,7 +22,7 @@ namespace C_TestForge.UI.Dialogs
             DataContext = viewModel;
 
             // Lưu testCase gốc
-            TestCase = testCase ?? new TestCaseUser();
+            TestCase = testCase ?? new TestCase();
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -38,16 +38,16 @@ namespace C_TestForge.UI.Dialogs
             TestCase.Status = viewModel.Status;
 
             // Cập nhật inputs và outputs
-            TestCase.Inputs.Clear();
+            TestCase.InputVariables.Clear();
             foreach (var input in viewModel.Inputs)
             {
-                TestCase.Inputs.Add(input);
+                TestCase.InputVariables.Add(input);
             }
 
-            TestCase.ExpectedOutputs.Clear();
+            TestCase.OutputVariables.Clear();
             foreach (var output in viewModel.ExpectedOutputs)
             {
-                TestCase.ExpectedOutputs.Add(output);
+                TestCase.OutputVariables.Add(output);
             }
 
             TestCase.ActualOutputs.Clear();

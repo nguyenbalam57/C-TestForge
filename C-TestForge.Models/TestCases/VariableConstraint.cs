@@ -14,17 +14,17 @@ namespace C_TestForge.Models.TestCases
         /// <summary>
         /// Gets or sets the variable name
         /// </summary>
-        public string VariableName { get; set; }
+        public string VariableName { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the minimum value
         /// </summary>
-        public string MinValue { get; set; }
+        public string MinValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the maximum value
         /// </summary>
-        public string MaxValue { get; set; }
+        public string MaxValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the enum values

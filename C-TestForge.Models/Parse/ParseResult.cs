@@ -14,7 +14,13 @@ namespace C_TestForge.Models.Parse
         /// <summary>
         /// Path to the source file that was parsed
         /// </summary>
-        public string SourceFilePath { get; set; }
+        public string SourceFilePath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// List of preprocessor directives in the file
+        /// </summary>
+        public List<CPreprocessorDirective> PreprocessorDirectives { get; set; } = new List<CPreprocessorDirective>();
+
 
         /// <summary>
         /// List of preprocessor definitions found in the source file
@@ -42,6 +48,11 @@ namespace C_TestForge.Models.Parse
         public List<ParseError> ParseErrors { get; set; } = new List<ParseError>();
 
         /// <summary>
+        /// List of function relationships found in the analysis
+        /// </summary>
+        public List<FunctionRelationship> FunctionRelationships { get; set; } = new List<FunctionRelationship>();
+
+        /// <summary>
         /// Gets whether the parse result contains critical errors
         /// </summary>
         [JsonIgnore]
@@ -67,6 +78,7 @@ namespace C_TestForge.Models.Parse
             if (other == null)
                 return;
 
+            PreprocessorDirectives.AddRange(other.PreprocessorDirectives);
             Definitions.AddRange(other.Definitions);
             Variables.AddRange(other.Variables);
             Functions.AddRange(other.Functions);

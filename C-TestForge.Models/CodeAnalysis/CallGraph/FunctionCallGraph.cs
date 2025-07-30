@@ -10,7 +10,7 @@ namespace C_TestForge.Models.CodeAnalysis.CallGraph
         /// <summary>
         /// Gets or sets the root function name
         /// </summary>
-        public string RootFunctionName { get; set; }
+        public string RootFunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the nodes in the graph

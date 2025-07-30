@@ -34,6 +34,11 @@ namespace C_TestForge.Models.Solver
         public List<string> ViolatedConstraints { get; set; } = new List<string>();
 
         /// <summary>
+        /// Whether this solution is optimal according to the solver
+        /// </summary>
+        public bool IsOptimal { get; set; }
+
+        /// <summary>
         /// Creates a clone of the solver solution
         /// </summary>
         public SolverSolution Clone()

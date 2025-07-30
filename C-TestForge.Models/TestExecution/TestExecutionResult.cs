@@ -22,12 +22,12 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// ID of the test case that was executed
         /// </summary>
-        public string TestCaseId { get; set; }
+        public string TestCaseId { get; set; } = string.Empty;
 
         /// <summary>
         /// Name of the test case that was executed
         /// </summary>
-        public string TestCaseName { get; set; }
+        public string TestCaseName { get; set; } = string.Empty;
 
         /// <summary>
         /// Status of the test case after execution
@@ -52,22 +52,22 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Error message if the test failed
         /// </summary>
-        public string ErrorMessage { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
 
         /// <summary>
         /// Stack trace if the test failed
         /// </summary>
-        public string StackTrace { get; set; }
+        public string StackTrace { get; set; } = string.Empty;
 
         /// <summary>
         /// Actual return value of the function under test
         /// </summary>
-        public string ActualReturnValue { get; set; }
+        public string ActualReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Expected return value of the function under test
         /// </summary>
-        public string ExpectedReturnValue { get; set; }
+        public string ExpectedReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// List of variable values after execution
@@ -82,7 +82,7 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Output captured during test execution
         /// </summary>
-        public string CapturedOutput { get; set; }
+        public string CapturedOutput { get; set; } = string.Empty;
 
         /// <summary>
         /// Custom properties for the result

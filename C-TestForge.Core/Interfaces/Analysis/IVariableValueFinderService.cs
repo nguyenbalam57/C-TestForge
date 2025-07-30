@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 
 namespace C_TestForge.Core.Interfaces.Analysis
 {
@@ -20,7 +21,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// <param name="filePath">The file path</param>
         /// <returns>Dictionary of variable names and their values</returns>
         Task<Dictionary<string, string>> FindValuesForTestCaseAsync(
-            TestCaseModels testCase,
+            TestCase testCase,
             string functionName,
             string filePath);
 

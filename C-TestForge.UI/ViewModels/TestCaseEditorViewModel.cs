@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;
@@ -13,23 +14,23 @@ namespace C_TestForge.UI.ViewModels
 {
     public class TestCaseEditorViewModel : BindableBase
     {
-        private Models.TestCases.TestCase _testCase;
+        private TestCase _testCase;
         private List<CFunction> _functions;
         private CFunction _selectedFunction;
-        private ObservableCollection<TestCaseInput> _inputs;
-        private ObservableCollection<TestCaseOutput> _expectedOutputs;
+        private ObservableCollection<TestCaseVariableInput> _inputs;
+        private ObservableCollection<TestCaseVariableOutput> _expectedOutputs;
         private bool _isUnitTest;
         private bool _isIntegrationTest;
 
-        public Models.TestCases.TestCase TestCase
+        public TestCase TestCase
         {
             get => _testCase;
             set
             {
                 if (SetProperty(ref _testCase, value))
                 {
-                    Inputs = new ObservableCollection<TestCaseInput>(value?.Inputs ?? new List<TestCaseInput>());
-                    ExpectedOutputs = new ObservableCollection<TestCaseOutput>(value?.ExpectedOutputs ?? new List<TestCaseOutput>());
+                    Inputs = new ObservableCollection<TestCaseVariableInput>(value?.InputVariables ?? new List<TestCaseVariableInput>());
+                    ExpectedOutputs = new ObservableCollection<TestCaseVariableOutput>(value?.OutputVariables ?? new List<TestCaseVariableOutput>());
 
                     if (value != null)
                     {
@@ -67,13 +68,13 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        public ObservableCollection<TestCaseInput> Inputs
+        public ObservableCollection<TestCaseVariableInput> Inputs
         {
             get => _inputs;
             set => SetProperty(ref _inputs, value);
         }
 
-        public ObservableCollection<TestCaseOutput> ExpectedOutputs
+        public ObservableCollection<TestCaseVariableOutput> ExpectedOutputs
         {
             get => _expectedOutputs;
             set => SetProperty(ref _expectedOutputs, value);
@@ -113,18 +114,18 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        public DelegateCommand<TestCaseInput> RemoveInputCommand { get; }
-        public DelegateCommand<TestCaseOutput> RemoveOutputCommand { get; }
+        public DelegateCommand<TestCaseVariableInput> RemoveInputCommand { get; }
+        public DelegateCommand<TestCaseVariableOutput> RemoveOutputCommand { get; }
 
         public TestCaseEditorViewModel()
         {
-            TestCase = new Models.TestCases.TestCase();
-            Inputs = new ObservableCollection<TestCaseInput>();
-            ExpectedOutputs = new ObservableCollection<TestCaseOutput>();
+            TestCase = new TestCase();
+            Inputs = new ObservableCollection<TestCaseVariableInput>();
+            ExpectedOutputs = new ObservableCollection<TestCaseVariableOutput>();
             IsUnitTest = true;
 
-            RemoveInputCommand = new DelegateCommand<TestCaseInput>(ExecuteRemoveInput);
-            RemoveOutputCommand = new DelegateCommand<TestCaseOutput>(ExecuteRemoveOutput);
+            RemoveInputCommand = new DelegateCommand<TestCaseVariableInput>(ExecuteRemoveInput);
+            RemoveOutputCommand = new DelegateCommand<TestCaseVariableOutput>(ExecuteRemoveOutput);
         }
 
         private void UpdateInputsAndOutputs()
@@ -137,12 +138,12 @@ namespace C_TestForge.UI.ViewModels
             {
                 foreach (var param in SelectedFunction.Parameters)
                 {
-                    Inputs.Add(new TestCaseInput
+                    Inputs.Add(new TestCaseVariableInput
                     {
-                        VariableName = param.Name,
-                        VariableType = param.Type,
-                        Value = GenerateDefaultValueForType(param.Type),
-                        IsStub = false
+                        Name = param.Name,
+                        Type = param.TypeName,
+                        Value = GenerateDefaultValueForType(param.TypeName),
+                        IsStubParameter = false
                     });
                 }
             }
@@ -150,11 +151,11 @@ namespace C_TestForge.UI.ViewModels
             // If we don't already have expected outputs, generate them from the function return type
             if (ExpectedOutputs.Count == 0 && SelectedFunction.ReturnType != "void")
             {
-                ExpectedOutputs.Add(new TestCaseOutput
+                ExpectedOutputs.Add(new TestCaseVariableOutput
                 {
-                    VariableName = "return",
-                    VariableType = SelectedFunction.ReturnType,
-                    Value = GenerateDefaultValueForType(SelectedFunction.ReturnType)
+                    Name = "return",
+                    Type = SelectedFunction.ReturnType,
+                    ActualValue = GenerateDefaultValueForType(SelectedFunction.ReturnType)
                 });
             }
         }
@@ -190,7 +191,7 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        private void ExecuteRemoveInput(TestCaseInput input)
+        private void ExecuteRemoveInput(TestCaseVariableInput input)
         {
             if (input != null)
             {
@@ -198,7 +199,7 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        private void ExecuteRemoveOutput(TestCaseOutput output)
+        private void ExecuteRemoveOutput(TestCaseVariableOutput output)
         {
             if (output != null)
             {
@@ -210,8 +211,8 @@ namespace C_TestForge.UI.ViewModels
         {
             if (TestCase != null)
             {
-                TestCase.Inputs = new List<TestCaseInput>(Inputs);
-                TestCase.ExpectedOutputs = new List<TestCaseOutput>(ExpectedOutputs);
+                TestCase.InputVariables = new List<TestCaseVariableInput>(Inputs);
+                TestCase.OutputVariables = new List<TestCaseVariableOutput>(ExpectedOutputs);
             }
         }
     }

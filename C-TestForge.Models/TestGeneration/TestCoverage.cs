@@ -18,7 +18,7 @@ namespace C_TestForge.Models.TestGeneration
         /// <summary>
         /// Name of the coverage
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Dictionary of coverage metrics by type

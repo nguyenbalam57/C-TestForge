@@ -17,7 +17,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Name of the configuration
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Dictionary of macro definitions
@@ -37,7 +37,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Description of the configuration
         /// </summary>
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         /// <summary>
         /// Custom configuration properties

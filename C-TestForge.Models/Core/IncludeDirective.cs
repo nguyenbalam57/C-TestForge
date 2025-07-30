@@ -16,7 +16,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Path to the included file
         /// </summary>
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
 
         /// <summary>
         /// Line number in the source file
@@ -27,6 +27,11 @@ namespace C_TestForge.Models.Core
         /// Whether the include is a system include (<>) or a local include ("")
         /// </summary>
         public bool IsSystemInclude { get; set; }
+
+        /// <summary>
+        /// Source file where the directive is defined
+        /// </summary>
+        public string SourceFile { get; set; } = string.Empty;
 
         /// <summary>
         /// Get a string representation of the include directive
@@ -53,7 +58,8 @@ namespace C_TestForge.Models.Core
                 Id = Id,
                 FilePath = FilePath,
                 LineNumber = LineNumber,
-                IsSystemInclude = IsSystemInclude
+                IsSystemInclude = IsSystemInclude,
+                SourceFile = SourceFile
             };
         }
     }

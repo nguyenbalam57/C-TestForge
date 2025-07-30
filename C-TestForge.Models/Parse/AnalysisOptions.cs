@@ -31,6 +31,11 @@
         public bool AnalyzeVariableConstraints { get; set; } = true;
 
         /// <summary>
+        /// Whether to analyze cross-file relationships
+        /// </summary>
+        public bool AnalyzeCrossFileRelationships { get; set; } = false;
+
+        /// <summary>
         /// Level of detail for analysis
         /// </summary>
         public AnalysisLevel DetailLevel { get; set; } = AnalysisLevel.Normal;

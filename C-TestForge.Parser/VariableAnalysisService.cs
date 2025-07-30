@@ -1,24 +1,18 @@
-﻿using System;
+﻿using C_TestForge.Core.Interfaces.Analysis;
+using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
+using ClangSharp;
+using ClangSharp.Interop;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using ClangSharp;
-using ClangSharp.Interop;
-using C_TestForge.Core;
-using C_TestForge.Models;
-using Microsoft.Extensions.Logging;
-using C_TestForge.Core.Interfaces.TestCaseManagement;
-using C_TestForge.Core.Interfaces.Analysis;
-using C_TestForge.Core.Interfaces.Parser;
-using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Interfaces.Solver;
 
 namespace C_TestForge.Parser
 {
-    #region VariableAnalysisService Implementation
-
     /// <summary>
     /// Implementation of the variable analysis service
     /// </summary>
@@ -27,6 +21,11 @@ namespace C_TestForge.Parser
         private readonly ILogger<VariableAnalysisService> _logger;
         private readonly ISourceCodeService _sourceCodeService;
 
+        /// <summary>
+        /// Constructor for VariableAnalysisService
+        /// </summary>
+        /// <param name="logger">Logger instance</param>
+        /// <param name="sourceCodeService">Source code service for reading source files</param>
         public VariableAnalysisService(
             ILogger<VariableAnalysisService> logger,
             ISourceCodeService sourceCodeService)
@@ -52,7 +51,7 @@ namespace C_TestForge.Parser
                 CXFile file;
                 uint line, column, offset;
                 cursor.Location.GetFileLocation(out file, out line, out column, out offset);
-                string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
+                string sourceFile = file != null ? System.IO.Path.GetFileName(file.Name.ToString()) : null;
 
                 // Get variable type
                 var type = cursor.Type;
@@ -98,309 +97,142 @@ namespace C_TestForge.Parser
                     SourceFile = sourceFile,
                     IsConst = isConst,
                     IsVolatile = isVolatile,
-                    IsReadOnly = isReadOnly,
-                    Constraints = new List<VariableConstraint>()
+                    IsReadOnly = isReadOnly
                 };
 
-                // Determine size of the variable
-                variable.Size = DetermineVariableSize(type);
-
-                // Add basic type constraints
-                AddBasicTypeConstraints(variable);
+                // Determine size if possible
+                variable.Size = DetermineSize(type);
 
                 return variable;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting variable from cursor: {cursor.Spelling}");
+                _logger.LogError(ex, $"Error extracting variable: {ex.Message}");
                 return null;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<List<VariableConstraint>> AnalyzeVariablesAsync(List<CVariable> variables, List<CFunction> functions, List<CDefinition> definitions)
+        public async Task<List<VariableConstraint>> AnalyzeVariablesAsync(
+            List<CVariable> variables,
+            List<CFunction> functions,
+            List<CDefinition> definitions)
         {
+            _logger.LogInformation($"Analyzing {variables.Count} variables");
+
+            var constraints = new List<VariableConstraint>();
+
             try
             {
-                _logger.LogInformation($"Analyzing {variables.Count} variables");
-
-                var allConstraints = new List<VariableConstraint>();
-
-                // Analyze each variable for constraints
+                // Analyze each variable
                 foreach (var variable in variables)
                 {
                     _logger.LogDebug($"Analyzing variable: {variable.Name}");
 
-                    // Add basic constraints based on type
-                    var typeConstraints = GetTypeConstraints(variable);
-                    allConstraints.AddRange(typeConstraints);
-                    variable.Constraints.AddRange(typeConstraints);
+                    // Add constraints based on variable type
+                    var typeConstraints = ExtractTypeConstraints(variable);
+                    constraints.AddRange(typeConstraints);
 
-                    // Check for enum constraints
-                    if (variable.VariableType == VariableType.Enum)
-                    {
-                        var enumConstraints = GetEnumConstraints(variable, definitions);
-                        allConstraints.AddRange(enumConstraints);
-                        variable.Constraints.AddRange(enumConstraints);
-                    }
-
-                    // Look for constraints in function bodies
+                    // Find which functions use this variable
+                    variable.UsedByFunctions.Clear();
                     foreach (var function in functions)
                     {
                         if (function.UsedVariables.Contains(variable.Name))
                         {
-                            _logger.LogDebug($"Variable {variable.Name} is used in function {function.Name}");
-                            var functionConstraints = GetFunctionConstraints(variable, function);
-                            allConstraints.AddRange(functionConstraints);
-                            variable.Constraints.AddRange(functionConstraints);
+                            variable.UsedByFunctions.Add(function.Name);
+                        }
+                    }
+
+                    // Look for enum constraints
+                    if (variable.TypeName.Contains("enum"))
+                    {
+                        var enumConstraints = ExtractEnumConstraints(variable, definitions);
+                        constraints.AddRange(enumConstraints);
+                    }
+                }
+
+                // Analyze function bodies for additional constraints
+                foreach (var function in functions)
+                {
+                    foreach (var variable in variables)
+                    {
+                        if (function.UsedVariables.Contains(variable.Name))
+                        {
+                            var usageConstraints = await ExtractUsageConstraintsAsync(variable, function);
+                            constraints.AddRange(usageConstraints);
                         }
                     }
                 }
 
-                _logger.LogInformation($"Found {allConstraints.Count} constraints for {variables.Count} variables");
+                _logger.LogInformation($"Extracted {constraints.Count} variable constraints");
 
-                return allConstraints;
+                return constraints;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing variables");
-                throw;
+                _logger.LogError(ex, $"Error analyzing variables: {ex.Message}");
+                return constraints;
             }
         }
 
         /// <inheritdoc/>
         public async Task<List<VariableConstraint>> ExtractConstraintsAsync(CVariable variable, SourceFile sourceFile)
         {
+            _logger.LogInformation($"Extracting constraints for variable {variable.Name}");
+
+            var constraints = new List<VariableConstraint>();
+
             try
             {
-                _logger.LogInformation($"Extracting constraints for variable: {variable.Name}");
-
-                if (variable == null)
-                {
-                    throw new ArgumentNullException(nameof(variable));
-                }
-
-                if (sourceFile == null)
-                {
-                    throw new ArgumentNullException(nameof(sourceFile));
-                }
-
-                var constraints = new List<VariableConstraint>();
-
                 // Add basic type constraints
-                constraints.AddRange(GetTypeConstraints(variable));
+                constraints.AddRange(ExtractTypeConstraints(variable));
 
-                // Extract constraints from the source code
-                foreach (string line in sourceFile.Lines)
-                {
-                    // Skip comments
-                    if (line.TrimStart().StartsWith("//") || line.TrimStart().StartsWith("/*"))
-                    {
-                        continue;
-                    }
+                // Extract constraints from source code comments
+                var commentConstraints = await ExtractConstraintsFromCommentsAsync(variable, sourceFile);
+                constraints.AddRange(commentConstraints);
 
-                    // Look for comparison constraints (e.g., if (x > 0))
-                    ExtractComparisonConstraints(line, variable, constraints);
+                // Extract constraints from code patterns
+                var patternConstraints = await ExtractConstraintsFromPatternsAsync(variable, sourceFile);
+                constraints.AddRange(patternConstraints);
 
-                    // Look for range checks (e.g., if (x >= min && x <= max))
-                    ExtractRangeConstraints(line, variable, constraints);
-
-                    // Look for assignment constraints (e.g., x = 5)
-                    ExtractAssignmentConstraints(line, variable, constraints);
-                }
-
-                _logger.LogInformation($"Extracted {constraints.Count} constraints for variable: {variable.Name}");
+                _logger.LogInformation($"Extracted {constraints.Count} constraints for variable {variable.Name}");
 
                 return constraints;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error extracting constraints for variable: {variable.Name}");
-                throw;
+                _logger.LogError(ex, $"Error extracting constraints for variable {variable.Name}: {ex.Message}");
+                return constraints;
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<ValueRange> DetermineValueRangeAsync(CVariable variable)
-        {
-            try
-            {
-                _logger.LogInformation($"Determining value range for variable: {variable.Name}");
-
-                if (variable == null)
-                {
-                    throw new ArgumentNullException(nameof(variable));
-                }
-
-                var range = new ValueRange
-                {
-                    VariableName = variable.Name
-                };
-
-                // Get constraints from the variable
-                var minConstraint = variable.Constraints.FirstOrDefault(c => c.Type == ConstraintType.MinValue);
-                var maxConstraint = variable.Constraints.FirstOrDefault(c => c.Type == ConstraintType.MaxValue);
-                var rangeConstraint = variable.Constraints.FirstOrDefault(c => c.Type == ConstraintType.Range);
-                var enumConstraint = variable.Constraints.FirstOrDefault(c => c.Type == ConstraintType.Enumeration);
-
-                // Set min and max values from constraints
-                if (minConstraint != null)
-                {
-                    range.MinValue = minConstraint.MinValue;
-                    range.MustBePositive = int.TryParse(minConstraint.MinValue, out int minValue) && minValue > 0;
-                }
-
-                if (maxConstraint != null)
-                {
-                    range.MaxValue = maxConstraint.MaxValue;
-                }
-
-                if (rangeConstraint != null)
-                {
-                    range.MinValue = rangeConstraint.MinValue;
-                    range.MaxValue = rangeConstraint.MaxValue;
-                    range.MustBePositive = int.TryParse(rangeConstraint.MinValue, out int minValue) && minValue > 0;
-                }
-
-                if (enumConstraint != null)
-                {
-                    range.AllowedValues = enumConstraint.AllowedValues;
-                }
-
-                // Set defaults based on type if no constraints are found
-                if (range.MinValue == null && range.MaxValue == null && range.AllowedValues == null)
-                {
-                    SetDefaultValueRange(variable, range);
-                }
-
-                _logger.LogInformation($"Determined value range for variable: {variable.Name}, Min: {range.MinValue}, Max: {range.MaxValue}, Allowed Values: {(range.AllowedValues != null ? range.AllowedValues.Count : 0)}");
-
-                return range;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error determining value range for variable: {variable.Name}");
-                throw;
-            }
-        }
-
-        /// <inheritdoc/>
-        public async Task<VariableDataFlow> AnalyzeVariableDataFlowAsync(CVariable variable, CFunction function, SourceFile sourceFile)
-        {
-            try
-            {
-                _logger.LogInformation($"Analyzing data flow for variable: {variable.Name} in function: {function.Name}");
-
-                if (variable == null)
-                {
-                    throw new ArgumentNullException(nameof(variable));
-                }
-
-                if (function == null)
-                {
-                    throw new ArgumentNullException(nameof(function));
-                }
-
-                if (sourceFile == null)
-                {
-                    throw new ArgumentNullException(nameof(sourceFile));
-                }
-
-                var dataFlow = new VariableDataFlow
-                {
-                    VariableName = variable.Name,
-                    FunctionName = function.Name,
-                    Assignments = new List<VariableAssignment>(),
-                    Usages = new List<VariableUsage>()
-                };
-
-                // Extract the function body
-                var functionBody = ExtractFunctionBody(function, sourceFile);
-
-                if (functionBody.Count == 0)
-                {
-                    _logger.LogWarning($"Could not extract function body for {function.Name}");
-                    return dataFlow;
-                }
-
-                // Analyze each line for assignments and usages
-                for (int i = 0; i < functionBody.Count; i++)
-                {
-                    string line = functionBody[i];
-
-                    // Skip comments
-                    if (line.TrimStart().StartsWith("//") || line.TrimStart().StartsWith("/*"))
-                    {
-                        continue;
-                    }
-
-                    // Look for assignments
-                    if (ContainsAssignment(line, variable.Name))
-                    {
-                        var assignment = ExtractAssignment(line, variable.Name);
-                        if (assignment != null)
-                        {
-                            assignment.LineNumber = function.LineNumber + i;
-                            dataFlow.Assignments.Add(assignment);
-                        }
-                    }
-
-                    // Look for usages
-                    if (ContainsVariableName(line, variable.Name))
-                    {
-                        var usage = new VariableUsage
-                        {
-                            LineNumber = function.LineNumber + i,
-                            Context = line.Trim(),
-                            UsageType = DetermineUsageType(line, variable.Name)
-                        };
-
-                        dataFlow.Usages.Add(usage);
-                    }
-                }
-
-                _logger.LogInformation($"Analyzed data flow for variable: {variable.Name}, found {dataFlow.Assignments.Count} assignments and {dataFlow.Usages.Count} usages");
-
-                return dataFlow;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error analyzing data flow for variable: {variable.Name} in function: {function.Name}");
-                throw;
-            }
-        }
-
+        /// <summary>
+        /// Determines the scope of a variable
+        /// </summary>
+        /// <param name="cursor">Variable cursor</param>
+        /// <returns>Variable scope</returns>
         private unsafe VariableScope DetermineScope(CXCursor cursor)
         {
             // Check if the variable is a parameter
-            if (cursor.SemanticParent.Kind == CXCursorKind.CXCursor_FunctionDecl ||
-                cursor.SemanticParent.Kind == CXCursorKind.CXCursor_ParmDecl)
+            if (cursor.Kind == CXCursorKind.CXCursor_ParmDecl)
             {
                 return VariableScope.Parameter;
             }
 
             // Check if the variable is local
-            if (cursor.SemanticParent.Kind == CXCursorKind.CXCursor_CompoundStmt)
+            var parent = clang.getCursorLexicalParent(cursor);
+            if (parent.Kind == CXCursorKind.CXCursor_FunctionDecl ||
+                parent.Kind == CXCursorKind.CXCursor_CXXMethod)
             {
                 return VariableScope.Local;
             }
 
-            // Check storage class
+            // Check if the variable is static
             bool isStatic = false;
             cursor.VisitChildren((child, parent, clientData) =>
             {
-                // Kiểm tra bất kỳ attr nào có thể chứa thông tin về storage class
-                if (child.Kind == CXCursorKind.CXCursor_UnexposedAttr ||
-                    child.Kind == CXCursorKind.CXCursor_DeclRefExpr)
-                {
-                    string spelling = child.Spelling.ToString();
-                    if (spelling == "static")
-                    {
-                        isStatic = true;
-                    }
-                }
 
-                // Kiểm tra thông qua spelling của cursor, không phụ thuộc vào loại cursor
+                // Check spelling for static keyword
                 string childText = child.Spelling.ToString();
                 if (childText == "static")
                 {
@@ -426,6 +258,11 @@ namespace C_TestForge.Parser
             return VariableScope.Global;
         }
 
+        /// <summary>
+        /// Determines the variable type
+        /// </summary>
+        /// <param name="type">Clang type</param>
+        /// <returns>Variable type</returns>
         private VariableType DetermineVariableType(CXType type)
         {
             switch (type.kind)
@@ -440,572 +277,839 @@ namespace C_TestForge.Parser
                     return VariableType.Pointer;
 
                 case CXTypeKind.CXType_Record:
-                    return type.Spelling.ToString().Contains("struct") ? VariableType.Struct : VariableType.Union;
+                    return type.Spelling.ToString().Contains("struct") ?
+                        VariableType.Struct : VariableType.Union;
 
                 case CXTypeKind.CXType_Enum:
                     return VariableType.Enum;
 
+                case CXTypeKind.CXType_Float:
+                case CXTypeKind.CXType_Double:
+                case CXTypeKind.CXType_LongDouble:
+                    return VariableType.Float;
+
+                case CXTypeKind.CXType_Bool:
+                    return VariableType.Bool;
+
+                case CXTypeKind.CXType_Char_S:
+                case CXTypeKind.CXType_Char_U:
+                case CXTypeKind.CXType_SChar:
+                case CXTypeKind.CXType_UChar:
+                    return VariableType.Char;
+
                 default:
-                    return VariableType.Primitive;
+                    // Handle integer types
+                    if (type.kind >= CXTypeKind.CXType_Short && type.kind <= CXTypeKind.CXType_ULongLong)
+                    {
+                        return VariableType.Integer;
+                    }
+
+                    return VariableType.Unknown;
             }
         }
 
+        /// <summary>
+        /// Gets the literal value from a Clang cursor
+        /// </summary>
+        /// <param name="cursor">Literal cursor</param>
+        /// <returns>String representation of the literal value</returns>
         private string GetLiteralValue(CXCursor cursor)
         {
-            switch (cursor.Kind)
-            {
-                case CXCursorKind.CXCursor_IntegerLiteral:
-                    // This is a simplified approach - would need proper evaluation
-                    return "0"; // Placeholder
-
-                case CXCursorKind.CXCursor_FloatingLiteral:
-                    // This is a simplified approach - would need proper evaluation
-                    return "0.0"; // Placeholder
-
-                case CXCursorKind.CXCursor_StringLiteral:
-                    // This is a simplified approach - would need proper evaluation
-                    return "\"\""; // Placeholder
-
-                case CXCursorKind.CXCursor_CharacterLiteral:
-                    // This is a simplified approach - would need proper evaluation
-                    return "'\\0'"; // Placeholder
-
-                case CXCursorKind.CXCursor_InitListExpr:
-                    // This is a simplified approach - would need proper evaluation
-                    return "{}"; // Placeholder
-
-                default:
-                    return null;
-            }
+            var extent = cursor.Extent;
+            return extent.ToString();
         }
 
-        private int DetermineVariableSize(CXType type)
+        /// <summary>
+        /// Determines the size of a variable type in bytes
+        /// </summary>
+        /// <param name="type">Clang type</param>
+        /// <returns>Size in bytes or 0 if unknown</returns>
+        private int DetermineSize(CXType type)
         {
-            // This is a simplified approach - a real implementation would be more sophisticated
-            switch (type.kind)
+            try
             {
-                case CXTypeKind.CXType_Bool:
-                    return 1;
-
-                case CXTypeKind.CXType_Char_U:
-                case CXTypeKind.CXType_Char_S:
-                case CXTypeKind.CXType_UChar:
-                case CXTypeKind.CXType_SChar:
-                    return 1;
-
-                case CXTypeKind.CXType_UShort:
-                case CXTypeKind.CXType_Short:
-                    return 2;
-
-                case CXTypeKind.CXType_UInt:
-                case CXTypeKind.CXType_Int:
-                case CXTypeKind.CXType_Float:
-                    return 4;
-
-                case CXTypeKind.CXType_ULong:
-                case CXTypeKind.CXType_Long:
-                case CXTypeKind.CXType_Double:
-                    return 8;
-
-                case CXTypeKind.CXType_LongLong:
-                case CXTypeKind.CXType_ULongLong:
-                case CXTypeKind.CXType_LongDouble:
-                    return 8;
-
-                case CXTypeKind.CXType_Pointer:
-                    return 4; // Assume 32-bit pointers
-
-                case CXTypeKind.CXType_ConstantArray:
-                    long elementCount = type.ArraySize;
-                    var elementType = type.ElementType;
-                    int elementSize = DetermineVariableSize(elementType);
-                    return (int)(elementCount * elementSize);
-
-                default:
-                    return 0;
-            }
-        }
-
-        private void AddBasicTypeConstraints(CVariable variable)
-        {
-            // Add basic constraints based on type
-            if (variable.TypeName.Contains("unsigned") || variable.TypeName.Contains("uint"))
-            {
-                variable.Constraints.Add(new VariableConstraint
+                switch (type.kind)
                 {
-                    Type = ConstraintType.MinValue,
-                    MinValue = "0",
+                    case CXTypeKind.CXType_Bool:
+                        return 1;
+
+                    case CXTypeKind.CXType_Char_S:
+                    case CXTypeKind.CXType_Char_U:
+                    case CXTypeKind.CXType_SChar:
+                    case CXTypeKind.CXType_UChar:
+                        return 1;
+
+                    case CXTypeKind.CXType_Short:
+                    case CXTypeKind.CXType_UShort:
+                        return 2;
+
+                    case CXTypeKind.CXType_Int:
+                    case CXTypeKind.CXType_UInt:
+                        return 4;
+
+                    case CXTypeKind.CXType_Long:
+                    case CXTypeKind.CXType_ULong:
+                        return 4; // May be 8 on 64-bit platforms
+
+                    case CXTypeKind.CXType_LongLong:
+                    case CXTypeKind.CXType_ULongLong:
+                        return 8;
+
+                    case CXTypeKind.CXType_Float:
+                        return 4;
+
+                    case CXTypeKind.CXType_Double:
+                        return 8;
+
+                    case CXTypeKind.CXType_LongDouble:
+                        return 16; // May vary by platform
+
+                    case CXTypeKind.CXType_Pointer:
+                        return 4; // May be 8 on 64-bit platforms
+
+                    case CXTypeKind.CXType_ConstantArray:
+                        unsafe
+                        {
+                            long arraySize = clang.getArraySize(type);
+                            var elementType = clang.getArrayElementType(type);
+                            int elementSize = DetermineSize(elementType);
+                            return (int)(arraySize * elementSize);
+                        }
+
+                    default:
+                        return 0;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Extracts constraints based on the variable's type
+        /// </summary>
+        /// <param name="variable">Variable to analyze</param>
+        /// <returns>List of type-based constraints</returns>
+        private List<VariableConstraint> ExtractTypeConstraints(CVariable variable)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            string typeName = variable.TypeName.ToLower();
+
+            // Add range constraints based on variable type
+            if (typeName.Contains("bool"))
+            {
+                // Boolean constraints
+                constraints.Add(new VariableConstraint
+                {
+                    VariableName = variable.Name,
+                    Type = ConstraintType.Enumeration,
+                    AllowedValues = new List<string> { "0", "1", "false", "true" },
                     Source = $"Type constraint: {variable.TypeName}"
                 });
             }
-        }
-
-        private List<VariableConstraint> GetTypeConstraints(CVariable variable)
-        {
-            var constraints = new List<VariableConstraint>();
-            string typeName = variable.TypeName.ToLowerInvariant();
-
-            if (typeName.Contains("unsigned") || typeName.Contains("uint"))
+            else if (typeName.Contains("char") && !typeName.Contains("*"))
             {
-                // Unsigned integer constraints
-                if (typeName.Contains("char") || typeName.Contains("uint8"))
+                // Character constraints
+                if (typeName.Contains("unsigned") || typeName.Contains("uchar"))
                 {
+                    // Unsigned char constraints
                     constraints.Add(new VariableConstraint
                     {
+                        VariableName = variable.Name,
                         Type = ConstraintType.Range,
                         MinValue = "0",
                         MaxValue = "255",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
-                else if (typeName.Contains("short") || typeName.Contains("uint16"))
+                else
                 {
+                    // Signed char constraints
                     constraints.Add(new VariableConstraint
                     {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Range,
+                        MinValue = "-128",
+                        MaxValue = "127",
+                        Source = $"Type constraint: {variable.TypeName}"
+                    });
+                }
+            }
+            else if (typeName.Contains("short") || typeName.Contains("int16"))
+            {
+                if (typeName.Contains("unsigned") || typeName.Contains("ushort"))
+                {
+                    // Unsigned short constraints
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
                         Type = ConstraintType.Range,
                         MinValue = "0",
                         MaxValue = "65535",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
-                else if (typeName.Contains("int") || typeName.Contains("uint32"))
+                else
                 {
+                    // Signed short constraints
                     constraints.Add(new VariableConstraint
                     {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Range,
+                        MinValue = "-32768",
+                        MaxValue = "32767",
+                        Source = $"Type constraint: {variable.TypeName}"
+                    });
+                }
+            }
+            else if (typeName.Contains("int") || typeName.Contains("int32"))
+            {
+                if (typeName.Contains("unsigned") || typeName.Contains("uint"))
+                {
+                    // Unsigned int constraints
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
                         Type = ConstraintType.Range,
                         MinValue = "0",
                         MaxValue = "4294967295",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
-                else if (typeName.Contains("long long") || typeName.Contains("uint64"))
+                else
                 {
+                    // Signed int constraints
                     constraints.Add(new VariableConstraint
                     {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Range,
+                        MinValue = "-2147483648",
+                        MaxValue = "2147483647",
+                        Source = $"Type constraint: {variable.TypeName}"
+                    });
+                }
+            }
+            else if (typeName.Contains("long long") || typeName.Contains("int64"))
+            {
+                if (typeName.Contains("unsigned") || typeName.Contains("uint64"))
+                {
+                    // Unsigned long long constraints
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
                         Type = ConstraintType.Range,
                         MinValue = "0",
                         MaxValue = "18446744073709551615",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
+                else
+                {
+                    // Signed long long constraints
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Range,
+                        MinValue = "-9223372036854775808",
+                        MaxValue = "9223372036854775807",
+                        Source = $"Type constraint: {variable.TypeName}"
+                    });
+                }
             }
-            else if (typeName.Contains("char") || typeName.Contains("int8"))
+            else if (typeName.Contains("float"))
             {
-                // Signed char constraints
+                // Float constraints (approximate)
                 constraints.Add(new VariableConstraint
                 {
+                    VariableName = variable.Name,
                     Type = ConstraintType.Range,
-                    MinValue = "-128",
-                    MaxValue = "127",
+                    MinValue = "-3.4e38",
+                    MaxValue = "3.4e38",
                     Source = $"Type constraint: {variable.TypeName}"
                 });
             }
-            else if (typeName.Contains("short") || typeName.Contains("int16"))
+            else if (typeName.Contains("double"))
             {
-                // Signed short constraints
+                // Double constraints (approximate)
                 constraints.Add(new VariableConstraint
                 {
+                    VariableName = variable.Name,
                     Type = ConstraintType.Range,
-                    MinValue = "-32768",
-                    MaxValue = "32767",
+                    MinValue = "-1.7e308",
+                    MaxValue = "1.7e308",
                     Source = $"Type constraint: {variable.TypeName}"
                 });
             }
-            else if (typeName.Contains("int") || typeName.Contains("int32"))
+
+            // Check for array size constraints
+            if (variable.VariableType == VariableType.Array)
             {
-                // Signed int constraints
-                constraints.Add(new VariableConstraint
+                // Extract array size from type name
+                var match = Regex.Match(variable.TypeName, @"\[(\d+)\]");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out int arraySize))
                 {
-                    Type = ConstraintType.Range,
-                    MinValue = "-2147483648",
-                    MaxValue = "2147483647",
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
-            }
-            else if (typeName.Contains("long long") || typeName.Contains("int64"))
-            {
-                // Signed long long constraints
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Range,
-                    MinValue = "-9223372036854775808",
-                    MaxValue = "9223372036854775807",
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
-            }
-            else if (typeName.Contains("bool"))
-            {
-                // Boolean constraints
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Enumeration,
-                    AllowedValues = new List<string> { "0", "1", "false", "true" },
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.ArraySize,
+                        Value = arraySize.ToString(),
+                        Source = $"Array size: {arraySize}"
+                    });
+                }
             }
 
             return constraints;
         }
 
-        private List<VariableConstraint> GetEnumConstraints(CVariable variable, List<CDefinition> definitions)
+        /// <summary>
+        /// Extracts enum constraints for a variable
+        /// </summary>
+        /// <param name="variable">Variable to analyze</param>
+        /// <param name="definitions">Available definitions</param>
+        /// <returns>List of enum-based constraints</returns>
+        private List<VariableConstraint> ExtractEnumConstraints(CVariable variable, List<CDefinition> definitions)
         {
             var constraints = new List<VariableConstraint>();
 
-            // Find enum values that match the variable type
-            var enumValues = definitions
-                .Where(d => d.DefinitionType == DefinitionType.EnumValue)
-                .ToList();
-
-            if (enumValues.Any())
+            try
             {
-                var allowedValues = enumValues
-                    .Select(e => e.Name)
-                    .ToList();
-
-                constraints.Add(new VariableConstraint
+                // Look for enum definitions that match the variable type
+                var enumValues = new List<string>();
+                foreach (var definition in definitions)
                 {
-                    Type = ConstraintType.Enumeration,
-                    AllowedValues = allowedValues,
-                    Source = $"Enum constraint: {variable.TypeName}"
-                });
-            }
+                    if (definition.DefinitionType == DefinitionType.EnumValue)
+                    {
+                        enumValues.Add(definition.Name);
+                    }
+                }
 
-            return constraints;
+                if (enumValues.Count > 0)
+                {
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Enumeration,
+                        AllowedValues = enumValues,
+                        Source = $"Enum values for {variable.TypeName}"
+                    });
+                }
+
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting enum constraints for variable {variable.Name}: {ex.Message}");
+                return constraints;
+            }
         }
 
-        private List<VariableConstraint> GetFunctionConstraints(CVariable variable, CFunction function)
+        /// <summary>
+        /// Extracts constraints from usage patterns in a function
+        /// </summary>
+        /// <param name="variable">Variable to analyze</param>
+        /// <param name="function">Function to analyze</param>
+        /// <returns>List of usage-based constraints</returns>
+        private async Task<List<VariableConstraint>> ExtractUsageConstraintsAsync(CVariable variable, CFunction function)
         {
             var constraints = new List<VariableConstraint>();
 
-            // Only add custom constraints for function parameters
-            if (function.Parameters.Any(p => p.Name == variable.Name))
+            try
             {
-                constraints.Add(new VariableConstraint
+                if (string.IsNullOrEmpty(function.Body))
                 {
-                    Type = ConstraintType.Custom,
-                    Expression = $"Used in function {function.Name}",
-                    Source = $"Function parameter in {function.Name}"
-                });
-            }
-
-            return constraints;
-        }
-
-        private void ExtractComparisonConstraints(string line, CVariable variable, List<VariableConstraint> constraints)
-        {
-            // Look for comparison operators
-            string variableName = variable.Name;
-
-            // Check for greater than
-            var greaterThanMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*>\s*([0-9.]+)");
-            if (greaterThanMatch.Success)
-            {
-                string value = greaterThanMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.MinValue,
-                    MinValue = value,
-                    Source = $"Comparison: {variableName} > {value}"
-                });
-            }
-
-            // Check for greater than or equal
-            var greaterThanEqualMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*>=\s*([0-9.]+)");
-            if (greaterThanEqualMatch.Success)
-            {
-                string value = greaterThanEqualMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.MinValue,
-                    MinValue = value,
-                    Source = $"Comparison: {variableName} >= {value}"
-                });
-            }
-
-            // Check for less than
-            var lessThanMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*<\s*([0-9.]+)");
-            if (lessThanMatch.Success)
-            {
-                string value = lessThanMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.MaxValue,
-                    MaxValue = value,
-                    Source = $"Comparison: {variableName} < {value}"
-                });
-            }
-
-            // Check for less than or equal
-            var lessThanEqualMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*<=\s*([0-9.]+)");
-            if (lessThanEqualMatch.Success)
-            {
-                string value = lessThanEqualMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.MaxValue,
-                    MaxValue = value,
-                    Source = $"Comparison: {variableName} <= {value}"
-                });
-            }
-
-            // Check for equality
-            var equalityMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*==\s*([0-9.]+|true|false)");
-            if (equalityMatch.Success)
-            {
-                string value = equalityMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Enumeration,
-                    AllowedValues = new List<string> { value },
-                    Source = $"Equality: {variableName} == {value}"
-                });
-            }
-        }
-
-        private void ExtractRangeConstraints(string line, CVariable variable, List<VariableConstraint> constraints)
-        {
-            string variableName = variable.Name;
-
-            // Check for range checks (e.g., if (x >= min && x <= max))
-            var rangeMatch = Regex.Match(line, $@"{Regex.Escape(variableName)}\s*>=\s*([0-9.]+).*&&.*{Regex.Escape(variableName)}\s*<=\s*([0-9.]+)");
-            if (rangeMatch.Success)
-            {
-                string minValue = rangeMatch.Groups[1].Value;
-                string maxValue = rangeMatch.Groups[2].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Range,
-                    MinValue = minValue,
-                    MaxValue = maxValue,
-                    Source = $"Range check: {variableName} >= {minValue} && {variableName} <= {maxValue}"
-                });
-            }
-
-            // Check for reversed range checks (e.g., if (min <= x && x <= max))
-            var reversedRangeMatch = Regex.Match(line, $@"([0-9.]+)\s*<=\s*{Regex.Escape(variableName)}.*&&.*{Regex.Escape(variableName)}\s*<=\s*([0-9.]+)");
-            if (reversedRangeMatch.Success)
-            {
-                string minValue = reversedRangeMatch.Groups[1].Value;
-                string maxValue = reversedRangeMatch.Groups[2].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Range,
-                    MinValue = minValue,
-                    MaxValue = maxValue,
-                    Source = $"Range check: {minValue} <= {variableName} && {variableName} <= {maxValue}"
-                });
-            }
-        }
-
-        private void ExtractAssignmentConstraints(string line, CVariable variable, List<VariableConstraint> constraints)
-        {
-            string variableName = variable.Name;
-
-            // Check for direct assignments (e.g., x = 5)
-            var assignmentMatch = Regex.Match(line, $@"\b{Regex.Escape(variableName)}\s*=\s*([0-9.]+|true|false)");
-            if (assignmentMatch.Success)
-            {
-                string value = assignmentMatch.Groups[1].Value;
-                constraints.Add(new VariableConstraint
-                {
-                    Type = ConstraintType.Custom,
-                    Expression = $"{variableName} = {value}",
-                    Source = $"Assignment: {variableName} = {value}"
-                });
-            }
-        }
-
-        private void SetDefaultValueRange(CVariable variable, ValueRange range)
-        {
-            string typeName = variable.TypeName.ToLowerInvariant();
-
-            if (typeName.Contains("unsigned") || typeName.Contains("uint"))
-            {
-                range.MinValue = "0";
-                range.MustBePositive = true;
-
-                if (typeName.Contains("char") || typeName.Contains("uint8"))
-                {
-                    range.MaxValue = "255";
+                    return constraints;
                 }
-                else if (typeName.Contains("short") || typeName.Contains("uint16"))
-                {
-                    range.MaxValue = "65535";
-                }
-                else if (typeName.Contains("int") || typeName.Contains("uint32"))
-                {
-                    range.MaxValue = "4294967295";
-                }
-                else if (typeName.Contains("long long") || typeName.Contains("uint64"))
-                {
-                    range.MaxValue = "18446744073709551615";
-                }
+
+                // Look for range checks
+                var rangeChecks = ExtractRangeChecks(function.Body, variable.Name);
+                constraints.AddRange(rangeChecks);
+
+                // Look for equality checks
+                var equalityChecks = ExtractEqualityChecks(function.Body, variable.Name);
+                constraints.AddRange(equalityChecks);
+
+                // Look for value assignments
+                var assignmentConstraints = ExtractAssignmentConstraints(function.Body, variable.Name);
+                constraints.AddRange(assignmentConstraints);
+
+                return constraints;
             }
-            else if (typeName.Contains("char") || typeName.Contains("int8"))
+            catch (Exception ex)
             {
-                range.MinValue = "-128";
-                range.MaxValue = "127";
-            }
-            else if (typeName.Contains("short") || typeName.Contains("int16"))
-            {
-                range.MinValue = "-32768";
-                range.MaxValue = "32767";
-            }
-            else if (typeName.Contains("int") || typeName.Contains("int32"))
-            {
-                range.MinValue = "-2147483648";
-                range.MaxValue = "2147483647";
-            }
-            else if (typeName.Contains("long long") || typeName.Contains("int64"))
-            {
-                range.MinValue = "-9223372036854775808";
-                range.MaxValue = "9223372036854775807";
-            }
-            else if (typeName.Contains("bool"))
-            {
-                range.AllowedValues = new List<string> { "0", "1", "false", "true" };
+                _logger.LogError(ex, $"Error extracting usage constraints for variable {variable.Name} in function {function.Name}: {ex.Message}");
+                return constraints;
             }
         }
 
-        private List<string> ExtractFunctionBody(CFunction function, SourceFile sourceFile)
+        /// <summary>
+        /// Extracts constraints from source code comments
+        /// </summary>
+        /// <param name="variable">Variable to analyze</param>
+        /// <param name="sourceFile">Source file</param>
+        /// <returns>List of comment-based constraints</returns>
+        private async Task<List<VariableConstraint>> ExtractConstraintsFromCommentsAsync(CVariable variable, SourceFile sourceFile)
         {
-            var bodyLines = new List<string>();
+            var constraints = new List<VariableConstraint>();
 
-            // Find the function in the source file
-            bool foundFunction = false;
-            int braceCount = 0;
-
-            for (int i = function.LineNumber - 1; i < sourceFile.Lines.Count; i++)
+            try
             {
-                string line = sourceFile.Lines[i];
-
-                if (!foundFunction)
+                if (sourceFile == null || sourceFile.Lines == null || sourceFile.Lines.Count == 0)
                 {
-                    // Look for the function declaration
-                    if (line.Contains(function.Name) && (line.Contains('(') || line.Contains(')')))
+                    return constraints;
+                }
+
+                // Look for comments around the variable declaration
+                int startLine = Math.Max(0, variable.LineNumber - 5);
+                int endLine = Math.Min(sourceFile.Lines.Count - 1, variable.LineNumber + 5);
+
+                for (int i = startLine; i <= endLine; i++)
+                {
+                    string line = sourceFile.Lines[i];
+
+                    // Look for range comments: e.g., "// Range: 0-100" or "/* Valid values: 1, 2, 3 */"
+                    var rangeMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Range|Valid range|Value range):\s*(-?\d+(?:\.\d+)?)\s*(?:to|-)\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+                    if (rangeMatch.Success)
                     {
-                        foundFunction = true;
+                        string minValue = rangeMatch.Groups[1].Value;
+                        string maxValue = rangeMatch.Groups[2].Value;
+
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = minValue,
+                            MaxValue = maxValue,
+                            Source = $"Comment at line {i + 1}"
+                        });
                     }
 
-                    continue;
-                }
-
-                // Count braces to find the function body
-                for (int j = 0; j < line.Length; j++)
-                {
-                    if (line[j] == '{')
+                    // Look for enumeration comments: e.g., "// Valid values: 1, 2, 3" or "/* Allowed: A, B, C */"
+                    var enumMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Valid values|Allowed|Allowed values|Valid|Values):\s*([\w\d\s,]+)", RegexOptions.IgnoreCase);
+                    if (enumMatch.Success)
                     {
-                        braceCount++;
+                        string valuesStr = enumMatch.Groups[1].Value;
+                        var values = valuesStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                              .Select(v => v.Trim())
+                                              .Where(v => !string.IsNullOrWhiteSpace(v))
+                                              .ToList();
 
-                        if (braceCount == 1)
+                        if (values.Count > 0)
                         {
-                            // Start of function body
-                            bodyLines.Add(line.Substring(j));
-                            break;
+                            constraints.Add(new VariableConstraint
+                            {
+                                VariableName = variable.Name,
+                                Type = ConstraintType.Enumeration,
+                                AllowedValues = values,
+                                Source = $"Comment at line {i + 1}"
+                            });
                         }
                     }
-                    else if (line[j] == '}')
-                    {
-                        braceCount--;
 
-                        if (braceCount == 0)
+                    // Look for min/max comments: e.g., "// Min: 0" or "/* Maximum: 100 */"
+                    var minMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Min|Minimum|Lower bound):\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+                    var maxMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Max|Maximum|Upper bound):\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+
+                    if (minMatch.Success || maxMatch.Success)
+                    {
+                        string minValue = minMatch.Success ? minMatch.Groups[1].Value : null;
+                        string maxValue = maxMatch.Success ? maxMatch.Groups[1].Value : null;
+
+                        constraints.Add(new VariableConstraint
                         {
-                            // End of function body
-                            bodyLines.Add(line.Substring(0, j + 1));
-                            return bodyLines;
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = minValue,
+                            MaxValue = maxValue,
+                            Source = $"Comment at line {i + 1}"
+                        });
+                    }
+                }
+
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting constraints from comments for variable {variable.Name}: {ex.Message}");
+                return constraints;
+            }
+        }
+
+        /// <summary>
+        /// Extracts constraints from code patterns
+        /// </summary>
+        /// <param name="variable">Variable to analyze</param>
+        /// <param name="sourceFile">Source file</param>
+        /// <returns>List of pattern-based constraints</returns>
+        private async Task<List<VariableConstraint>> ExtractConstraintsFromPatternsAsync(CVariable variable, SourceFile sourceFile)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                if (sourceFile == null || string.IsNullOrEmpty(sourceFile.Content))
+                {
+                    return constraints;
+                }
+
+                string content = sourceFile.Content;
+
+                // Look for range checks: e.g., "if (variable > min && variable < max)"
+                var rangeChecks = ExtractRangeChecks(content, variable.Name);
+                constraints.AddRange(rangeChecks);
+
+                // Look for equality checks: e.g., "if (variable == value1 || variable == value2)"
+                var equalityChecks = ExtractEqualityChecks(content, variable.Name);
+                constraints.AddRange(equalityChecks);
+
+                // Look for switch statements: e.g., "switch (variable) { case value1: ... }"
+                var switchCases = ExtractSwitchCases(content, variable.Name);
+                if (switchCases.Count > 0)
+                {
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Enumeration,
+                        AllowedValues = switchCases,
+                        Source = "Switch statement cases"
+                    });
+                }
+
+                // Look for array accesses: e.g., "array[variable]"
+                var arrayAccesses = ExtractArrayAccessConstraints(content, variable.Name);
+                constraints.AddRange(arrayAccesses);
+
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting constraints from patterns for variable {variable.Name}: {ex.Message}");
+                return constraints;
+            }
+        }
+
+        /// <summary>
+        /// Extracts range checks from code
+        /// </summary>
+        /// <param name="code">Code to analyze</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>List of range-based constraints</returns>
+        private List<VariableConstraint> ExtractRangeChecks(string code, string variableName)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                // Look for range checks of the form: if (variable >= min && variable <= max)
+                var rangePattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(>=|>)\s*([^&|]+)\s*&&\s*{Regex.Escape(variableName)}\s*(<|<=)\s*([^&|]+)\s*\)");
+                var matches = rangePattern.Matches(code);
+
+                foreach (Match match in matches)
+                {
+                    string minOp = match.Groups[1].Value;
+                    string minValue = match.Groups[2].Value.Trim();
+                    string maxOp = match.Groups[3].Value;
+                    string maxValue = match.Groups[4].Value.Trim();
+
+                    // Adjust bounds based on operators
+                    if (minOp == ">")
+                    {
+                        // Exclusive lower bound, add 1 to minimum
+                        if (double.TryParse(minValue, out double minDouble))
+                        {
+                            minValue = (minDouble + 1).ToString();
+                        }
+                    }
+
+                    if (maxOp == "<")
+                    {
+                        // Exclusive upper bound, subtract 1 from maximum
+                        if (double.TryParse(maxValue, out double maxDouble))
+                        {
+                            maxValue = (maxDouble - 1).ToString();
+                        }
+                    }
+
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variableName,
+                        Type = ConstraintType.Range,
+                        MinValue = minValue,
+                        MaxValue = maxValue,
+                        Source = "Code range check"
+                    });
+                }
+
+                // Look for individual bounds checks: if (variable >= min) or if (variable <= max)
+                var lowerBoundPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(>=|>)\s*([^&|]+)\s*\)");
+                var upperBoundPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(<|<=)\s*([^&|]+)\s*\)");
+
+                var lowerMatches = lowerBoundPattern.Matches(code);
+                var upperMatches = upperBoundPattern.Matches(code);
+
+                foreach (Match match in lowerMatches)
+                {
+                    string op = match.Groups[1].Value;
+                    string value = match.Groups[2].Value.Trim();
+
+                    // Adjust bound based on operator
+                    if (op == ">")
+                    {
+                        // Exclusive lower bound
+                        if (double.TryParse(value, out double valueDouble))
+                        {
+                            value = (valueDouble + 1).ToString();
+                        }
+                    }
+
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variableName,
+                        Type = ConstraintType.Range,
+                        MinValue = value,
+                        MaxValue = null,
+                        Source = "Code lower bound check"
+                    });
+                }
+
+                foreach (Match match in upperMatches)
+                {
+                    string op = match.Groups[1].Value;
+                    string value = match.Groups[2].Value.Trim();
+
+                    // Adjust bound based on operator
+                    if (op == "<")
+                    {
+                        // Exclusive upper bound
+                        if (double.TryParse(value, out double valueDouble))
+                        {
+                            value = (valueDouble - 1).ToString();
+                        }
+                    }
+
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variableName,
+                        Type = ConstraintType.Range,
+                        MinValue = null,
+                        MaxValue = value,
+                        Source = "Code upper bound check"
+                    });
+                }
+
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting range checks for variable {variableName}: {ex.Message}");
+                return constraints;
+            }
+        }
+
+        /// <summary>
+        /// Extracts equality checks from code
+        /// </summary>
+        /// <param name="code">Code to analyze</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>List of equality-based constraints</returns>
+        private List<VariableConstraint> ExtractEqualityChecks(string code, string variableName)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                // Look for equality checks of the form: if (variable == value)
+                var equalityPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*==\s*([^&|]+)\s*\)");
+                var matches = equalityPattern.Matches(code);
+
+                if (matches.Count > 0)
+                {
+                    var allowedValues = new List<string>();
+
+                    foreach (Match match in matches)
+                    {
+                        string value = match.Groups[1].Value.Trim();
+                        if (!allowedValues.Contains(value))
+                        {
+                            allowedValues.Add(value);
+                        }
+                    }
+
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variableName,
+                        Type = ConstraintType.Enumeration,
+                        AllowedValues = allowedValues,
+                        Source = "Code equality checks"
+                    });
+                }
+
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting equality checks for variable {variableName}: {ex.Message}");
+                return constraints;
+            }
+        }
+
+        /// <summary>
+        /// Extracts switch cases from code
+        /// </summary>
+        /// <param name="code">Code to analyze</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>List of switch case values</returns>
+        private List<string> ExtractSwitchCases(string code, string variableName)
+        {
+            var switchCases = new List<string>();
+
+            try
+            {
+                // Look for switch statements of the form: switch (variable) { case value1: ... case value2: ... }
+                var switchPattern = new Regex($@"switch\s*\(\s*{Regex.Escape(variableName)}\s*\)\s*{{([^}}]+)}}");
+                var matches = switchPattern.Matches(code);
+
+                foreach (Match match in matches)
+                {
+                    string switchBody = match.Groups[1].Value;
+                    var casePattern = new Regex(@"case\s+([^:]+):");
+                    var caseMatches = casePattern.Matches(switchBody);
+
+                    foreach (Match caseMatch in caseMatches)
+                    {
+                        string caseValue = caseMatch.Groups[1].Value.Trim();
+                        if (!switchCases.Contains(caseValue))
+                        {
+                            switchCases.Add(caseValue);
                         }
                     }
                 }
 
-                if (braceCount > 0 && (!bodyLines.Contains(line)))
-                {
-                    bodyLines.Add(line);
-                }
+                return switchCases;
             }
-
-            return bodyLines;
-        }
-
-        private bool ContainsAssignment(string line, string variableName)
-        {
-            // Check for direct assignments (e.g., x = 5)
-            var assignmentRegex = new Regex($@"\b{Regex.Escape(variableName)}\s*=([^=])");
-            return assignmentRegex.IsMatch(line);
-        }
-
-        private VariableAssignment ExtractAssignment(string line, string variableName)
-        {
-            // Extract the assignment expression
-            var assignmentRegex = new Regex($@"\b{Regex.Escape(variableName)}\s*=\s*(.+?)(;|$)");
-            var match = assignmentRegex.Match(line);
-
-            if (match.Success)
+            catch (Exception ex)
             {
-                string expression = match.Groups[1].Value.Trim();
+                _logger.LogError(ex, $"Error extracting switch cases for variable {variableName}: {ex.Message}");
+                return switchCases;
+            }
+        }
 
-                // Extract variables used in the expression
-                var usedVariables = new List<string>();
-                var variableRegex = new Regex(@"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
-                var variableMatches = variableRegex.Matches(expression);
+        /// <summary>
+        /// Extracts array access constraints from code
+        /// </summary>
+        /// <param name="code">Code to analyze</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>List of array access constraints</returns>
+        private List<VariableConstraint> ExtractArrayAccessConstraints(string code, string variableName)
+        {
+            var constraints = new List<VariableConstraint>();
 
-                foreach (Match variableMatch in variableMatches)
+            try
+            {
+                // Look for array accesses of the form: array[variable]
+                var arrayAccessPattern = new Regex($@"[a-zA-Z_]\w*\[\s*{Regex.Escape(variableName)}\s*\]");
+                var matches = arrayAccessPattern.Matches(code);
+
+                if (matches.Count > 0)
                 {
-                    string usedVarName = variableMatch.Value;
+                    // Look for array sizes
+                    var arraySizePattern = new Regex(@"([a-zA-Z_]\w*)\[(\d+)\]");
+                    var sizeMatches = arraySizePattern.Matches(code);
 
-                    // Skip keywords
-                    if (usedVarName != "if" && usedVarName != "else" && usedVarName != "for" &&
-                        usedVarName != "while" && usedVarName != "return" && usedVarName != "break" &&
-                        usedVarName != "continue" && usedVarName != "switch" && usedVarName != "case" &&
-                        usedVarName != "default" && usedVarName != "goto" && usedVarName != "sizeof" &&
-                        usedVarName != "true" && usedVarName != "false" && usedVarName != "NULL")
+                    foreach (Match match in matches)
                     {
-                        usedVariables.Add(usedVarName);
+                        string arrayExpression = match.Value;
+                        string arrayName = arrayExpression.Substring(0, arrayExpression.IndexOf('['));
+
+                        // Find the size of this array
+                        foreach (Match sizeMatch in sizeMatches)
+                        {
+                            if (sizeMatch.Groups[1].Value == arrayName)
+                            {
+                                string sizeStr = sizeMatch.Groups[2].Value;
+                                if (int.TryParse(sizeStr, out int size))
+                                {
+                                    // Array indices are typically 0 to size-1
+                                    constraints.Add(new VariableConstraint
+                                    {
+                                        VariableName = variableName,
+                                        Type = ConstraintType.Range,
+                                        MinValue = "0",
+                                        MaxValue = (size - 1).ToString(),
+                                        Source = $"Array access for {arrayName}"
+                                    });
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
 
-                return new VariableAssignment
+                return constraints;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting array access constraints for variable {variableName}: {ex.Message}");
+                return constraints;
+            }
+        }
+
+        /// <summary>
+        /// Extracts constraints from assignment statements
+        /// </summary>
+        /// <param name="code">Code to analyze</param>
+        /// <param name="variableName">Variable name</param>
+        /// <returns>List of assignment-based constraints</returns>
+        private List<VariableConstraint> ExtractAssignmentConstraints(string code, string variableName)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                // Look for assignments of the form: variable = value;
+                var assignmentPattern = new Regex($@"{Regex.Escape(variableName)}\s*=\s*([^;]+);");
+                var matches = assignmentPattern.Matches(code);
+
+                if (matches.Count > 0)
                 {
-                    Expression = expression,
-                    UsedVariables = usedVariables
-                };
+                    var assignedValues = new List<string>();
+
+                    foreach (Match match in matches)
+                    {
+                        string value = match.Groups[1].Value.Trim();
+
+                        // Only add simple literal values to the list
+                        if (Regex.IsMatch(value, @"^[0-9]+$") || // Integer
+                            Regex.IsMatch(value, @"^[0-9]*\.[0-9]+$") || // Float
+                            Regex.IsMatch(value, @"^'.'$")) // Character
+                        {
+                            if (!assignedValues.Contains(value))
+                            {
+                                assignedValues.Add(value);
+                            }
+                        }
+                    }
+
+                    if (assignedValues.Count > 0)
+                    {
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variableName,
+                            Type = ConstraintType.Enumeration,
+                            AllowedValues = assignedValues,
+                            Source = "Code assignments"
+                        });
+                    }
+                }
+
+                return constraints;
             }
-
-            return null;
-        }
-
-        private bool ContainsVariableName(string line, string variableName)
-        {
-            // Check if the line contains the variable name as a whole word
-            var regex = new Regex($@"\b{Regex.Escape(variableName)}\b");
-            return regex.IsMatch(line);
-        }
-
-        private string DetermineUsageType(string line, string variableName)
-        {
-            // Check if the variable is being written to
-            if (ContainsAssignment(line, variableName))
+            catch (Exception ex)
             {
-                return "Write";
+                _logger.LogError(ex, $"Error extracting assignment constraints for variable {variableName}: {ex.Message}");
+                return constraints;
             }
-
-            // Check if the variable is being incremented/decremented
-            var incDecRegex = new Regex($@"\b{Regex.Escape(variableName)}\+\+|\+\+{Regex.Escape(variableName)}|\b{Regex.Escape(variableName)}--|--(Regex.Escape(variableName))");
-            if (incDecRegex.IsMatch(line))
-            {
-                return "ReadWrite";
-            }
-
-            // Check for compound assignments
-            var compoundAssignRegex = new Regex($@"\b{Regex.Escape(variableName)}\s*(\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<=|>>=)");
-            if (compoundAssignRegex.IsMatch(line))
-            {
-                return "ReadWrite";
-            }
-
-            // Default to read
-            return "Read";
         }
     }
-
-    #endregion
 }

@@ -1,116 +1,144 @@
-﻿using AutoMapper;
+﻿
+using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Core.Interfaces.Solver;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
-using C_TestForge.TestCase;
-using C_TestForge.TestCase.Repositories;
-using C_TestForge.TestCase.Services;
 using C_TestForge.UI.Controls;
+using C_TestForge.UI.Services;
 using C_TestForge.UI.ViewModels;
 using C_TestForge.UI.Views;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Prism.Ioc;
 using Prism.Modularity;
 using Prism.Unity;
 using System;
 using System.IO;
+using System.Reflection;
 using System.Windows;
-using C_TestForge.UI.Services;
-using System;
 
-
-namespace C_TestForge.UI;
-
-/// <summary>
-/// Interaction logic for App.xaml
-/// </summary>
-public partial class App : PrismApplication
+namespace C_TestForge.UI
 {
-    protected override Window CreateShell()
+    /// <summary>
+    /// Interaction logic for App.xaml
+    /// </summary>
+    public partial class App : PrismApplication
     {
-        return Container.Resolve<MainWindow>();
-    }
-
-    protected override void RegisterTypes(IContainerRegistry containerRegistry)
-    {
-        // Register services from previous stages
-
-        // Register TestCase services
-        containerRegistry.RegisterSingleton<IMapper>(() =>
+        /// <summary>
+        /// Creates the shell window of the application
+        /// </summary>
+        /// <returns>The main window of the application</returns>
+        protected override Window CreateShell()
         {
-            var config = new MapperConfiguration(cfg =>
+            return Container.Resolve<MainWindow>();
+        }
+
+        /// <summary>
+        /// Registers types with the container
+        /// </summary>
+        /// <param name="containerRegistry">The container registry</param>
+        protected override void RegisterTypes(IContainerRegistry containerRegistry)
+        {
+            // Register logger
+            containerRegistry.RegisterSingleton<ILogger>(() =>
+                LoggerFactory.Create(builder =>
+                    builder.AddConsole().AddDebug()).CreateLogger("C-TestForge"));
+
+            // Register TestCase services
+            //containerRegistry.RegisterSingleton<IMapper>(() =>
+            //{
+            //    var config = new MapperConfiguration(cfg =>
+            //    {
+            //        // Configure AutoMapper mappings here
+            //        // Add specific mappings as needed for your models
+            //    });
+
+            //    return config.CreateMapper();
+            //});
+
+            // Register repositories
+            //containerRegistry.RegisterSingleton<ITestCaseRepository>(() =>
+            //    new TestCaseRepository(
+            //        Path.Combine(
+            //            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            //            "C-TestForge",
+            //            "TestCases.db"),
+            //        Container.Resolve<IMapper>()));
+
+            // Register services
+            //containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
+            //containerRegistry.RegisterSingleton<IClangParserService, ClangParserService>();
+            //containerRegistry.RegisterSingleton<IZ3SolverService, Z3SolverService>();
+            //containerRegistry.RegisterSingleton<IFileService, FileService>();
+
+            // Register dialogs
+            containerRegistry.RegisterDialog<TestCaseEditorDialog, TestCaseEditorDialogViewModel>();
+            containerRegistry.RegisterDialog<TestCaseComparisonDialog, TestCaseComparisonDialogViewModel>();
+            containerRegistry.RegisterDialog<GenerateTestCaseDialog, GenerateTestCaseDialogViewModel>();
+            containerRegistry.RegisterDialog<ConfirmationDialog, ConfirmationDialogViewModel>();
+
+            // Register views
+            //containerRegistry.RegisterForNavigation<SourceCodeView, SourceCodeViewModel>();
+            //containerRegistry.RegisterForNavigation<TestCaseView, TestCaseViewModel>();
+            //containerRegistry.RegisterForNavigation<TestGenerationView, TestGenerationViewModel>();
+            //containerRegistry.RegisterForNavigation<SettingsView, SettingsViewModel>();
+        }
+
+        /// <summary>
+        /// Configure the module catalog
+        /// </summary>
+        /// <param name="moduleCatalog">The module catalog</param>
+        protected override void ConfigureModuleCatalog(IModuleCatalog moduleCatalog)
+        {
+            // Register Infrastructure Module first
+            moduleCatalog.AddModule<InfrastructureModule>();
+
+            // Register UI Module next
+            moduleCatalog.AddModule<UIModule>();
+
+            // Register other modules
+            //moduleCatalog.AddModule<ParserModule>();
+            //moduleCatalog.AddModule<TestCaseModule>();
+        }
+
+        /// <summary>
+        /// Application startup event
+        /// </summary>
+        /// <param name="e">Startup event arguments</param>
+        protected override void OnInitialized()
+        {
+            base.OnInitialized();
+
+            // Set up exception handling
+            AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
+                LogUnhandledException((Exception)ex.ExceptionObject, "AppDomain.CurrentDomain.UnhandledException");
+
+            // Create application data directory if it doesn't exist
+            string appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "C-TestForge");
+
+            if (!Directory.Exists(appDataPath))
             {
-                // Configure AutoMapper mappings here
-            });
+                Directory.CreateDirectory(appDataPath);
+            }
 
-            return config.CreateMapper();
-        });
+        }
 
-        containerRegistry.RegisterSingleton<ITestCaseRepository>(() =>
-            new TestCaseRepository(
-                Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "C-TestForge",
-                    "TestCases.db"),
-                Container.Resolve<IMapper>()));
+        /// <summary>
+        /// Logs an unhandled exception
+        /// </summary>
+        /// <param name="exception">The exception that occurred</param>
+        /// <param name="source">Source of the exception</param>
+        private void LogUnhandledException(Exception exception, string source)
+        {
+            // Get the logger
+            var logger = Container.Resolve<ILogger>();
+            logger?.LogError(exception, $"Unhandled exception from {source}");
 
-        containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
-
-        // Register dialogs
-        containerRegistry.RegisterDialog<TestCaseEditorDialog, ViewModels.TestCaseEditorDialogViewModel>();
-        containerRegistry.RegisterDialog<TestCaseComparisonDialog, ViewModels.TestCaseComparisonDialogViewModel>();
-        containerRegistry.RegisterDialog<GenerateTestCaseDialog, ViewModels.GenerateTestCaseDialogViewModel>();
-        containerRegistry.RegisterDialog<ConfirmationDialog, ViewModels.ConfirmationDialogViewModel>();
-    }
-
-    protected override void ConfigureModuleCatalog(IModuleCatalog moduleCatalog)
-    {
-        // Đăng ký Infrastructure Module trước
-        moduleCatalog.AddModule<InfrastructureModule>();
-
-        // Đăng ký UI Module tiếp theo
-        moduleCatalog.AddModule<UIModule>();
-
-        // Đăng ký các module khác
-        //moduleCatalog.AddModule<ParserModule>();
-        moduleCatalog.AddModule<TestCaseModule>();
-    }
-
-    private readonly ServiceProvider _serviceProvider;
-
-    public App()
-    {
-        var services = new ServiceCollection();
-        ConfigureServices(services);
-        _serviceProvider = services.BuildServiceProvider();
-    }
-
-    private void ConfigureServices(ServiceCollection services)
-    {
-        // Register all services from all phases
-        services.RegisterAllServices();
-
-        // Register ViewModels
-        services.AddSingleton<MainViewModel>();
-        services.AddSingleton<ProjectViewModel>();
-        services.AddSingleton<SourceCodeViewModel>();
-        services.AddSingleton<TestCaseViewModel>();
-        services.AddSingleton<TestGenerationViewModel>();
-
-        // Register Views
-        services.AddSingleton<MainWindow>();
-        services.AddTransient<ProjectView>();
-        services.AddTransient<SourceCodeView>();
-        services.AddTransient<TestCaseView>();
-        services.AddTransient<TestGenerationView>();
-    }
-
-    protected override void OnStartup(StartupEventArgs e)
-    {
-        base.OnStartup(e);
-
-        var mainWindow = _serviceProvider.GetService<MainWindow>();
-        mainWindow.Show();
+            // Show error message to user
+            MessageBox.Show($"An unhandled exception occurred: {exception.Message}\r\n\r\nSource: {source}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 }
-
-

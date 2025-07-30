@@ -4,10 +4,12 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using C_TestForge.Core;
+using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Services;
 using C_TestForge.Models;
+using C_TestForge.Models.Projects;
 using C_TestForge.Models.TestCases;
-using C_TestForge.TestCase.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -21,12 +23,12 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
         private readonly ILogger<MainWindowViewModel> _logger;
 
-        private TestProject _currentProject;
+        private Project _currentProject;
         private string _statusMessage;
-        private CSourceFile _selectedSourceFile;
-        private ObservableCollection<CSourceFile> _sourceFiles;
-        private ObservableCollection<TestCaseUser> _testCases;
-        private TestCaseUser _selectedTestCase;
+        private SourceFile _selectedSourceFile;
+        private ObservableCollection<SourceFile> _sourceFiles;
+        private ObservableCollection<TestCase> _testCases;
+        private TestCase _selectedTestCase;
 
         public MainWindowViewModel(IProjectService projectService, ITestCaseService testCaseService, ILogger<MainWindowViewModel> logger)
         {
@@ -41,18 +43,18 @@ namespace C_TestForge.UI.ViewModels
             CloseProjectCommand = new RelayCommand(CloseProject, CanCloseProject);
             ParseSourceFilesCommand = new RelayCommand(ParseSourceFiles, CanParseSourceFiles);
             ImportTestCasesCommand = new RelayCommand(ImportTestCases, CanImportTestCases);
-            ExportTestCasesCommand = new RelayCommand(ExportTestCases, CanExportTestCases);
+            //ExportTestCasesCommand = new RelayCommand(ExportTestCases, CanExportTestCases);
 
             // Initialize collections
-            SourceFiles = new ObservableCollection<CSourceFile>();
-            TestCases = new ObservableCollection<TestCaseUser>();
+            SourceFiles = new ObservableCollection<SourceFile>();
+            TestCases = new ObservableCollection<TestCase>();
 
             // Set default status
             StatusMessage = "Ready";
         }
 
         // Properties
-        public TestProject CurrentProject
+        public Project CurrentProject
         {
             get => _currentProject;
             set
@@ -73,25 +75,25 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _statusMessage, value);
         }
 
-        public CSourceFile SelectedSourceFile
+        public SourceFile SelectedSourceFile
         {
             get => _selectedSourceFile;
             set => SetProperty(ref _selectedSourceFile, value);
         }
 
-        public ObservableCollection<CSourceFile> SourceFiles
+        public ObservableCollection<SourceFile> SourceFiles
         {
             get => _sourceFiles;
             set => SetProperty(ref _sourceFiles, value);
         }
 
-        public ObservableCollection<TestCaseUser> TestCases
+        public ObservableCollection<TestCase> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
         }
 
-        public TestCaseUser SelectedTestCase
+        public TestCase SelectedTestCase
         {
             get => _selectedTestCase;
             set => SetProperty(ref _selectedTestCase, value);
@@ -114,13 +116,13 @@ namespace C_TestForge.UI.ViewModels
                 var dialog = new Dialogs.NewProjectDialog();
                 if (dialog.ShowDialog() == true)
                 {
-                    var newProject = _projectService.CreateProject(
-                        dialog.ProjectName,
-                        dialog.ProjectDescription,
-                        dialog.SourceDirectory);
+                    //var newProject = _projectService.CreateProjectAsync(
+                    //    dialog.ProjectName,
+                    //    dialog.ProjectDescription,
+                    //    dialog.SourceDirectory);
 
-                    CurrentProject = newProject;
-                    StatusMessage = $"Created new project: {newProject.Name}";
+                    //CurrentProject = newProject;
+                    //StatusMessage = $"Created new project: {newProject.Name}";
 
                     // Refresh UI
                     RefreshSourceFiles();
@@ -139,20 +141,20 @@ namespace C_TestForge.UI.ViewModels
         {
             try
             {
-                var dialog = new Dialogs.OpenProjectDialog(_projectService.GetAllProjects());
-                if (dialog.ShowDialog() == true)
-                {
-                    var project = _projectService.LoadProject(dialog.SelectedProjectId);
-                    if (project != null)
-                    {
-                        CurrentProject = project;
-                        StatusMessage = $"Opened project: {project.Name}";
+                //var dialog = new Dialogs.OpenProjectDialog(_projectService.GetAllProjects());
+                //if (dialog.ShowDialog() == true)
+                //{
+                //    var project = _projectService.LoadProject(dialog.SelectedProjectId);
+                //    if (project != null)
+                //    {
+                //        CurrentProject = project;
+                //        StatusMessage = $"Opened project: {project.Name}";
 
-                        // Refresh UI
-                        RefreshSourceFiles();
-                        RefreshTestCases();
-                    }
-                }
+                //        // Refresh UI
+                //        RefreshSourceFiles();
+                //        RefreshTestCases();
+                //    }
+                //}
             }
             catch (Exception ex)
             {
@@ -166,8 +168,8 @@ namespace C_TestForge.UI.ViewModels
         {
             try
             {
-                _projectService.SaveProject(CurrentProject);
-                StatusMessage = $"Saved project: {CurrentProject.Name}";
+                //_projectService.SaveProject(CurrentProject);
+                //StatusMessage = $"Saved project: {CurrentProject.Name}";
             }
             catch (Exception ex)
             {
@@ -195,15 +197,15 @@ namespace C_TestForge.UI.ViewModels
             {
                 StatusMessage = "Parsing source files...";
 
-                var parsedFiles = _projectService.ParseProjectFiles(CurrentProject);
-                SourceFiles.Clear();
+                //var parsedFiles = _projectService.ParseProjectFiles(CurrentProject);
+                //SourceFiles.Clear();
 
-                foreach (var file in parsedFiles.Values)
-                {
-                    SourceFiles.Add(file);
-                }
+                //foreach (var file in parsedFiles.Values)
+                //{
+                //    SourceFiles.Add(file);
+                //}
 
-                StatusMessage = $"Parsed {parsedFiles.Count} source files";
+                //StatusMessage = $"Parsed {parsedFiles.Count} source files";
             }
             catch (Exception ex)
             {
@@ -227,9 +229,9 @@ namespace C_TestForge.UI.ViewModels
 
                 if (dialog.ShowDialog() == true)
                 {
-                    _testCaseService.ImportTestCasesFromFile(dialog.FileName);
-                    RefreshTestCases();
-                    StatusMessage = $"Imported test cases from {Path.GetFileName(dialog.FileName)}";
+                    //_testCaseService.ImportTestCasesFromFile(dialog.FileName);
+                    //RefreshTestCases();
+                    //StatusMessage = $"Imported test cases from {Path.GetFileName(dialog.FileName)}";
                 }
             }
             catch (Exception ex)
@@ -255,8 +257,8 @@ namespace C_TestForge.UI.ViewModels
 
                 if (dialog.ShowDialog() == true)
                 {
-                    _testCaseService.ExportTestCasesToFile(CurrentProject.TestCases, dialog.FileName);
-                    StatusMessage = $"Exported test cases to {Path.GetFileName(dialog.FileName)}";
+                    //_testCaseService.ExportTestCasesToFile(CurrentProject.TestCases, dialog.FileName);
+                    //StatusMessage = $"Exported test cases to {Path.GetFileName(dialog.FileName)}";
                 }
             }
             catch (Exception ex)
@@ -267,7 +269,7 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        private bool CanExportTestCases() => CurrentProject != null && CurrentProject.TestCases.Count > 0;
+        //private bool CanExportTestCases() => CurrentProject != null && CurrentProject.TestCases.Count > 0;
 
         // Helper methods
         private void RefreshSourceFiles()
@@ -279,11 +281,11 @@ namespace C_TestForge.UI.ViewModels
                 {
                     if (File.Exists(filePath))
                     {
-                        SourceFiles.Add(new CSourceFile
-                        {
-                            FilePath = filePath,
-                            Content = File.ReadAllText(filePath)
-                        });
+                        //SourceFiles.Add(new CSourceFile
+                        //{
+                        //    FilePath = filePath,
+                        //    Content = File.ReadAllText(filePath)
+                        //});
                     }
                 }
             }
@@ -294,10 +296,10 @@ namespace C_TestForge.UI.ViewModels
             TestCases.Clear();
             if (CurrentProject != null)
             {
-                foreach (var testCase in CurrentProject.TestCases)
-                {
-                    TestCases.Add(testCase);
-                }
+                //foreach (var testCase in CurrentProject.TestCases)
+                //{
+                //    TestCases.Add(testCase);
+                //}
             }
         }
     }

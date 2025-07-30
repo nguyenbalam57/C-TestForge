@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.TestCases;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,12 +41,12 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <summary>
         /// Executes a test case and returns the result
         /// </summary>
-        Task<TestCaseResult> ExecuteTestCaseAsync(TestCase testCase);
+        //Task<TestCaseResult> ExecuteTestCaseAsync(TestCase testCase);
 
-        /// <summary>
-        /// Validates a test case
-        /// </summary>
-        Task<TestCaseValidationResult> ValidateTestCaseAsync(TestCase testCase);
+        ///// <summary>
+        ///// Validates a test case
+        ///// </summary>
+        //Task<TestCaseValidationResult> ValidateTestCaseAsync(TestCase testCase);
     }
 
     /// <summary>
@@ -81,7 +82,7 @@ namespace C_TestForge.Core.Interfaces.TestCaseManagement
         /// <summary>
         /// Actual output variables
         /// </summary>
-        public List<TestCaseVariable> ActualOutputVariables { get; set; } = new List<TestCaseVariable>();
+        //public List<TestCaseVariable> ActualOutputVariables { get; set; } = new List<TestCaseVariable>();
 
         /// <summary>
         /// Execution time in milliseconds

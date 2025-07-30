@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models;
+using C_TestForge.Models.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,7 +44,7 @@ namespace C_TestForge.Core.Interfaces.Solver
         /// <param name="targetCoverage">The target coverage (0.0-1.0)</param>
         /// <returns>List of dictionaries of variable names and their values</returns>
         Task<List<Dictionary<string, string>>> FindVariableValuesForCoverageAsync(
-            CFunctionAnalysis functionAnalysis,
+            CFunction functionAnalysis,
             Dictionary<string, string> variableTypes,
             Dictionary<string, VariableConstraint> constraints,
             double targetCoverage = 0.9);

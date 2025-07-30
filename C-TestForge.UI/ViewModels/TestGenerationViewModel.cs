@@ -5,9 +5,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using C_TestForge.Core.Interfaces;
+using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Models;
-using C_TestForge.TestCase.Models;
-using C_TestForge.TestCase.Services;
+using C_TestForge.Models.Core;
+using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;
 
@@ -149,15 +151,15 @@ namespace C_TestForge.UI.ViewModels
         {
             try
             {
-                var functions = _parserService.GetFunctions();
+                //var functions = _parserService.GetFunctions();
 
-                AvailableFunctions.Clear();
-                foreach (var function in functions)
-                {
-                    AvailableFunctions.Add(new CFunctionViewModel(function));
-                }
+                //AvailableFunctions.Clear();
+                //foreach (var function in functions)
+                //{
+                //    AvailableFunctions.Add(new CFunctionViewModel(function));
+                //}
 
-                StatusMessage = $"Loaded {functions.Count} functions";
+                //StatusMessage = $"Loaded {functions.Count} functions";
             }
             catch (Exception ex)
             {
@@ -185,23 +187,23 @@ namespace C_TestForge.UI.ViewModels
 
                 await Task.Run(() =>
                 {
-                    var availableVariables = _parserService.GetVariables();
+                    //var availableVariables = _parserService.GetVariables();
 
                     if (SelectedTestType == TestCaseType.UnitTest)
                     {
                         // Generate unit tests for each selected function
                         foreach (var function in selectedFunctionModels)
                         {
-                            var functionTestCases = _unitTestGenerator.GenerateTestCasesForFunction(function, availableVariables);
-                            newTestCases.AddRange(functionTestCases);
+                            //var functionTestCases = _unitTestGenerator.GenerateTestCasesForFunction(function, availableVariables);
+                            //newTestCases.AddRange(functionTestCases);
                         }
                     }
                     else if (SelectedTestType == TestCaseType.IntegrationTest)
                     {
                         // Generate integration tests for the selected functions
                         var functionNames = selectedFunctionModels.Select(f => f.Name).ToList();
-                        var integrationTests = _integrationTestGenerator.GenerateIntegrationTests(functionNames, availableVariables);
-                        newTestCases.AddRange(integrationTests);
+                        //var integrationTests = _integrationTestGenerator.GenerateIntegrationTests(functionNames, availableVariables);
+                       // newTestCases.AddRange(integrationTests);
                     }
                 });
 
@@ -250,11 +252,11 @@ namespace C_TestForge.UI.ViewModels
 
                 if (SelectedTestCase.Type == TestCaseType.UnitTest)
                 {
-                    GeneratedCode = _unitTestGenerator.GenerateTestCode(SelectedTestCase);
+                    //GeneratedCode = _unitTestGenerator.GenerateTestCode(SelectedTestCase);
                 }
                 else if (SelectedTestCase.Type == TestCaseType.IntegrationTest)
                 {
-                    GeneratedCode = _integrationTestGenerator.GenerateIntegrationTestCode(SelectedTestCase);
+                    //GeneratedCode = _integrationTestGenerator.GenerateIntegrationTestCode(SelectedTestCase);
                 }
 
                 StatusMessage = "Code generated successfully";
@@ -277,7 +279,7 @@ namespace C_TestForge.UI.ViewModels
 
                 foreach (var testCase in GeneratedTestCases)
                 {
-                    _testCaseService.SaveTestCase(testCase);
+                    //_testCaseService.SaveTestCase(testCase);
                 }
 
                 StatusMessage = $"Saved {GeneratedTestCases.Count} test cases";
@@ -344,7 +346,7 @@ namespace C_TestForge.UI.ViewModels
         {
             get
             {
-                string parameters = string.Join(", ", _function.Parameters.Select(p => $"{p.Type} {p.Name}"));
+                string parameters = string.Join(", ", _function.Parameters.Select(p => $"{p.TypeName} {p.Name}"));
                 return $"{ReturnType} {Name}({parameters})";
             }
         }

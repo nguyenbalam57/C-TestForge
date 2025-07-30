@@ -20,7 +20,7 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Name of the stubbed function
         /// </summary>
-        public string FunctionName { get; set; }
+        public string FunctionName { get; set; } = string.Empty;
 
         /// <summary>
         /// Sequence number of the call (1-based)
@@ -40,7 +40,7 @@ namespace C_TestForge.Models.TestExecution
         /// <summary>
         /// Return value from the stub
         /// </summary>
-        public string ReturnValue { get; set; }
+        public string ReturnValue { get; set; } = string.Empty;
 
         /// <summary>
         /// Creates a clone of the stub call record
