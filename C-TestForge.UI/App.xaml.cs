@@ -7,6 +7,7 @@ using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
+using C_TestForge.Parser.Analysis;
 using C_TestForge.Parser.TestCaseManagement;
 using C_TestForge.SolverServices;
 using C_TestForge.UI.Controls;
@@ -49,6 +50,9 @@ namespace C_TestForge.UI
 
             // Register generic logger
             containerRegistry.RegisterGenericLogger();
+
+            // Đăng ký TypeManager
+            containerRegistry.RegisterSingleton<ITypeManager, TypeManager>();
 
             // Register core services
             containerRegistry.RegisterSingleton<IFileService, FileService>();
@@ -114,6 +118,9 @@ namespace C_TestForge.UI
         /// </summary>
         protected override void OnInitialized()
         {
+            // Đăng ký encoding provider
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
             base.OnInitialized();
 
             // Set up exception handling
@@ -125,10 +132,20 @@ namespace C_TestForge.UI
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "C-TestForge");
 
+            // Khởi tạo TypeManager
+            var typeManager = Container.Resolve<ITypeManager>();
+            InitializeTypeManagerAsync(typeManager);
+
             if (!Directory.Exists(appDataPath))
             {
                 Directory.CreateDirectory(appDataPath);
             }
+        }
+
+        private async void InitializeTypeManagerAsync(ITypeManager typeManager)
+        {
+            await typeManager.InitializeAsync();
+            // Có thể thực hiện các thao tác bổ sung sau khi TypeManager được khởi tạo
         }
 
         /// <summary>

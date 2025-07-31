@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace C_TestForge.Parser
 {
@@ -698,21 +699,65 @@ namespace C_TestForge.Parser
                 uint endLine, endColumn, endOffset;
                 extent.End.GetFileLocation(out file, out endLine, out endColumn, out endOffset);
 
-                // Sử dụng offset để trích xuất chính xác phần thân hàm
-                // Lưu ý: startOffset và endOffset là vị trí byte trong file
-                if (endOffset > startOffset && startOffset < sourceCode.Length)
+                // Lấy vùng nội dung xấp xỉ dựa trên offset (có thể có sai số)
+                int approxLength = (int)(endOffset - startOffset);
+                if (approxLength <= 0 || startOffset >= sourceCode.Length)
                 {
-                    string fullFunction = sourceCode.Substring((int)startOffset, (int)(endOffset - startOffset));
-
-                    // Tìm dấu { đầu tiên
-                    int openBrace = fullFunction.IndexOf('{');
-                    if (openBrace >= 0 && openBrace < fullFunction.Length - 1)
-                    {
-                        return fullFunction.Substring(openBrace);
-                    }
+                    _logger.LogWarning($"Invalid offset range: start={startOffset}, end={endOffset}, length={sourceCode.Length}");
+                    return string.Empty;
                 }
 
-                return string.Empty;
+                int safeLength = Math.Min(approxLength, sourceCode.Length - (int)startOffset);
+                string approximateFunction = sourceCode.Substring((int)startOffset, safeLength);
+
+                // Tìm dấu { đầu tiên trong vùng xấp xỉ
+                int openBraceIndex = approximateFunction.IndexOf('{');
+                if (openBraceIndex < 0)
+                {
+                    // Nếu không tìm thấy, thử sử dụng phương pháp dựa trên dòng
+                    string[] lines = sourceCode.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                    for (int i = (int)startLine - 1; i < Math.Min((int)endLine, lines.Length); i++)
+                    {
+                        int bracePos = lines[i].IndexOf('{');
+                        if (bracePos >= 0)
+                        {
+                            // Tìm thấy dấu { - sử dụng dòng này làm vị trí bắt đầu
+                            _logger.LogInformation($"Found opening brace at line {i + 1} (fallback method)");
+                            return ExtractFunctionBodyByLines(sourceCode, i + 1, (int)endLine);
+                        }
+                    }
+
+                    return string.Empty;
+                }
+
+                // Tìm dấu } tương ứng
+                int braceCount = 1;
+                int closeBraceIndex = openBraceIndex + 1;
+
+                while (braceCount > 0 && closeBraceIndex < approximateFunction.Length)
+                {
+                    char c = approximateFunction[closeBraceIndex];
+                    if (c == '{')
+                        braceCount++;
+                    else if (c == '}')
+                        braceCount--;
+
+                    closeBraceIndex++;
+                }
+
+                if (braceCount == 0)
+                {
+                    // Trích xuất body (bao gồm dấu ngoặc)
+                    return approximateFunction.Substring(openBraceIndex, closeBraceIndex - openBraceIndex);
+                }
+                else
+                {
+                    // Nếu không tìm được dấu } tương ứng, có thể do sai số offset
+                    // Chuyển sang phương pháp dựa trên số dòng
+                    _logger.LogWarning("Failed to find matching brace using offset, falling back to line-based extraction");
+                    return ExtractFunctionBodyByLines(sourceCode, (int)startLine, (int)endLine);
+                }
             }
             catch (Exception ex)
             {
@@ -720,6 +765,113 @@ namespace C_TestForge.Parser
                 return string.Empty;
             }
         }
+
+        private string ExtractFunctionBodyByLines(string sourceCode, int startLine, int endLine)
+        {
+            try
+            {
+
+                // Tách file nguồn thành các dòng
+                string[] lines = sourceCode.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                // Kiểm tra xem số dòng có hợp lệ không
+                if (startLine < 1 || endLine > lines.Length)
+                {
+                    _logger.LogWarning($"Invalid line numbers: start={startLine}, end={endLine}, total lines={lines.Length}");
+                    return string.Empty;
+                }
+
+                // Tìm dấu { đầu tiên từ dòng bắt đầu
+                int openBraceLineIndex = -1;
+                int openBracePos = -1;
+
+                for (int i = (int)startLine - 1; i < Math.Min((int)endLine, lines.Length); i++)
+                {
+                    int bracePos = lines[i].IndexOf('{');
+                    if (bracePos >= 0)
+                    {
+                        openBraceLineIndex = i;
+                        openBracePos = bracePos;
+                        break;
+                    }
+                }
+
+                if (openBraceLineIndex < 0)
+                {
+                    _logger.LogWarning($"No opening brace found for function at line {startLine}");
+                    return string.Empty;
+                }
+
+                // Đảm bảo dấu } cuối cùng ở trong phạm vi function
+                int closingBraceLineIndex = -1;
+                int closingBracePos = -1;
+
+                // Tìm dấu } cuối cùng trong phạm vi function
+                int braceCount = 1; // Đã đếm dấu { đầu tiên
+
+                // Bắt đầu từ vị trí sau dấu { đầu tiên
+                for (int i = openBraceLineIndex; i < Math.Min((int)endLine, lines.Length); i++)
+                {
+                    string line = lines[i];
+                    int startPos = (i == openBraceLineIndex) ? openBracePos + 1 : 0;
+
+                    for (int j = startPos; j < line.Length; j++)
+                    {
+                        if (line[j] == '{')
+                        {
+                            braceCount++;
+                        }
+                        else if (line[j] == '}')
+                        {
+                            braceCount--;
+                            if (braceCount == 0)
+                            {
+                                closingBraceLineIndex = i;
+                                closingBracePos = j;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (closingBraceLineIndex >= 0)
+                        break;
+                }
+
+                // Không tìm thấy dấu } tương ứng
+                if (closingBraceLineIndex < 0)
+                {
+                    _logger.LogWarning($"No matching closing brace found for function at line {startLine}");
+                    return string.Empty;
+                }
+
+                // Xây dựng body từ dòng bắt đầu đến dòng kết thúc
+                var bodyLines = new List<string>();
+
+                // Thêm dòng đầu tiên từ vị trí dấu {
+                bodyLines.Add(lines[openBraceLineIndex].Substring(openBracePos));
+
+                // Thêm các dòng ở giữa
+                for (int i = openBraceLineIndex + 1; i < closingBraceLineIndex; i++)
+                {
+                    bodyLines.Add(lines[i]);
+                }
+
+                // Thêm dòng cuối cùng đến vị trí dấu }
+                if (closingBraceLineIndex > openBraceLineIndex)
+                {
+                    bodyLines.Add(lines[closingBraceLineIndex].Substring(0, closingBracePos + 1));
+                }
+
+                return string.Join(Environment.NewLine, bodyLines);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting function body: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+
 
         /// <summary>
         /// Extracts function calls and variable uses from function body

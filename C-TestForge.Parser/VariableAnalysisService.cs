@@ -20,6 +20,7 @@ namespace C_TestForge.Parser
     {
         private readonly ILogger<VariableAnalysisService> _logger;
         private readonly ISourceCodeService _sourceCodeService;
+        private readonly ITypeManager _typeManager;
 
         /// <summary>
         /// Constructor for VariableAnalysisService
@@ -28,10 +29,12 @@ namespace C_TestForge.Parser
         /// <param name="sourceCodeService">Source code service for reading source files</param>
         public VariableAnalysisService(
             ILogger<VariableAnalysisService> logger,
-            ISourceCodeService sourceCodeService)
+            ISourceCodeService sourceCodeService,
+            ITypeManager typeManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _sourceCodeService = sourceCodeService ?? throw new ArgumentNullException(nameof(sourceCodeService));
+            _typeManager = typeManager ?? throw new ArgumentNullException(nameof(typeManager));
         }
 
         /// <inheritdoc/>
@@ -51,7 +54,7 @@ namespace C_TestForge.Parser
                 CXFile file;
                 uint line, column, offset;
                 cursor.Location.GetFileLocation(out file, out line, out column, out offset);
-                string sourceFile = file != null ? System.IO.Path.GetFileName(file.Name.ToString()) : null;
+                string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
                 // Get variable type
                 var type = cursor.Type;
@@ -395,170 +398,181 @@ namespace C_TestForge.Parser
         {
             var constraints = new List<VariableConstraint>();
 
-            string typeName = variable.TypeName.ToLower();
+            // Thử lấy ràng buộc từ TypeManager
+            var typeConstraint = _typeManager.GetConstraintForType(variable.TypeName, variable.Name);
+            if (typeConstraint != null)
+            {
+                constraints.Add(typeConstraint);
+            }
+            else
+            {
+                string typeName = variable.TypeName.ToLower();
 
-            // Add range constraints based on variable type
-            if (typeName.Contains("bool"))
-            {
-                // Boolean constraints
-                constraints.Add(new VariableConstraint
+                // Add range constraints based on variable type
+                if (typeName.Contains("bool"))
                 {
-                    VariableName = variable.Name,
-                    Type = ConstraintType.Enumeration,
-                    AllowedValues = new List<string> { "0", "1", "false", "true" },
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
-            }
-            else if (typeName.Contains("char") && !typeName.Contains("*"))
-            {
-                // Character constraints
-                if (typeName.Contains("unsigned") || typeName.Contains("uchar"))
+                    // Boolean constraints
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Enumeration,
+                        AllowedValues = new List<string> { "0", "1", "false", "true" },
+                        Source = $"Type constraint: {variable.TypeName}"
+                    });
+                }
+                else if (typeName.Contains("char") && !typeName.Contains("*"))
                 {
-                    // Unsigned char constraints
+                    // Character constraints
+                    if (typeName.Contains("unsigned") || typeName.Contains("uchar"))
+                    {
+                        // Unsigned char constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = "255",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                    else
+                    {
+                        // Signed char constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-128",
+                            MaxValue = "127",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                }
+                else if (typeName.Contains("short") || typeName.Contains("int16"))
+                {
+                    if (typeName.Contains("unsigned") || typeName.Contains("ushort"))
+                    {
+                        // Unsigned short constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = "65535",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                    else
+                    {
+                        // Signed short constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-32768",
+                            MaxValue = "32767",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                }
+                else if (typeName.Contains("int") || typeName.Contains("int32"))
+                {
+                    if (typeName.Contains("unsigned") || typeName.Contains("uint"))
+                    {
+                        // Unsigned int constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = "4294967295",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                    else
+                    {
+                        // Signed int constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-2147483648",
+                            MaxValue = "2147483647",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                }
+                else if (typeName.Contains("long long") || typeName.Contains("int64"))
+                {
+                    if (typeName.Contains("unsigned") || typeName.Contains("uint64"))
+                    {
+                        // Unsigned long long constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = "18446744073709551615",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                    else
+                    {
+                        // Signed long long constraints
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-9223372036854775808",
+                            MaxValue = "9223372036854775807",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                    }
+                }
+                else if (typeName.Contains("float"))
+                {
+                    // Float constraints (approximate)
                     constraints.Add(new VariableConstraint
                     {
                         VariableName = variable.Name,
                         Type = ConstraintType.Range,
-                        MinValue = "0",
-                        MaxValue = "255",
+                        MinValue = "-3.4e38",
+                        MaxValue = "3.4e38",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
-                else
+                else if (typeName.Contains("double"))
                 {
-                    // Signed char constraints
+                    // Double constraints (approximate)
                     constraints.Add(new VariableConstraint
                     {
                         VariableName = variable.Name,
                         Type = ConstraintType.Range,
-                        MinValue = "-128",
-                        MaxValue = "127",
+                        MinValue = "-1.7e308",
+                        MaxValue = "1.7e308",
                         Source = $"Type constraint: {variable.TypeName}"
                     });
                 }
-            }
-            else if (typeName.Contains("short") || typeName.Contains("int16"))
-            {
-                if (typeName.Contains("unsigned") || typeName.Contains("ushort"))
+
+                // Check for array size constraints
+                if (variable.VariableType == VariableType.Array)
                 {
-                    // Unsigned short constraints
-                    constraints.Add(new VariableConstraint
+                    // Extract array size from type name
+                    var match = Regex.Match(variable.TypeName, @"\[(\d+)\]");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int arraySize))
                     {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "0",
-                        MaxValue = "65535",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.ArraySize,
+                            Value = arraySize.ToString(),
+                            Source = $"Array size: {arraySize}"
+                        });
+                    }
                 }
-                else
-                {
-                    // Signed short constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "-32768",
-                        MaxValue = "32767",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-            }
-            else if (typeName.Contains("int") || typeName.Contains("int32"))
-            {
-                if (typeName.Contains("unsigned") || typeName.Contains("uint"))
-                {
-                    // Unsigned int constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "0",
-                        MaxValue = "4294967295",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-                else
-                {
-                    // Signed int constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "-2147483648",
-                        MaxValue = "2147483647",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-            }
-            else if (typeName.Contains("long long") || typeName.Contains("int64"))
-            {
-                if (typeName.Contains("unsigned") || typeName.Contains("uint64"))
-                {
-                    // Unsigned long long constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "0",
-                        MaxValue = "18446744073709551615",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-                else
-                {
-                    // Signed long long constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "-9223372036854775808",
-                        MaxValue = "9223372036854775807",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-            }
-            else if (typeName.Contains("float"))
-            {
-                // Float constraints (approximate)
-                constraints.Add(new VariableConstraint
-                {
-                    VariableName = variable.Name,
-                    Type = ConstraintType.Range,
-                    MinValue = "-3.4e38",
-                    MaxValue = "3.4e38",
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
-            }
-            else if (typeName.Contains("double"))
-            {
-                // Double constraints (approximate)
-                constraints.Add(new VariableConstraint
-                {
-                    VariableName = variable.Name,
-                    Type = ConstraintType.Range,
-                    MinValue = "-1.7e308",
-                    MaxValue = "1.7e308",
-                    Source = $"Type constraint: {variable.TypeName}"
-                });
             }
 
-            // Check for array size constraints
-            if (variable.VariableType == VariableType.Array)
-            {
-                // Extract array size from type name
-                var match = Regex.Match(variable.TypeName, @"\[(\d+)\]");
-                if (match.Success && int.TryParse(match.Groups[1].Value, out int arraySize))
-                {
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.ArraySize,
-                        Value = arraySize.ToString(),
-                        Source = $"Array size: {arraySize}"
-                    });
-                }
-            }
+            
 
             return constraints;
         }

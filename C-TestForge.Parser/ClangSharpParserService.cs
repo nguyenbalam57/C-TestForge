@@ -83,10 +83,10 @@ namespace C_TestForge.Parser
                     }
                 }
 
-                var parseResult = await ParseSourceFileAsync(filePath, options);
-
                 // Đọc nội dung file
                 string sourceContent = await _fileService.ReadFileAsync(filePath);
+
+                var parseResult = await ParseSourceFileAsync(filePath, options);
 
                 // Convert ParseResult to SourceFile
                 var sourceFile = new SourceFile
@@ -897,7 +897,7 @@ namespace C_TestForge.Parser
         /// <returns>Content hash as string</returns>
         private string GetContentHash(string content)
         {
-            using (var sha = SHA256.Create())
+            using (var sha = System.Security.Cryptography.SHA256.Create())
             {
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(content);
                 byte[] hash = sha.ComputeHash(bytes);
