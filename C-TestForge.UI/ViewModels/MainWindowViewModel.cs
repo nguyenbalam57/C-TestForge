@@ -65,7 +65,7 @@ namespace C_TestForge.UI.ViewModels
             CloseProjectCommand = new RelayCommand(CloseProject, CanCloseProject);
             ParseSourceFilesCommand = new AsyncRelayCommand(ParseSourceFilesAsync, CanParseSourceFiles);
             ImportTestCasesCommand = new AsyncRelayCommand(ImportTestCasesAsync, CanImportTestCases);
-            //ExportTestCasesCommand = new AsyncRelayCommand(ExportTestCasesAsync, CanExportTestCases);
+            ExportTestCasesCommand = new AsyncRelayCommand(ExportTestCasesAsync, CanExportTestCases);
             AnalyzeSourceFileCommand = new AsyncRelayCommand<SourceFile>(AnalyzeSourceFileAsync, CanAnalyzeSourceFile);
             AddSourceFileCommand = new AsyncRelayCommand(AddSourceFileAsync, CanAddSourceFile);
             RemoveSourceFileCommand = new AsyncRelayCommand<SourceFile>(RemoveSourceFileAsync, CanRemoveSourceFile);
@@ -415,6 +415,8 @@ namespace C_TestForge.UI.ViewModels
                 MessageBox.Show($"Error exporting test cases: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private bool CanExportTestCases() => CurrentProject != null;
 
         private async Task AddSourceFileAsync()
         {

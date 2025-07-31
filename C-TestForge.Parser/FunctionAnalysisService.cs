@@ -41,7 +41,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public unsafe CFunction ExtractFunction(CXCursor cursor)
+        public unsafe CFunction ExtractFunction(CXCursor cursor, string sourceCode)
         {
             try
             {
@@ -72,7 +72,7 @@ namespace C_TestForge.Parser
                 List<CVariable> parameters = ExtractParameters(cursor);
 
                 // Extract function body
-                string body = ExtractFunctionBody(cursor);
+                string body = ExtractFunctionBody(cursor, sourceCode);
 
                 // Extract called functions and used variables
                 var (calledFunctions, usedVariables) = ExtractFunctionCallsAndVariables(body);
@@ -685,50 +685,34 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="cursor">Function cursor</param>
         /// <returns>Function body as a string</returns>
-        private string ExtractFunctionBody(CXCursor cursor)
+        private string ExtractFunctionBody(CXCursor cursor, string sourceCode)
         {
             try
             {
+                // Lấy vị trí của function trong file
                 var extent = cursor.Extent;
-                string fullText = extent.ToString();
+                CXFile file;
+                uint startLine, startColumn, startOffset;
+                extent.Start.GetFileLocation(out file, out startLine, out startColumn, out startOffset);
 
-                // Find the opening brace
-                int openBrace = fullText.IndexOf('{');
-                if (openBrace < 0)
+                uint endLine, endColumn, endOffset;
+                extent.End.GetFileLocation(out file, out endLine, out endColumn, out endOffset);
+
+                // Sử dụng offset để trích xuất chính xác phần thân hàm
+                // Lưu ý: startOffset và endOffset là vị trí byte trong file
+                if (endOffset > startOffset && startOffset < sourceCode.Length)
                 {
-                    // No body, might be a declaration
-                    return string.Empty;
-                }
+                    string fullFunction = sourceCode.Substring((int)startOffset, (int)(endOffset - startOffset));
 
-                // Find the closing brace (matching the opening one)
-                int closeBrace = -1;
-                int braceCount = 0;
-
-                for (int i = openBrace; i < fullText.Length; i++)
-                {
-                    if (fullText[i] == '{')
+                    // Tìm dấu { đầu tiên
+                    int openBrace = fullFunction.IndexOf('{');
+                    if (openBrace >= 0 && openBrace < fullFunction.Length - 1)
                     {
-                        braceCount++;
-                    }
-                    else if (fullText[i] == '}')
-                    {
-                        braceCount--;
-                        if (braceCount == 0)
-                        {
-                            closeBrace = i;
-                            break;
-                        }
+                        return fullFunction.Substring(openBrace);
                     }
                 }
 
-                if (closeBrace < 0)
-                {
-                    // Could not find matching closing brace
-                    return string.Empty;
-                }
-
-                // Extract the body (including braces)
-                return fullText.Substring(openBrace, closeBrace - openBrace + 1);
+                return string.Empty;
             }
             catch (Exception ex)
             {

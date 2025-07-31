@@ -7,6 +7,8 @@ using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
+using C_TestForge.Parser.TestCaseManagement;
+using C_TestForge.SolverServices;
 using C_TestForge.UI.Controls;
 using C_TestForge.UI.Services;
 using C_TestForge.UI.ViewModels;
@@ -65,16 +67,16 @@ namespace C_TestForge.UI
             containerRegistry.RegisterSingleton<IAnalysisService, AnalysisService>();
 
             // Register solver services
-            //containerRegistry.RegisterSingleton<IZ3SolverService, Z3SolverService>();
+            containerRegistry.RegisterSingleton<IZ3SolverService, Z3SolverService>();
 
             // Register project services
             containerRegistry.RegisterSingleton<IProjectService, ProjectService>();
 
             // Register test case services
-            //containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
-            //containerRegistry.RegisterSingleton<IUnitTestGeneratorService, UnitTestGeneratorService>();
-            //containerRegistry.RegisterSingleton<IIntegrationTestGeneratorService, IntegrationTestGeneratorService>();
-            //containerRegistry.RegisterSingleton<ITestCodeGeneratorService, TestCodeGeneratorService>();
+            containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();
+            containerRegistry.RegisterSingleton<IUnitTestGeneratorService, UnitTestGeneratorService>();
+            containerRegistry.RegisterSingleton<IIntegrationTestGeneratorService, IntegrationTestGeneratorService>();
+            containerRegistry.RegisterSingleton<ITestCodeGeneratorService, TestCodeGeneratorService>();
 
             // Register dialogs
             containerRegistry.RegisterDialog<TestCaseEditorDialog, TestCaseEditorDialogViewModel>();

@@ -526,7 +526,7 @@ namespace C_TestForge.Parser
                     // Extract functions and variables from the AST - sử dụng rootCursor đã lấy từ khối unsafe
                     if (options.AnalyzeFunctions || options.AnalyzeVariables)
                     {
-                        await TraverseASTAsync(rootCursor, fileName, result, options);
+                        await TraverseASTAsync(rootCursor, fileName, sourceCode, result, options);
                     }
 
                     _logger.LogInformation($"Successfully parsed {fileName}: {result.Functions.Count} functions, {result.Variables.Count} variables, {result.Definitions.Count} definitions");
@@ -801,7 +801,7 @@ namespace C_TestForge.Parser
         /// <param name="result">Parse result to update</param>
         /// <param name="options">Parse options</param>
         /// <returns>Task</returns>
-        private async Task TraverseASTAsync(CXCursor cursor, string sourceFileName, ParseResult result, ParseOptions options)
+        private async Task TraverseASTAsync(CXCursor cursor, string sourceFileName, string sourceCode, ParseResult result, ParseOptions options)
         {
             try
             {
@@ -819,7 +819,7 @@ namespace C_TestForge.Parser
                 {
                     cursor.VisitChildren((child, parent, clientData) =>
                     {
-                        visitor.Visit(child, parent);
+                        visitor.Visit(child, parent, sourceCode);
                         return CXChildVisitResult.CXChildVisit_Continue;
                     }, default(CXClientData));
                 }
@@ -897,7 +897,7 @@ namespace C_TestForge.Parser
         /// <returns>Content hash as string</returns>
         private string GetContentHash(string content)
         {
-            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var sha = SHA256.Create())
             {
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(content);
                 byte[] hash = sha.ComputeHash(bytes);
@@ -1173,7 +1173,7 @@ namespace C_TestForge.Parser
             /// </summary>
             /// <param name="cursor">Current cursor</param>
             /// <param name="parent">Parent cursor</param>
-            public void Visit(CXCursor cursor, CXCursor parent)
+            public void Visit(CXCursor cursor, CXCursor parent, string sourceCode)
             {
                 try
                 {
@@ -1205,7 +1205,7 @@ namespace C_TestForge.Parser
                     // Process function declarations
                     if (_options.AnalyzeFunctions && cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
                     {
-                        var function = _functionAnalysisService.ExtractFunction(cursor);
+                        var function = _functionAnalysisService.ExtractFunction(cursor, sourceCode);
                         if (function != null)
                         {
                             Functions.Add(function);

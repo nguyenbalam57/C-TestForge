@@ -5,6 +5,7 @@
     <ProjectReference Include="..\C-TestForge.Infrastructure\C-TestForge.Infrastructure.csproj" />
     <ProjectReference Include="..\C-TestForge.Models\C-TestForge.Models.csproj" />
     <ProjectReference Include="..\C-TestForge.Parser\C-TestForge.Parser.csproj" />
+    <ProjectReference Include="..\C-TestForge.Solver\C-TestForge.SolverServices.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
     <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.7" />
   </ItemGroup>
 
   <PropertyGroup>

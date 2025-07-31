@@ -54,6 +54,11 @@ namespace C_TestForge.Models.Core
         /// </summary>
         public List<string> UsedVariables { get; set; } = new List<string>();
 
+        /// <summary>
+        /// Control flow paths in this function
+        /// </summary>
+        public List<ControlFlowPath> ControlFlowPaths { get; set; } = new List<ControlFlowPath>();
+
         public int StartLineNumber { get; set; }
         public int EndLineNumber { get; set; }
 
@@ -100,8 +105,29 @@ namespace C_TestForge.Models.Core
                 IsExternal = IsExternal,
                 Body = Body,
                 CalledFunctions = CalledFunctions != null ? new List<string>(CalledFunctions) : new List<string>(),
-                UsedVariables = UsedVariables != null ? new List<string>(UsedVariables) : new List<string>()
+                UsedVariables = UsedVariables != null ? new List<string>(UsedVariables) : new List<string>(),
+                ControlFlowPaths = ControlFlowPaths?.Select(p => p.Clone()).ToList() ?? new List<ControlFlowPath>(),
+                StartLineNumber = StartLineNumber,
+                EndLineNumber = EndLineNumber
             };
+        }
+
+        /// <summary>
+        /// Gets the code coverage percentage based on covered paths
+        /// </summary>
+        [JsonIgnore]
+        public double CodeCoverage
+        {
+            get
+            {
+                if (ControlFlowPaths == null || ControlFlowPaths.Count == 0)
+                {
+                    return 0.0;
+                }
+
+                int coveredPaths = ControlFlowPaths.Count(p => p.IsCovered);
+                return (double)coveredPaths / ControlFlowPaths.Count;
+            }
         }
     }
 }

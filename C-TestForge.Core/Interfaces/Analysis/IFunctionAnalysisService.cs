@@ -20,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// </summary>
         /// <param name="cursor">Clang cursor</param>
         /// <returns>Function object</returns>
-        CFunction ExtractFunction(CXCursor cursor);
+        CFunction ExtractFunction(CXCursor cursor, string sourceCode);
 
         /// <summary>
         /// Analyzes relationships between functions

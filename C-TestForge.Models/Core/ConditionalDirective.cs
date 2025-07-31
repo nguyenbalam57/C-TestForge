@@ -16,7 +16,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Unique identifier
         /// </summary>
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Id { get; set; }
 
         /// <summary>
         /// Type of the conditional directive
@@ -26,7 +26,7 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Condition of the directive
         /// </summary>
-        public string Condition { get; set; } = string.Empty;
+        public string Condition { get; set; } 
 
         /// <summary>
         /// Line number in the source file
@@ -41,13 +41,13 @@ namespace C_TestForge.Models.Core
         /// <summary>
         /// Source file where the directive is defined
         /// </summary>
-        public string SourceFile { get; set; } = string.Empty;
+        public string SourceFile { get; set; }
 
         /// <summary>
         /// Parent directive (for else/elif)
         /// </summary>
         [JsonIgnore]
-        public ConditionalDirective ParentDirective { get; set; } = new ConditionalDirective();
+        public ConditionalDirective ParentDirective { get; set; } 
 
         /// <summary>
         /// List of branch directives (else/elif)

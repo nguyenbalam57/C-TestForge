@@ -16,7 +16,7 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// </summary>
         /// <param name="filePath">Path to the file</param>
         /// <returns>File content</returns>
-        Task<string> ReadFileAsync(string filePath);
+        Task<string> ReadFileAsync(string filePath, string encodingName = null);
 
         /// <summary>
         /// Writes content to a file
