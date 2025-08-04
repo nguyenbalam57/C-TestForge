@@ -38,7 +38,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public unsafe CVariable ExtractVariable(CXCursor cursor)
+        public unsafe CVariable ExtractVariable(CXCursor cursor, string sourceCode)
         {
             try
             {
@@ -56,9 +56,29 @@ namespace C_TestForge.Parser
                 cursor.Location.GetFileLocation(out file, out line, out column, out offset);
                 string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
 
+                // Get source code for original type detection
+                string filePath = null;
+                if (file != null)
+                {
+                    filePath = file.Name.ToString();
+
+                    // Đăng ký kiểu tùy chỉnh từ mã nguồn nếu chưa được xử lý
+                    if (!string.IsNullOrEmpty(sourceCode))
+                    {
+                        _typeManager.RegisterTypeAliasesFromSourceCode(sourceCode);
+                    }
+                }
+
                 // Get variable type
                 var type = cursor.Type;
                 string typeName = type.Spelling.ToString();
+
+                // Phát hiện kiểu gốc nếu có mã nguồn
+                string originalTypeName = typeName;
+                if (!string.IsNullOrEmpty(sourceCode))
+                {
+                    originalTypeName = _typeManager.DetectOriginalTypeFromSourceCode(typeName, sourceCode, (int)line);
+                }
 
                 // Determine variable scope
                 VariableScope scope = DetermineScope(cursor);
@@ -92,6 +112,8 @@ namespace C_TestForge.Parser
                 {
                     Name = variableName,
                     TypeName = typeName,
+                    OriginalTypeName = originalTypeName,  // Lưu kiểu gốc
+                    IsCustomType = originalTypeName != typeName,  // Đánh dấu là kiểu tùy chỉnh
                     VariableType = variableType,
                     Scope = scope,
                     DefaultValue = defaultValue,
@@ -397,6 +419,9 @@ namespace C_TestForge.Parser
         private List<VariableConstraint> ExtractTypeConstraints(CVariable variable)
         {
             var constraints = new List<VariableConstraint>();
+
+            // Ưu tiên sử dụng kiểu gốc nếu là kiểu tùy chỉnh
+            string typeToUse = variable.IsCustomType ? variable.OriginalTypeName : variable.TypeName;
 
             // Thử lấy ràng buộc từ TypeManager
             var typeConstraint = _typeManager.GetConstraintForType(variable.TypeName, variable.Name);

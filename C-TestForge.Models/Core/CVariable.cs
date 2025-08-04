@@ -24,6 +24,10 @@ namespace C_TestForge.Models.Core
         /// </summary>
         public VariableType VariableType { get; set; }
 
+        // Thuộc tính mới thêm
+        public string OriginalTypeName { get; set; } = string.Empty; // Type hiện tại của biến, có thể là typedef hoặc alias
+        public bool IsCustomType { get; set; } // Biến có phải là kiểu dữ liệu tùy chỉnh hay không
+
         /// <summary>
         /// Scope of the variable
         /// </summary>

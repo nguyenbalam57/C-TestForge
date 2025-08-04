@@ -4,16 +4,19 @@ using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Core.Interfaces.Solver;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Core.Interfaces.UI;
 using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
 using C_TestForge.Parser.Analysis;
 using C_TestForge.Parser.TestCaseManagement;
+using C_TestForge.Parser.UI;
 using C_TestForge.SolverServices;
 using C_TestForge.UI.Controls;
 using C_TestForge.UI.Services;
 using C_TestForge.UI.ViewModels;
 using C_TestForge.UI.Views;
+using MaterialDesignThemes.Wpf;
 using Microsoft.Extensions.Logging;
 using Prism.Ioc;
 using Prism.Modularity;
@@ -22,6 +25,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using static Microsoft.WindowsAPICodePack.Shell.PropertySystem.SystemProperties.System;
 
 namespace C_TestForge.UI
 {
@@ -87,6 +91,25 @@ namespace C_TestForge.UI
             containerRegistry.RegisterDialog<TestCaseComparisonDialog, TestCaseComparisonDialogViewModel>();
             containerRegistry.RegisterDialog<GenerateTestCaseDialog, GenerateTestCaseDialogViewModel>();
             containerRegistry.RegisterDialog<ConfirmationDialog, ConfirmationDialogViewModel>();
+
+            // Register ViewModels
+            containerRegistry.RegisterDialog<TypeMappingManagerViewModel>();
+            containerRegistry.RegisterSingleton<IDialogService, DialogService>();
+            // Đăng ký SnackbarMessageQueue
+            containerRegistry.RegisterSingleton<SnackbarMessageQueue>(provider =>
+            {
+                return new SnackbarMessageQueue(TimeSpan.FromSeconds(3));
+            });
+
+            // Đăng ký ISnackbarMessageQueue
+            containerRegistry.RegisterSingleton<Core.Interfaces.UI.ISnackbarMessageQueue>(provider =>
+            {
+                var messageQueue = provider.Resolve<SnackbarMessageQueue>();
+                return new SnackbarMessageQueueAdapter(messageQueue);
+            });
+
+            // Đăng ký IDialogService
+            containerRegistry.RegisterSingleton<IDialogService, MaterialDialogService>();
 
             // Register views
             //containerRegistry.RegisterForNavigation<SourceCodeView, SourceCodeViewModel>();

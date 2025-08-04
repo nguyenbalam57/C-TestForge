@@ -1,0 +1,70 @@
+﻿<UserControl x:Class="C_TestForge.UI.Dialogs.MaterialDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:models="clr-namespace:C_TestForge.UI.Models"
+             mc:Ignorable="d" 
+             d:DataContext="{d:DesignInstance Type=models:MaterialDialogModel}"
+             Width="400">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Icon -->
+            <materialDesign:PackIcon Grid.Column="0" 
+                                     Kind="{Binding Icon}"
+                                     Width="24" Height="24"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,16,0"
+                                     Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+            <!-- Title -->
+            <TextBlock Grid.Column="1" 
+                       Text="{Binding Title}" 
+                       Style="{StaticResource MaterialDesignHeadline6TextBlock}" 
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <!-- Message -->
+        <TextBlock Grid.Row="1" 
+                   Text="{Binding Message}"
+                   TextWrapping="Wrap"
+                   Style="{StaticResource MaterialDesignBody1TextBlock}"
+                   Margin="0,0,0,24" />
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+
+            <!-- Cancel Button (only for confirmations) -->
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Content="{Binding CancelText}"
+                    Command="{Binding CancelCommand}"
+                    CommandParameter="{Binding}"
+                    Margin="0,0,8,0"
+                    Visibility="{Binding IsConfirmation, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+            <!-- OK Button -->
+            <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                    Content="{Binding OkText}"
+                    Command="{Binding OkCommand}"
+                    CommandParameter="{Binding}"
+                    Background="{StaticResource PrimaryColor}"
+                    BorderBrush="{StaticResource PrimaryColor}"
+                    Foreground="White" />
+        </StackPanel>
+    </Grid>
+</UserControl>

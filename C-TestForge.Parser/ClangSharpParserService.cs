@@ -7,6 +7,7 @@ using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using ClangSharp;
 using ClangSharp.Interop;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -31,6 +32,8 @@ namespace C_TestForge.Parser
         private readonly IMacroAnalysisService _macroAnalysisService;
         private readonly IFileService _fileService;
         private readonly IConfigurationService _configurationService;
+
+        private static ServiceProvider _serviceProvider;
 
         /// <summary>
         /// Constructor for ClangSharpParserService
@@ -360,6 +363,10 @@ namespace C_TestForge.Parser
             {
                 throw new ArgumentException("Source code cannot be null or empty", nameof(sourceCode));
             }
+
+            // Đăng ký kiểu từ mã nguồn trước khi phân tích
+            var typeManager = _serviceProvider.GetRequiredService<ITypeManager>();
+            typeManager.RegisterTypeAliasesFromSourceCode(sourceCode);
 
             if (string.IsNullOrEmpty(fileName))
             {
@@ -1195,7 +1202,7 @@ namespace C_TestForge.Parser
                     // Process variable declarations
                     if (_options.AnalyzeVariables && cursor.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
-                        var variable = _variableAnalysisService.ExtractVariable(cursor);
+                        var variable = _variableAnalysisService.ExtractVariable(cursor, sourceCode);
                         if (variable != null)
                         {
                             Variables.Add(variable);

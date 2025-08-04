@@ -1,5 +1,6 @@
 ﻿using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Infrastructure.ViewModels;
+using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Services.Dialogs;
@@ -15,9 +16,9 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
 
         private string _title = "Compare Test Cases";
-        private ObservableCollection<Models.TestCases.TestCase> _testCases;
-        private Models.TestCases.TestCase _testCase1;
-        private Models.TestCases.TestCase _testCase2;
+        private ObservableCollection<TestCase> _testCases;
+        private TestCase _testCase1;
+        private TestCase _testCase2;
         //private ObservableCollection<Models.TestCases.TestCaseDifference> _differences;
         private bool _isComparing;
 
@@ -27,13 +28,13 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _title, value);
         }
 
-        public ObservableCollection<Models.TestCases.TestCase> TestCases
+        public ObservableCollection<TestCase> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
         }
 
-        public Models.TestCases.TestCase TestCase1
+        public TestCase TestCase1
         {
             get => _testCase1;
             set
@@ -45,7 +46,7 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
-        public Models.TestCases.TestCase TestCase2
+        public TestCase TestCase2
         {
             get => _testCase2;
             set
@@ -120,7 +121,7 @@ namespace C_TestForge.UI.ViewModels
         {
             if (parameters.ContainsKey("TestCases"))
             {
-                var testCases = parameters.GetValue<ObservableCollection<Models.TestCases.TestCase>>("TestCases");
+                var testCases = parameters.GetValue<ObservableCollection<TestCase>>("TestCases");
                 TestCases = testCases;
 
                 if (testCases.Count >= 2)

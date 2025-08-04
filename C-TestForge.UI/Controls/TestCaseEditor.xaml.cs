@@ -11,12 +11,12 @@ namespace C_TestForge.UI.Controls
     public partial class TestCaseEditor : UserControl
     {
         public static readonly DependencyProperty TestCaseProperty =
-            DependencyProperty.Register("TestCase", typeof(Models.TestCases.TestCase), typeof(TestCaseEditor),
+            DependencyProperty.Register("TestCase", typeof(TestCase), typeof(TestCaseEditor),
                 new PropertyMetadata(null, TestCasePropertyChanged));
 
-        public Models.TestCases.TestCase TestCase
+        public TestCase TestCase
         {
-            get { return (Models.TestCases.TestCase)GetValue(TestCaseProperty); }
+            get { return (TestCase)GetValue(TestCaseProperty); }
             set { SetValue(TestCaseProperty, value); }
         }
 
@@ -30,7 +30,7 @@ namespace C_TestForge.UI.Controls
             var control = d as TestCaseEditor;
             if (control != null && control.DataContext is TestCaseEditorViewModel viewModel)
             {
-                viewModel.TestCase = e.NewValue as Models.TestCases.TestCase;
+                viewModel.TestCase = e.NewValue as TestCase;
             }
         }
     }

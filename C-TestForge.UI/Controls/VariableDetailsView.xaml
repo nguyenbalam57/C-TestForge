@@ -1,0 +1,218 @@
+﻿<UserControl x:Class="C_TestForge.UI.Controls.VariableDetailsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:C_TestForge.UI.Controls"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Variable Header -->
+        <Border Grid.Row="0" Background="{StaticResource LightBackgroundColor}" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Variable Name and Type -->
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding Variable.Name}" 
+                               Style="{StaticResource MaterialDesignHeadline5TextBlock}"/>
+
+                    <!-- Type Info with Original Type -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding Variable.TypeName}" 
+                                   Style="{StaticResource MaterialDesignBody1TextBlock}"/>
+
+                        <!-- Original type shown only for custom types -->
+                        <TextBlock Text=" (" 
+                                   Visibility="{Binding Variable.IsCustomType, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Style="{StaticResource MaterialDesignBody1TextBlock}"/>
+                        <TextBlock Text="{Binding Variable.OriginalTypeName}" 
+                                   Foreground="Green"
+                                   FontWeight="SemiBold"
+                                   Visibility="{Binding Variable.IsCustomType, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Style="{StaticResource MaterialDesignBody1TextBlock}"/>
+                        <TextBlock Text=")" 
+                                   Visibility="{Binding Variable.IsCustomType, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Style="{StaticResource MaterialDesignBody1TextBlock}"/>
+                    </StackPanel>
+
+                    <!-- File location -->
+                    <TextBlock Text="{Binding Variable.SourceFile, StringFormat=File: {0}}" 
+                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                               Margin="0,8,0,0"/>
+                    <TextBlock Text="{Binding Variable.LineNumber, StringFormat=Line: {0}}" 
+                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <!-- Variable Badges -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Scope Badge -->
+                    <Border Background="{Binding Variable.Scope, Converter={StaticResource ScopeToColorConverter}}"
+                            CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
+                        <TextBlock Text="{Binding Variable.Scope}" Foreground="White"/>
+                    </Border>
+
+                    <!-- Const Badge -->
+                    <Border Background="#607D8B" CornerRadius="4" Padding="8,4" Margin="0,0,8,0"
+                            Visibility="{Binding Variable.IsConst, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="const" Foreground="White"/>
+                    </Border>
+
+                    <!-- Volatile Badge -->
+                    <Border Background="#FF9800" CornerRadius="4" Padding="8,4" Margin="0,0,8,0"
+                            Visibility="{Binding Variable.IsVolatile, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="volatile" Foreground="White"/>
+                    </Border>
+
+                    <!-- Custom Type Badge -->
+                    <Border Background="#4CAF50" CornerRadius="4" Padding="8,4"
+                            Visibility="{Binding Variable.IsCustomType, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="custom type" Foreground="White"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Variable Details Content -->
+        <TabControl Grid.Row="1" materialDesign:ColorZoneAssist.Mode="Standard">
+            <!-- Details Tab -->
+            <TabItem Header="Details">
+                <!-- Details Content -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Variable Properties -->
+                        <GroupBox Grid.Row="0" Header="Properties" Margin="0,0,0,16">
+                            <Grid Margin="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Size -->
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Size:" 
+                                           Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                           Margin="0,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" 
+                                           Text="{Binding Variable.Size, StringFormat={}{0} bytes}"
+                                           Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                           Margin="0,4"/>
+
+                                <!-- Default Value -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Default Value:" 
+                                           Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                           Margin="0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" 
+                                           Text="{Binding Variable.DefaultValue, TargetNullValue='Not specified'}"
+                                           Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                           Margin="0,4"/>
+
+                                <!-- Attributes -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Attributes:" 
+                                           Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                           Margin="0,4"/>
+                                <WrapPanel Grid.Row="2" Grid.Column="1" Margin="0,4">
+                                    <TextBlock Text="const" 
+                                               Visibility="{Binding Variable.IsConst, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBlock Text="volatile" 
+                                               Visibility="{Binding Variable.IsVolatile, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBlock Text="read-only" 
+                                               Visibility="{Binding Variable.IsReadOnly, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                                               Margin="0,0,8,0"/>
+                                </WrapPanel>
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Constraints Tab -->
+            <TabItem Header="Constraints">
+                <!-- Constraints Content -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <TextBlock Text="Value Constraints" 
+                                   Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                                   Margin="0,0,0,8"/>
+
+                        <ItemsControl ItemsSource="{Binding Variable.Constraints}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <materialDesign:Card Margin="0,0,0,8" Padding="8">
+                                        <StackPanel>
+                                            <!-- Constraint Type -->
+                                            <TextBlock Text="{Binding Type}" 
+                                                       Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
+
+                                            <!-- Constraint Value -->
+                                            <TextBlock Text="{Binding Description}" 
+                                                       Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                                       Margin="0,4,0,0"/>
+
+                                            <!-- Source -->
+                                            <TextBlock Text="{Binding Source}" 
+                                                       Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                                                       Foreground="{StaticResource SecondaryTextColor}"
+                                                       Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </materialDesign:Card>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Usage Tab -->
+            <TabItem Header="Usage">
+                <!-- Usage Content -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <TextBlock Text="Used by Functions" 
+                                   Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                                   Margin="0,0,0,8"/>
+
+                        <ItemsControl ItemsSource="{Binding Variable.UsedByFunctions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource MaterialDesignFlatButton}"
+                                            HorizontalAlignment="Left"
+                                            Margin="0,0,0,4">
+                                        <TextBlock Text="{Binding}" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

@@ -18,18 +18,18 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
         private readonly IDialogService _dialogService;
 
-        private ObservableCollection<Models.TestCases.TestCase> _testCases;
-        private Models.TestCases.TestCase _selectedTestCase;
+        private ObservableCollection<TestCase> _testCases;
+        private TestCase _selectedTestCase;
         private string _statusMessage;
         private bool _isLoading;
 
-        public ObservableCollection<Models.TestCases.TestCase> TestCases
+        public ObservableCollection<TestCase> TestCases
         {
             get => _testCases;
             set => SetProperty(ref _testCases, value);
         }
 
-        public Models.TestCases.TestCase SelectedTestCase
+        public TestCase SelectedTestCase
         {
             get => _selectedTestCase;
             set => SetProperty(ref _selectedTestCase, value);
@@ -48,9 +48,9 @@ namespace C_TestForge.UI.ViewModels
         }
 
         public DelegateCommand AddTestCaseCommand { get; }
-        public DelegateCommand<Models.TestCases.TestCase> EditTestCaseCommand { get; }
-        public DelegateCommand<Models.TestCases.TestCase> DuplicateTestCaseCommand { get; }
-        public DelegateCommand<Models.TestCases.TestCase> DeleteTestCaseCommand { get; }
+        public DelegateCommand<TestCase> EditTestCaseCommand { get; }
+        public DelegateCommand<TestCase> DuplicateTestCaseCommand { get; }
+        public DelegateCommand<TestCase> DeleteTestCaseCommand { get; }
         public DelegateCommand ImportTestCasesCommand { get; }
         public DelegateCommand ExportTestCasesCommand { get; }
         public DelegateCommand CompareTestCasesCommand { get; }
@@ -62,12 +62,12 @@ namespace C_TestForge.UI.ViewModels
             _testCaseService = testCaseService;
             _dialogService = dialogService;
 
-            TestCases = new ObservableCollection<Models.TestCases.TestCase>();
+            TestCases = new ObservableCollection<TestCase>();
 
             AddTestCaseCommand = new DelegateCommand(ExecuteAddTestCase);
-            EditTestCaseCommand = new DelegateCommand<Models.TestCases.TestCase>(ExecuteEditTestCase, CanExecuteTestCaseCommand);
-            DuplicateTestCaseCommand = new DelegateCommand<Models.TestCases.TestCase>(ExecuteDuplicateTestCase, CanExecuteTestCaseCommand);
-            DeleteTestCaseCommand = new DelegateCommand<Models.TestCases.TestCase>(ExecuteDeleteTestCase, CanExecuteTestCaseCommand);
+            EditTestCaseCommand = new DelegateCommand<TestCase>(ExecuteEditTestCase, CanExecuteTestCaseCommand);
+            DuplicateTestCaseCommand = new DelegateCommand<TestCase>(ExecuteDuplicateTestCase, CanExecuteTestCaseCommand);
+            DeleteTestCaseCommand = new DelegateCommand<TestCase>(ExecuteDeleteTestCase, CanExecuteTestCaseCommand);
             ImportTestCasesCommand = new DelegateCommand(ExecuteImportTestCases);
             ExportTestCasesCommand = new DelegateCommand(ExecuteExportTestCases, CanExecuteExportTestCases);
             CompareTestCasesCommand = new DelegateCommand(ExecuteCompareTestCases, CanExecuteCompareTestCases);
@@ -111,19 +111,19 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (result.Result == ButtonResult.OK && result.Parameters.ContainsKey("TestCase"))
                 {
-                    var newTestCase = result.Parameters.GetValue<Models.TestCases.TestCase>("TestCase");
+                    var newTestCase = result.Parameters.GetValue<TestCase>("TestCase");
                     TestCases.Add(newTestCase);
                     StatusMessage = $"Added test case: {newTestCase.Name}";
                 }
             });
         }
 
-        private bool CanExecuteTestCaseCommand(Models.TestCases.TestCase testCase)
+        private bool CanExecuteTestCaseCommand(TestCase testCase)
         {
             return testCase != null;
         }
 
-        private void ExecuteEditTestCase(Models.TestCases.TestCase testCase)
+        private void ExecuteEditTestCase(TestCase testCase)
         {
             var parameters = new DialogParameters
             {
@@ -155,7 +155,7 @@ namespace C_TestForge.UI.ViewModels
             StatusMessage = $"Duplicated test case: {testCase.Name} -> {duplicate.Name}";
         }
 
-        private async void ExecuteDeleteTestCase(Models.TestCases.TestCase testCase)
+        private async void ExecuteDeleteTestCase(TestCase testCase)
         {
             var parameters = new DialogParameters
             {
@@ -204,7 +204,7 @@ namespace C_TestForge.UI.ViewModels
                     IsLoading = true;
 
                     var extension = Path.GetExtension(dialog.FileName).ToLower();
-                    List<Models.TestCases.TestCase> importedTestCases = null;
+                    List<TestCase> importedTestCases = null;
 
                     switch (extension)
                     {
@@ -335,7 +335,7 @@ namespace C_TestForge.UI.ViewModels
                         IsLoading = true;
                         StatusMessage = $"Generating {type} for function {function.Name}...";
 
-                        Models.TestCases.TestCase generatedTestCase;
+                        TestCase generatedTestCase;
 
                         if (type == TestCaseType.UnitTest)
                         {

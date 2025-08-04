@@ -20,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// </summary>
         /// <param name="cursor">Clang cursor</param>
         /// <returns>Variable object</returns>
-        CVariable ExtractVariable(CXCursor cursor);
+        CVariable ExtractVariable(CXCursor cursor, string sourceCode);
 
         /// <summary>
         /// Analyzes variables for constraints and relationships

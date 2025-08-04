@@ -41,6 +41,31 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// Saves the current typedef configuration
         /// </summary>
         Task SaveTypedefConfigAsync();
+
+        /// <summary>
+        /// Detects original type from source code
+        /// </summary>
+        string DetectOriginalTypeFromSourceCode(string normalizedType, string sourceCode, int lineNumber);
+
+        /// <summary>
+        /// Registers type aliases from source code
+        /// </summary>
+        void RegisterTypeAliasesFromSourceCode(string sourceCode);
+
+        /// <summary>
+        /// Gets all type mappings
+        /// </summary>
+        Dictionary<string, TypedefMapping> GetAllTypeMappings();
+
+        /// <summary>
+        /// Derives constraints for a type from its base type
+        /// </summary>
+        void DeriveConstraintsFromBaseType(TypedefMapping mapping);
+
+        /// <summary>
+        /// Cleans a type name by removing qualifiers
+        /// </summary>
+        string CleanTypeName(string typeName);
     }
 
 }
