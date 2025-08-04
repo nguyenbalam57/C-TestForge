@@ -17,6 +17,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using C_TestForge.Core.Interfaces.Projects;
 
 namespace C_TestForge.UI.ViewModels
 {
@@ -26,6 +27,7 @@ namespace C_TestForge.UI.ViewModels
         private readonly ITestCaseService _testCaseService;
         private readonly IAnalysisService _analysisService;
         private readonly ISourceCodeService _sourceCodeService;
+        private readonly ISourceFileService _sourceFileService;
         private readonly ILogger<MainWindowViewModel> _logger;
 
         private Project _currentProject;
@@ -50,12 +52,14 @@ namespace C_TestForge.UI.ViewModels
             ITestCaseService testCaseService,
             IAnalysisService analysisService,
             ISourceCodeService sourceCodeService,
+            ISourceFileService sourceFileService,
             ILogger<MainWindowViewModel> logger)
         {
             _projectService = projectService ?? throw new ArgumentNullException(nameof(projectService));
             _testCaseService = testCaseService ?? throw new ArgumentNullException(nameof(testCaseService));
             _analysisService = analysisService ?? throw new ArgumentNullException(nameof(analysisService));
             _sourceCodeService = sourceCodeService ?? throw new ArgumentNullException(nameof(sourceCodeService));
+            _sourceFileService = sourceFileService ?? throw new ArgumentNullException(nameof(sourceFileService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             // Initialize commands
@@ -598,6 +602,12 @@ namespace C_TestForge.UI.ViewModels
 
                 // Clear previous analysis results
                 ClearAnalysisResults();
+
+                // Kiểm tra xem sourceFile proess đã được phân tích trước đó chưa
+                if(string.IsNullOrEmpty(sourceFile.ProcessedContent))
+                {
+                    _sourceFileService.ProcessTypeReplacements(sourceFile);
+                }    
 
                 // Analyze source file
                 _analysisResult = await _analysisService.AnalyzeSourceFileAsync(sourceFile, _analysisOptions);

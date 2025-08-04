@@ -2,6 +2,7 @@
 using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Core.Interfaces.Solver;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Interfaces.UI;
@@ -9,6 +10,7 @@ using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
 using C_TestForge.Parser;
 using C_TestForge.Parser.Analysis;
+using C_TestForge.Parser.Projects;
 using C_TestForge.Parser.TestCaseManagement;
 using C_TestForge.Parser.UI;
 using C_TestForge.SolverServices;
@@ -79,6 +81,7 @@ namespace C_TestForge.UI
 
             // Register project services
             containerRegistry.RegisterSingleton<IProjectService, ProjectService>();
+            containerRegistry.RegisterSingleton<ISourceFileService, SourceFileService>();
 
             // Register test case services
             containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();

@@ -14,10 +14,10 @@ namespace C_TestForge.Parser.TestCaseManagement
     /// </summary>
     public class UnitTestGeneratorService : IUnitTestGeneratorService
     {
-        private readonly IParser _parser;
+        private readonly IClangSharpParserService _parser;
         private readonly ITestCodeGeneratorService _testCodeGeneratorService;
 
-        public UnitTestGeneratorService(IParser parser, ITestCodeGeneratorService testCodeGeneratorService)
+        public UnitTestGeneratorService(IClangSharpParserService parser, ITestCodeGeneratorService testCodeGeneratorService)
         {
             _parser = parser ?? throw new ArgumentNullException(nameof(parser));
             _testCodeGeneratorService = testCodeGeneratorService ?? throw new ArgumentNullException(nameof(testCodeGeneratorService));

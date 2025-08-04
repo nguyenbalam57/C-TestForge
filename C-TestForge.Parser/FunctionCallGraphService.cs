@@ -3,6 +3,7 @@ using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Models;
 using C_TestForge.Models.CodeAnalysis.CallGraph;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,17 +31,13 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Builds a call graph for the given function
         /// </summary>
-        public async Task<FunctionCallGraph> BuildCallGraphAsync(string rootFunctionName, string filePath, int maxDepth = -1)
+        public async Task<FunctionCallGraph> BuildCallGraphAsync(string rootFunctionName, SourceFile sourceFile, int maxDepth = -1)
         {
             if (string.IsNullOrEmpty(rootFunctionName))
                 throw new ArgumentNullException(nameof(rootFunctionName));
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
 
             // Extract all functions
-            var functions = await _parserService.ExtractFunctionsAsync(filePath);
+            var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
             if (!functions.Any(f => f.Name == rootFunctionName))
                 throw new ArgumentException($"Function not found: {rootFunctionName}", nameof(rootFunctionName));
 
@@ -54,7 +51,7 @@ namespace C_TestForge.Parser
 
             // Build the graph
             var processedFunctions = new HashSet<string>();
-            await BuildCallGraphRecursiveAsync(rootFunctionName, filePath, 0, maxDepth, graph, processedFunctions, functions);
+            await BuildCallGraphRecursiveAsync(rootFunctionName, sourceFile.FilePath, 0, maxDepth, graph, processedFunctions, functions);
 
             return graph;
         }
@@ -135,17 +132,13 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Finds all paths from the root function to leaf functions
         /// </summary>
-        public async Task<List<FunctionCallPath>> FindCallPathsAsync(string rootFunctionName, string filePath, int maxDepth = -1)
+        public async Task<List<FunctionCallPath>> FindCallPathsAsync(string rootFunctionName, SourceFile sourceFile, int maxDepth = -1)
         {
             if (string.IsNullOrEmpty(rootFunctionName))
                 throw new ArgumentNullException(nameof(rootFunctionName));
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
 
             // Build call graph
-            var graph = await BuildCallGraphAsync(rootFunctionName, filePath, maxDepth);
+            var graph = await BuildCallGraphAsync(rootFunctionName, sourceFile, maxDepth);
 
             // Find all paths
             var paths = new List<FunctionCallPath>();
@@ -246,15 +239,17 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Analyzes potential cyclic dependencies in the call graph
         /// </summary>
-        public async Task<List<CyclicDependency>> AnalyzeCyclicDependenciesAsync(string filePath)
+        public async Task<List<CyclicDependency>> AnalyzeCyclicDependenciesAsync(SourceFile sourceFile)
         {
+            string filePath = sourceFile.FilePath;
+
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentNullException(nameof(filePath));
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("File not found", filePath);
 
             // Extract all functions
-            var functions = await _parserService.ExtractFunctionsAsync(filePath);
+            var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
 
             // Create adjacency list
             var adjacencyList = new Dictionary<string, List<string>>();

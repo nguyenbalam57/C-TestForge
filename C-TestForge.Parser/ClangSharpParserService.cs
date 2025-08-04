@@ -1,6 +1,7 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Models.CodeAnalysis.Functions;
 using C_TestForge.Models.Core;
 using C_TestForge.Models.Parse;
@@ -32,8 +33,8 @@ namespace C_TestForge.Parser
         private readonly IMacroAnalysisService _macroAnalysisService;
         private readonly IFileService _fileService;
         private readonly IConfigurationService _configurationService;
-
-        private static ServiceProvider _serviceProvider;
+        private readonly ITypeManager _typeManager;
+        private readonly ISourceFileService _sourceFileService;
 
         /// <summary>
         /// Constructor for ClangSharpParserService
@@ -45,6 +46,8 @@ namespace C_TestForge.Parser
             IVariableAnalysisService variableAnalysisService,
             IMacroAnalysisService macroAnalysisService,
             IFileService fileService,
+            ITypeManager typeManager,
+            ISourceFileService sourceFileService,
             IConfigurationService configurationService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -53,7 +56,12 @@ namespace C_TestForge.Parser
             _variableAnalysisService = variableAnalysisService ?? throw new ArgumentNullException(nameof(variableAnalysisService));
             _macroAnalysisService = macroAnalysisService ?? throw new ArgumentNullException(nameof(macroAnalysisService));
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
+            _typeManager = typeManager ?? throw new ArgumentNullException(nameof(typeManager));
+            _sourceFileService = sourceFileService ?? throw new ArgumentNullException(nameof(sourceFileService));
             _configurationService = configurationService;
+
+            // Đảm bảo hỗ trợ các bảng mã cho xử lý file
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         }
 
         #region IClangSharpParserService Implementation
@@ -89,8 +97,6 @@ namespace C_TestForge.Parser
                 // Đọc nội dung file
                 string sourceContent = await _fileService.ReadFileAsync(filePath);
 
-                var parseResult = await ParseSourceFileAsync(filePath, options);
-
                 // Convert ParseResult to SourceFile
                 var sourceFile = new SourceFile
                 {
@@ -101,33 +107,16 @@ namespace C_TestForge.Parser
                     ContentHash = GetContentHash(sourceContent),
                     FileType = DetermineFileType(filePath),
                     LastModified = _fileService.GetLastModifiedTime(filePath),
-                    ParseResult = parseResult,
+                    //ParseResult = parseResult,
                     IsDirty = false
                 };
 
-                // Xây dựng từ điển includes
-                var includeDirectives = parseResult.PreprocessorDirectives
-                    .Where(d => d.Type == "include")
-                    .ToList();
+                // Xử lý code để thay đổi type biến
+                if(string.IsNullOrEmpty(sourceFile.ProcessedContent))
+                    _sourceFileService.ProcessTypeReplacements(sourceFile);
 
-                foreach (var directive in includeDirectives)
-                {
-                    string value = directive.Value;
-                    // Loại bỏ ngoặc " hoặc <> để lấy đường dẫn
-                    if (value.StartsWith("\"") && value.EndsWith("\""))
-                    {
-                        value = value.Substring(1, value.Length - 2);
-                    }
-                    else if (value.StartsWith("<") && value.EndsWith(">"))
-                    {
-                        value = value.Substring(1, value.Length - 2);
-                    }
-
-                    if (!string.IsNullOrEmpty(value))
-                    {
-                        sourceFile.Includes[value] = $"#include {directive.Value}";
-                    }
-                }
+                // Lấy mã nguồn đã được raplace types
+                var pa = await ParseSourceCodeAsync(sourceFile);
 
                 return sourceFile;
             }
@@ -171,12 +160,8 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<SourceFile> ParseSourceCodeAsync(string sourceCode, string fileName = "inline.c")
+        public async Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, string fileName = "inline.c")
         {
-            if (string.IsNullOrEmpty(sourceCode))
-            {
-                throw new ArgumentException("Source code cannot be null or empty", nameof(sourceCode));
-            }
 
             if (string.IsNullOrEmpty(fileName))
             {
@@ -198,21 +183,11 @@ namespace C_TestForge.Parser
                     }
                 }
 
-                var parseResult = await ParseSourceCodeAsync(sourceCode, fileName, options);
+                // Lấy mã nguồn từ source đã được raplace types
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
-                // Convert ParseResult to SourceFile
-                var sourceFile = new SourceFile
-                {
-                    FilePath = fileName,
-                    FileName = fileName,
-                    Content = sourceCode,
-                    Lines = sourceCode.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList(),
-                    ContentHash = GetContentHash(sourceCode),
-                    FileType = DetermineFileType(fileName),
-                    LastModified = DateTime.Now,
-                    ParseResult = parseResult,
-                    IsDirty = false
-                };
+                // Ghi ParseResult vào SourceFile
+                sourceFile.ParseResult = parseResult;
 
                 // Xây dựng từ điển includes
                 var includeDirectives = parseResult.PreprocessorDirectives
@@ -248,21 +223,12 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<List<CFunction>> ExtractFunctionsAsync(string filePath)
+        public async Task<List<CFunction>> ExtractFunctionsAsync(SourceFile sourceFile)
         {
-            if (string.IsNullOrEmpty(filePath))
-            {
-                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
-            }
-
-            if (!_fileService.FileExists(filePath))
-            {
-                throw new FileNotFoundException($"Source file not found: {filePath}");
-            }
 
             try
             {
-                _logger.LogInformation($"Extracting functions from file: {filePath}");
+                _logger.LogInformation($"Extracting functions from file: {sourceFile.FilePath}");
 
                 // Parse the source file with function analysis only
                 var options = new ParseOptions
@@ -272,9 +238,9 @@ namespace C_TestForge.Parser
                     ParsePreprocessorDefinitions = false
                 };
 
-                var parseResult = await ParseSourceFileAsync(filePath, options);
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
-                _logger.LogInformation($"Extracted {parseResult.Functions.Count} functions from {filePath}");
+                _logger.LogInformation($"Extracted {parseResult.Functions.Count} functions from {sourceFile.FilePath}");
                 return parseResult.Functions;
             }
             catch (Exception ex)
@@ -285,12 +251,8 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<List<CFunction>> ExtractFunctionsFromCodeAsync(string sourceCode, string fileName = "inline.c")
+        public async Task<List<CFunction>> ExtractFunctionsFromCodeAsync(SourceFile sourceFile, string fileName = "inline.c")
         {
-            if (string.IsNullOrEmpty(sourceCode))
-            {
-                throw new ArgumentException("Source code cannot be null or empty", nameof(sourceCode));
-            }
 
             if (string.IsNullOrEmpty(fileName))
             {
@@ -309,7 +271,7 @@ namespace C_TestForge.Parser
                     ParsePreprocessorDefinitions = false
                 };
 
-                var parseResult = await ParseSourceCodeAsync(sourceCode, fileName, options);
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
                 _logger.LogInformation($"Extracted {parseResult.Functions.Count} functions from source code");
                 return parseResult.Functions;
@@ -326,60 +288,43 @@ namespace C_TestForge.Parser
         #region IParserService Implementation
 
         /// <inheritdoc/>
-        public async Task<ParseResult> ParseSourceFileAsync(string filePath, ParseOptions options)
+        public async Task<ParseResult> ParseSourceFileParserAsync(SourceFile sourceFile, ParseOptions options)
         {
-            if (string.IsNullOrEmpty(filePath))
-            {
-                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
-            }
-
-            if (!_fileService.FileExists(filePath))
-            {
-                throw new FileNotFoundException($"Source file not found: {filePath}");
-            }
 
             try
             {
-                _logger.LogInformation($"Starting parse of file: {filePath}");
-
-                // Read the source file
-                string sourceCode = await _fileService.ReadFileAsync(filePath);
-                string fileName = _fileService.GetFileName(filePath);
+                _logger.LogInformation($"Starting parse of file: {sourceFile.FilePath}");
 
                 // Parse the source code
-                return await ParseSourceCodeAsync(sourceCode, fileName, options);
+                return await ParseSourceCodeParserAsync(sourceFile, options);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error parsing source file: {filePath}");
+                _logger.LogError(ex, $"Error parsing source file: {sourceFile.FilePath}");
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<ParseResult> ParseSourceCodeAsync(string sourceCode, string fileName, ParseOptions options)
+        public async Task<ParseResult> ParseSourceCodeParserAsync(SourceFile sourceFile, ParseOptions options)
         {
-            if (string.IsNullOrEmpty(sourceCode))
+            if (string.IsNullOrEmpty(sourceFile.Content))
             {
-                throw new ArgumentException("Source code cannot be null or empty", nameof(sourceCode));
+                throw new ArgumentException("Source code cannot be null or empty", nameof(sourceFile.Content));
             }
 
-            // Đăng ký kiểu từ mã nguồn trước khi phân tích
-            var typeManager = _serviceProvider.GetRequiredService<ITypeManager>();
-            typeManager.RegisterTypeAliasesFromSourceCode(sourceCode);
-
-            if (string.IsNullOrEmpty(fileName))
+            if (string.IsNullOrEmpty(sourceFile.FileName))
             {
-                fileName = "inline.c";
+                sourceFile.FileName = "inline.c";
             }
 
             try
             {
-                _logger.LogInformation($"Parsing source code for {fileName}");
+                _logger.LogInformation($"Parsing source code for {sourceFile.FileName}");
 
                 var result = new ParseResult
                 {
-                    SourceFilePath = fileName
+                    SourceFilePath = sourceFile.FileName
                 };
 
                 // Khai báo biến ở phạm vi ngoài cùng để có thể truy cập từ khối finally
@@ -448,8 +393,8 @@ namespace C_TestForge.Parser
 
                         // Parse the translation unit
                         // Convert filename and source code to byte arrays
-                        byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(fileName + "\0");
-                        byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceCode);
+                        byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.FileName + "\0");
+                        byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.ProcessedContent);
 
                         // Allocate memory for arguments
                         var argPtrs = new List<IntPtr>();
@@ -468,7 +413,7 @@ namespace C_TestForge.Parser
                             {
                                 Filename = (sbyte*)fileNamePtr,
                                 Contents = (sbyte*)sourceCodePtr,
-                                Length = (nuint)sourceCode.Length
+                                Length = (nuint)sourceFile.ProcessedContent.Length
                             };
 
                             // Lấy con trỏ trực tiếp thay vì sử dụng khối fixed thứ hai
@@ -527,16 +472,16 @@ namespace C_TestForge.Parser
                     // Extract preprocessor definitions
                     if (options.ParsePreprocessorDefinitions)
                     {
-                        await ExtractPreprocessorDefinitionsAsync(translationUnit, fileName, result);
+                        await ExtractPreprocessorDefinitionsAsync(translationUnit, sourceFile.FileName, result);
                     }
 
                     // Extract functions and variables from the AST - sử dụng rootCursor đã lấy từ khối unsafe
                     if (options.AnalyzeFunctions || options.AnalyzeVariables)
                     {
-                        await TraverseASTAsync(rootCursor, fileName, sourceCode, result, options);
+                        await TraverseASTAsync(rootCursor, sourceFile.FileName, sourceFile.ProcessedContent, result, options);
                     }
 
-                    _logger.LogInformation($"Successfully parsed {fileName}: {result.Functions.Count} functions, {result.Variables.Count} variables, {result.Definitions.Count} definitions");
+                    _logger.LogInformation($"Successfully parsed {sourceFile.FileName}: {result.Functions.Count} functions, {result.Variables.Count} variables, {result.Definitions.Count} definitions");
 
                     return result;
                 }
@@ -571,25 +516,12 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<List<string>> GetIncludedFilesAsync(string filePath)
+        public async Task<List<string>> GetIncludedFilesParserAsync(SourceFile sourceFile)
         {
-            if (string.IsNullOrEmpty(filePath))
-            {
-                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
-            }
-
-            if (!_fileService.FileExists(filePath))
-            {
-                throw new FileNotFoundException($"Source file not found: {filePath}");
-            }
 
             try
             {
-                _logger.LogInformation($"Getting included files for: {filePath}");
-
-                // Read the source file
-                string sourceCode = await _fileService.ReadFileAsync(filePath);
-                string fileName = _fileService.GetFileName(filePath);
+                _logger.LogInformation($"Getting included files for: {sourceFile.FilePath}");
 
                 // Parse the source code with minimal options
                 var options = new ParseOptions
@@ -599,7 +531,7 @@ namespace C_TestForge.Parser
                     AnalyzeVariables = false
                 };
 
-                var result = await ParseSourceCodeAsync(sourceCode, fileName, options);
+                var result = await ParseSourceCodeParserAsync(sourceFile, options);
 
                 // Extract include directives
                 var includes = result.PreprocessorDirectives
@@ -607,7 +539,7 @@ namespace C_TestForge.Parser
                     .Select(d => d.Value.Trim())
                     .ToList();
 
-                _logger.LogInformation($"Found {includes.Count} included files in {filePath}");
+                _logger.LogInformation($"Found {includes.Count} included files in {sourceFile.FilePath}");
 
                 return includes;
             }
@@ -619,26 +551,16 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<FunctionAnalysisResult> AnalyzeFunctionAsync(string functionName, string filePath)
+        public async Task<FunctionAnalysisResult> AnalyzeFunctionParserAsync(string functionName, SourceFile sourceFile)
         {
             if (string.IsNullOrEmpty(functionName))
             {
                 throw new ArgumentException("Function name cannot be null or empty", nameof(functionName));
             }
 
-            if (string.IsNullOrEmpty(filePath))
-            {
-                throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
-            }
-
-            if (!_fileService.FileExists(filePath))
-            {
-                throw new FileNotFoundException($"Source file not found: {filePath}");
-            }
-
             try
             {
-                _logger.LogInformation($"Analyzing function {functionName} in file: {filePath}");
+                _logger.LogInformation($"Analyzing function {functionName} in file: {sourceFile.FilePath}");
 
                 // Parse the source file first
                 var options = new ParseOptions
@@ -648,20 +570,20 @@ namespace C_TestForge.Parser
                     ParsePreprocessorDefinitions = true
                 };
 
-                var parseResult = await ParseSourceFileAsync(filePath, options);
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
                 // Find the function in the parse result
                 var function = parseResult.Functions.FirstOrDefault(f => f.Name == functionName);
                 if (function == null)
                 {
-                    throw new InvalidOperationException($"Function '{functionName}' not found in file: {filePath}");
+                    throw new InvalidOperationException($"Function '{functionName}' not found in file: {sourceFile.FilePath}");
                 }
 
                 // Create a new FunctionAnalysisResult
                 var result = new FunctionAnalysisResult
                 {
                     FunctionName = function.Name,
-                    FilePath = filePath,
+                    FilePath = sourceFile.FilePath,
                     ReturnType = function.ReturnType,
                     StartLine = function.StartLineNumber,
                     EndLine = function.EndLineNumber,

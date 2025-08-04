@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Models.CodeAnalysis.CallGraph;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// <returns>The function call graph</returns>
         Task<FunctionCallGraph> BuildCallGraphAsync(
             string rootFunctionName,
-            string filePath,
+            SourceFile sourceFile,
             int maxDepth = -1);
 
         /// <summary>
@@ -33,7 +34,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// <returns>List of function call paths</returns>
         Task<List<FunctionCallPath>> FindCallPathsAsync(
             string rootFunctionName,
-            string filePath,
+            SourceFile sourceFile,
             int maxDepth = -1);
 
         /// <summary>
@@ -42,6 +43,6 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// <param name="filePath">The file path</param>
         /// <returns>List of cyclic dependencies</returns>
         Task<List<CyclicDependency>> AnalyzeCyclicDependenciesAsync(
-            string filePath);
+            SourceFile sourceFile);
     }
 }

@@ -14,9 +14,9 @@ namespace C_TestForge.Parser.TestCaseManagement
     /// </summary>
     public class TestCodeGeneratorService : ITestCodeGeneratorService
     {
-        private readonly IParser _parser;
+        private readonly IClangSharpParserService _parser;
 
-        public TestCodeGeneratorService(IParser parser)
+        public TestCodeGeneratorService(IClangSharpParserService parser)
         {
             _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         }

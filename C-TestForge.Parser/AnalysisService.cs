@@ -76,7 +76,7 @@ namespace C_TestForge.Parser
                 };
 
                 // Parse the source file
-                var parseResult = await _parserService.ParseSourceFileAsync(sourceFile.FilePath, parseOptions);
+                var parseResult = await _parserService.ParseSourceFileParserAsync(sourceFile, parseOptions);
 
                 // Copy results from parse result
                 result.Definitions.AddRange(parseResult.Definitions);

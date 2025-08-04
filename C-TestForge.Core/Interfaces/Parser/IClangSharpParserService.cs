@@ -1,5 +1,6 @@
 ﻿using C_TestForge.Models;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
@@ -34,14 +35,14 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="sourceCode">The source code to parse</param>
         /// <param name="fileName">Optional file name for the source</param>
         /// <returns>The parsed source file model</returns>
-        Task<SourceFile> ParseSourceCodeAsync(string sourceCode, string fileName = "inline.c");
+        Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, string fileName = "inline.c" );
 
         /// <summary>
         /// Extracts all functions from a C source file
         /// </summary>
         /// <param name="filePath">Path to the source file</param>
         /// <returns>List of extracted functions</returns>
-        Task<List<CFunction>> ExtractFunctionsAsync(string filePath);
+        Task<List<CFunction>> ExtractFunctionsAsync(SourceFile sourceFile);
 
         /// <summary>
         /// Extracts all functions from C source code string
@@ -49,7 +50,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="sourceCode">The source code to parse</param>
         /// <param name="fileName">Optional file name for the source</param>
         /// <returns>List of extracted functions</returns>
-        Task<List<CFunction>> ExtractFunctionsFromCodeAsync(string sourceCode, string fileName = "inline.c");
+        Task<List<CFunction>> ExtractFunctionsFromCodeAsync(SourceFile sourceFile, string fileName = "inline.c");
     }
 
 }

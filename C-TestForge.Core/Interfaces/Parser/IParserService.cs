@@ -1,5 +1,6 @@
 ﻿using C_TestForge.Models.CodeAnalysis.Functions;
 using C_TestForge.Models.Parse;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="filePath">Path to the source file</param>
         /// <param name="options">Parse options</param>
         /// <returns>Parse result</returns>
-        Task<ParseResult> ParseSourceFileAsync(string filePath, ParseOptions options);
+        Task<ParseResult> ParseSourceFileParserAsync(SourceFile sourceFile, ParseOptions options);
 
         /// <summary>
         /// Parses C source code content with options
@@ -28,14 +29,14 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="fileName">Name of the source file</param>
         /// <param name="options">Parse options</param>
         /// <returns>Parse result</returns>
-        Task<ParseResult> ParseSourceCodeAsync(string sourceCode, string fileName, ParseOptions options);
+        Task<ParseResult> ParseSourceCodeParserAsync(SourceFile sourceFile, ParseOptions options);
 
         /// <summary>
         /// Gets a list of files included by a source file
         /// </summary>
         /// <param name="filePath">Path to the source file</param>
         /// <returns>List of included file paths</returns>
-        Task<List<string>> GetIncludedFilesAsync(string filePath);
+        Task<List<string>> GetIncludedFilesParserAsync(SourceFile sourceFile);
 
         /// <summary>
         /// Analyzes a specific function in a source file
@@ -43,6 +44,6 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="functionName">Name of the function to analyze</param>
         /// <param name="filePath">Path to the source file</param>
         /// <returns>Function analysis result</returns>
-        Task<FunctionAnalysisResult> AnalyzeFunctionAsync(string functionName, string filePath);
+        Task<FunctionAnalysisResult> AnalyzeFunctionParserAsync(string functionName, SourceFile sourceFile);
     }
 }
