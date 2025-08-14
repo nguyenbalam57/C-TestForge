@@ -62,23 +62,11 @@ namespace C_TestForge.Parser
                 {
                     filePath = file.Name.ToString();
 
-                    // Đăng ký kiểu tùy chỉnh từ mã nguồn nếu chưa được xử lý
-                    if (!string.IsNullOrEmpty(sourceCode))
-                    {
-                        _typeManager.RegisterTypeAliasesFromSourceCode(sourceCode);
-                    }
                 }
 
                 // Get variable type
                 var type = cursor.Type;
                 string typeName = type.Spelling.ToString();
-
-                // Phát hiện kiểu gốc nếu có mã nguồn
-                string originalTypeName = typeName;
-                if (!string.IsNullOrEmpty(sourceCode))
-                {
-                    originalTypeName = _typeManager.DetectOriginalTypeFromSourceCode(typeName, sourceCode, (int)line);
-                }
 
                 // Determine variable scope
                 VariableScope scope = DetermineScope(cursor);
@@ -89,7 +77,7 @@ namespace C_TestForge.Parser
                 // Check attributes
                 bool isConst = typeName.Contains("const");
                 bool isVolatile = typeName.Contains("volatile");
-                bool isReadOnly = false;
+                bool isReadOnly = scope == VariableScope.Rom ? true : false ;
 
                 // Extract default value if available
                 string defaultValue = null;
@@ -112,8 +100,8 @@ namespace C_TestForge.Parser
                 {
                     Name = variableName,
                     TypeName = typeName,
-                    OriginalTypeName = originalTypeName,  // Lưu kiểu gốc
-                    IsCustomType = originalTypeName != typeName,  // Đánh dấu là kiểu tùy chỉnh
+                    //OriginalTypeName = originalTypeName,  // Lưu kiểu gốc
+                    //IsCustomType = originalTypeName != typeName,  // Đánh dấu là kiểu tùy chỉnh
                     VariableType = variableType,
                     Scope = scope,
                     DefaultValue = defaultValue,
@@ -309,18 +297,52 @@ namespace C_TestForge.Parser
                     return VariableType.Enum;
 
                 case CXTypeKind.CXType_Float:
-                case CXTypeKind.CXType_Double:
-                case CXTypeKind.CXType_LongDouble:
                     return VariableType.Float;
+
+                case CXTypeKind.CXType_Double:
+                    return VariableType.Double;
+
+                case CXTypeKind.CXType_LongDouble:
+                    return VariableType.LongDouble;
 
                 case CXTypeKind.CXType_Bool:
                     return VariableType.Bool;
 
                 case CXTypeKind.CXType_Char_S:
-                case CXTypeKind.CXType_Char_U:
                 case CXTypeKind.CXType_SChar:
-                case CXTypeKind.CXType_UChar:
                     return VariableType.Char;
+
+                case CXTypeKind.CXType_Char_U:
+                case CXTypeKind.CXType_UChar:
+                    return VariableType.UChar;
+
+                case CXTypeKind.CXType_UShort:
+                    return VariableType.UShort;
+
+                case CXTypeKind.CXType_ULong:
+                    return VariableType.ULong;
+
+                case CXTypeKind.CXType_ULongLong:
+                    return VariableType.ULongLong;
+
+                case CXTypeKind.CXType_UInt:
+                    return VariableType.UInt;
+
+                case CXTypeKind.CXType_Short:
+                    return VariableType.Short;
+
+                case CXTypeKind.CXType_Int:
+                    return VariableType.Int;
+
+                case CXTypeKind.CXType_Long:
+                    return VariableType.Long;
+
+                case CXTypeKind.CXType_LongLong:
+                    return VariableType.LongLong;
+
+                case CXTypeKind.CXType_Auto:
+                    return VariableType.Auto;
+
 
                 default:
                     // Handle integer types

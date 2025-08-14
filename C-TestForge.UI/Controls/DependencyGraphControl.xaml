@@ -1,0 +1,261 @@
+<UserControl x:Class="C_TestForge.UI.Controls.DependencyGraphControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <materialDesign:Card Grid.Row="0" Margin="0,0,0,12" UniformCornerRadius="8"
+                           materialDesign:ShadowAssist.ShadowDepth="Depth1">
+            <Grid Margin="20,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Graph" 
+                                           Foreground="{StaticResource AccentColor}" 
+                                           VerticalAlignment="Center" Margin="0,0,12,0" Width="24" Height="24"/>
+                    <StackPanel>
+                        <TextBlock Text="Dependency Graph" Style="{StaticResource HeadingStyle}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding ProjectAnalysisResult.DependencyGraph.SourceFiles.Count, StringFormat='Total: {0} files in graph'}" 
+                                 Style="{StaticResource SubheadingStyle}"/>
+                    </StackPanel>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="Export Graph" Style="{StaticResource OutlinedButtonStyle}"
+                          Command="{Binding ExportDependencyGraphCommand}" 
+                          Margin="0,0,8,0">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Export" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
+                    <Button Content="Visualize" Style="{StaticResource PrimaryButtonStyle}"
+                          Command="{Binding VisualizeDependencyGraphCommand}">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="GraphOutline" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </materialDesign:Card>
+        
+        <!-- Filter and View Options -->
+        <materialDesign:Card Grid.Row="1" Margin="0,0,0,12" UniformCornerRadius="8"
+                           materialDesign:ShadowAssist.ShadowDepth="Depth1">
+            <Grid Margin="16,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" 
+                       Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                       materialDesign:HintAssist.Hint="Search files by name or path..."
+                       Text="{Binding DependencySearchText, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,0,12,0"/>
+                
+                <ComboBox Grid.Column="1" Width="120"
+                        Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                        materialDesign:HintAssist.Hint="File Type"
+                        ItemsSource="{Binding AvailableFileTypes}"
+                        SelectedItem="{Binding SelectedFileTypeFilter}"
+                        Margin="0,0,12,0"/>
+                
+                <ToggleButton Grid.Column="2" Content="Show Only Dependencies" 
+                            Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}"
+                            IsChecked="{Binding ShowOnlyWithDependencies}"
+                            Margin="0,0,8,0" Padding="8,4"/>
+                
+                <Button Grid.Column="3" Content="Analyze Cycles" 
+                      Style="{StaticResource SecondaryButtonStyle}"
+                      Command="{Binding AnalyzeDependencyCyclesCommand}"/>
+            </Grid>
+        </materialDesign:Card>
+        
+        <!-- Dependency Graph Table -->
+        <materialDesign:Card Grid.Row="2" UniformCornerRadius="8"
+                           materialDesign:ShadowAssist.ShadowDepth="Depth1">
+            <DataGrid ItemsSource="{Binding FilteredDependencyFiles}" 
+                    Style="{StaticResource ModernDataGridStyle}"
+                    materialDesign:DataGridAssist.ColumnHeaderPadding="8,4" 
+                    Margin="8" CanUserAddRows="False" CanUserDeleteRows="False"
+                    SelectedItem="{Binding SelectedDependencyFile}">
+                <DataGrid.Columns>
+                    <!-- File Name with Type Icon -->
+                    <DataGridTemplateColumn Header="File" Width="250" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="{Binding FileType, Converter={StaticResource FileTypeToIconConverter}}" 
+                                                           Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                           Foreground="{Binding FileType, Converter={StaticResource FileTypeToColorConverter}}"/>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" FontWeight="Medium"/>
+                                        <TextBlock Text="{Binding FilePath}" FontSize="10" 
+                                                 Foreground="{StaticResource SecondaryText}"
+                                                 TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- File Type Badge -->
+                    <DataGridTemplateColumn Header="Type" Width="100" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding FileType, Converter={StaticResource FileTypeToColorConverter}}" 
+                                      CornerRadius="12" Padding="8,4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding FileType}" 
+                                             Foreground="White" FontSize="10" FontWeight="Medium"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Dependencies Count -->
+                    <DataGridTemplateColumn Header="Dependencies" Width="120" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialDesign:PackIcon Kind="ArrowRight" Width="14" Height="14" 
+                                                           VerticalAlignment="Center" Margin="0,0,4,0"
+                                                           Foreground="{StaticResource AccentColor}"/>
+                                    <TextBlock Text="{Binding DirectDependencies.Count}" VerticalAlignment="Center" FontWeight="Medium"/>
+                                    <Button Style="{StaticResource MaterialDesignIconButton}" 
+                                          ToolTip="View Dependencies"
+                                          Command="{Binding DataContext.ViewDependenciesCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                          CommandParameter="{Binding}"
+                                          Width="24" Height="24" Padding="2" Margin="4,0,0,0"
+                                          Visibility="{Binding DirectDependencies.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                                        <materialDesign:PackIcon Kind="Eye" Width="12" Height="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Dependent Files Count -->
+                    <DataGridTemplateColumn Header="Dependents" Width="120" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialDesign:PackIcon Kind="ArrowLeft" Width="14" Height="14" 
+                                                           VerticalAlignment="Center" Margin="0,0,4,0"
+                                                           Foreground="{StaticResource WarningColor}"/>
+                                    <TextBlock Text="{Binding DependentFiles.Count}" VerticalAlignment="Center" FontWeight="Medium"/>
+                                    <Button Style="{StaticResource MaterialDesignIconButton}" 
+                                          ToolTip="View Dependents"
+                                          Command="{Binding DataContext.ViewDependentsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                          CommandParameter="{Binding}"
+                                          Width="24" Height="24" Padding="2" Margin="4,0,0,0"
+                                          Visibility="{Binding DependentFiles.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                                        <materialDesign:PackIcon Kind="Eye" Width="12" Height="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Depth Level -->
+                    <DataGridTemplateColumn Header="Depth" Width="80" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding DependencyDepth, Converter={StaticResource DepthToColorConverter}}" 
+                                      CornerRadius="50" Width="30" Height="30" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding DependencyDepth}" 
+                                             Foreground="White" FontWeight="Bold"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- File Path -->
+                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"
+                                      materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                <Setter Property="ToolTip" Value="{Binding FilePath}"/>
+                                <Setter Property="FontFamily" Value="{StaticResource CodeFont}"/>
+                                <Setter Property="FontSize" Value="11"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    
+                    <!-- Actions -->
+                    <DataGridTemplateColumn Header="Actions" Width="100" 
+                                          materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Button Style="{StaticResource MaterialDesignIconButton}" 
+                                          ToolTip="Analyze File"
+                                          Command="{Binding DataContext.AnalyzeFileCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                          CommandParameter="{Binding}"
+                                          Width="28" Height="28" Padding="4">
+                                        <materialDesign:PackIcon Kind="FileSearch" Width="16" Height="16"/>
+                                    </Button>
+                                    <Button Style="{StaticResource MaterialDesignIconButton}" 
+                                          ToolTip="Open in Editor"
+                                          Command="{Binding DataContext.OpenFileCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                          CommandParameter="{Binding}"
+                                          Width="28" Height="28" Padding="4">
+                                        <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16"/>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+                
+                <!-- Row Style with Conditional Background -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <Setter Property="Height" Value="50"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasCircularDependency}" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+                                <Setter Property="Opacity" Value="0.1"/>
+                            </DataTrigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentColorLight}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </materialDesign:Card>
+    </Grid>
+</UserControl>

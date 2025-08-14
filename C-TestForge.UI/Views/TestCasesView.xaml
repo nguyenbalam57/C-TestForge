@@ -1,0 +1,481 @@
+﻿<UserControl x:Class="C_TestForge.UI.Views.TestCasesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:C_TestForge.UI.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800"
+             Background="{StaticResource AppBackground}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <materialDesign:Card Grid.Row="0" Margin="16,16,16,0" UniformCornerRadius="8"
+                           materialDesign:ShadowAssist.ShadowDepth="Depth1">
+            <Grid Margin="20,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                
+                <!-- Header Title -->
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Test Case Management" Style="{StaticResource HeadingStyle}" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding TestCases.Count, StringFormat='Total: {0} test cases'}" 
+                             Style="{StaticResource SubheadingStyle}"/>
+                </StackPanel>
+
+                <!-- Actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Create Test Case" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,0"
+                          Command="{Binding CreateTestCaseCommand}">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="PlusCircleOutline" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
+                    <Button Content="Generate" Style="{StaticResource SecondaryButtonStyle}" 
+                          Command="{Binding GenerateTestCasesCommand}">
+                        <Button.ContentTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="AutoFix" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </Button.ContentTemplate>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </materialDesign:Card>
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="16,16,16,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Test Cases List Section -->
+            <materialDesign:Card Grid.Column="0" UniformCornerRadius="8"
+                               materialDesign:ShadowAssist.ShadowDepth="Depth1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Test Cases Header -->
+                    <Border Grid.Row="0" Background="{StaticResource AccentColor}" Height="48">
+                        <StackPanel Orientation="Horizontal" Margin="16,0" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="TestTube" Width="24" Height="24" 
+                                                   VerticalAlignment="Center" Foreground="White"/>
+                            <TextBlock Text="Test Cases" FontSize="16" FontWeight="Medium" 
+                                     Margin="12,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Filter -->
+                    <Grid Grid.Row="1" Margin="16,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBox Grid.Column="0" 
+                               materialDesign:HintAssist.Hint="Search test cases..."
+                               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                               Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                        
+                        <ComboBox Grid.Column="1" Width="100" Margin="8,0,0,0"
+                                materialDesign:HintAssist.Hint="Filter"
+                                SelectedIndex="0"
+                                SelectedItem="{Binding SelectedStatusFilter}"
+                                Style="{StaticResource MaterialDesignOutlinedComboBox}">
+                            <ComboBoxItem Content="All"/>
+                            <ComboBoxItem Content="Passed"/>
+                            <ComboBoxItem Content="Failed"/>
+                            <ComboBoxItem Content="Not Run"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- Test Cases List -->
+                    <Grid Grid.Row="2">
+                        <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderLight}">
+                            <!-- Empty Message when no test cases -->
+                            <TextBlock Text="No test cases available in the project" 
+                                   FontSize="14" Foreground="{StaticResource DisabledText}" 
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding HasTestCases, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                        </Border>
+
+                        <!-- Test Case List when has test cases -->
+                        <ListView ItemsSource="{Binding TestCases}" 
+                              SelectedItem="{Binding SelectedTestCase, Mode=TwoWay}"
+                              Visibility="{Binding HasTestCases, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ListView}}">
+                                        <materialDesign:Card Padding="12,8" UniformCornerRadius="4" Margin="4,2"
+                                                          materialDesign:ShadowAssist.ShadowDepth="Depth0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon -->
+                                                <Border Grid.Column="0" Width="32" Height="32" 
+                                                      Margin="0,0,12,0" CornerRadius="16">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Success">
+                                                                    <Setter Property="Background" Value="{StaticResource SuccessColor}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                                    <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="NotRun">
+                                                                    <Setter Property="Background" Value="{StaticResource DisabledText}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    
+                                                    <materialDesign:PackIcon Width="18" Height="18" 
+                                                                         HorizontalAlignment="Center"
+                                                                         VerticalAlignment="Center"
+                                                                         Foreground="White">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Success">
+                                                                        <Setter Property="Kind" Value="Check"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                                        <Setter Property="Kind" Value="Close"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="NotRun">
+                                                                        <Setter Property="Kind" Value="Minus"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Border>
+
+                                                <!-- Test Case Information -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Medium" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding FunctionName}" 
+                                                             Foreground="{StaticResource SecondaryText}" FontSize="12"/>
+                                                </StackPanel>
+
+                                                <!-- Actions -->
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32"
+                                                          ToolTip="Run test case" Margin="0,0,4,0"
+                                                          Command="{Binding DataContext.RunTestCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          CommandParameter="{Binding}">
+                                                        <materialDesign:PackIcon Kind="Play" Width="18" Height="18"/>
+                                                    </Button>
+                                                    <Button Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32"
+                                                          ToolTip="Delete test case"
+                                                          Command="{Binding DataContext.DeleteTestCaseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          CommandParameter="{Binding}">
+                                                        <materialDesign:PackIcon Kind="Delete" Width="18" Height="18"/>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </materialDesign:Card>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListViewItem">
+                                                <Border Background="{TemplateBinding Background}" 
+                                                       BorderThickness="0">
+                                                    <ContentPresenter />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                    </Grid>
+                    
+                    <!-- Import/Export Section -->
+                    <Border Grid.Row="3" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderLight}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12">
+                            <Button Style="{StaticResource TextButtonStyle}" Content="Import" Margin="8,0" 
+                                  Command="{Binding ImportTestCasesCommand}">
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Import" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                            <Button Style="{StaticResource TextButtonStyle}" Content="Export" Margin="8,0"
+                                  Command="{Binding ExportTestCasesCommand}">
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Export" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </materialDesign:Card>
+
+            <!-- Test Case Details -->
+            <materialDesign:Card Grid.Column="1" Margin="16,0,0,0" UniformCornerRadius="8"
+                               materialDesign:ShadowAssist.ShadowDepth="Depth1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Details Header -->
+                    <Border Grid.Row="0" Background="{StaticResource AccentColor}" Height="48">
+                        <TextBlock Text="Test Case Details" FontSize="16" FontWeight="Medium" 
+                                 Margin="16,0" VerticalAlignment="Center" Foreground="White"/>
+                    </Border>
+
+                    <!-- No Test Case Selected -->
+                    <Grid Grid.Row="1" 
+                        Visibility="{Binding SelectedTestCase, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Inverse}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,48">
+                            <materialDesign:PackIcon Kind="TestTubeEmpty" Width="80" Height="80" 
+                                                  HorizontalAlignment="Center" Foreground="{StaticResource DisabledText}"/>
+                            <TextBlock Text="No Test Case Selected" Style="{StaticResource HeadingStyle}"
+                                     HorizontalAlignment="Center" Margin="0,24,0,0"/>
+                            <TextBlock Text="Select a test case from the list to view its details"
+                                     Style="{StaticResource BodyTextStyle}" Foreground="{StaticResource SecondaryText}"
+                                     HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" 
+                                     MaxWidth="400" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Test Case Details Content -->
+                    <Grid Grid.Row="1"
+                        Visibility="{Binding SelectedTestCase, Converter={StaticResource NullToVisibilityConverter}}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,20">
+                                <!-- Header and Status -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <TextBlock Grid.Column="0" Text="{Binding SelectedTestCase.Name}" 
+                                             Style="{StaticResource HeadingStyle}" Margin="0"/>
+                                    
+                                    <Border Grid.Column="1" Padding="12,6" CornerRadius="16">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="Success">
+                                                        <Setter Property="Background" Value="{StaticResource SuccessColor}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="Failed">
+                                                        <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="NotRun">
+                                                        <Setter Property="Background" Value="{StaticResource DisabledText}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        
+                                        <TextBlock Foreground="White" FontSize="12" FontWeight="Medium">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="Success">
+                                                            <Setter Property="Text" Value="PASSED"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="Failed">
+                                                            <Setter Property="Text" Value="FAILED"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedTestCase.Status}" Value="NotRun">
+                                                            <Setter Property="Text" Value="NOT RUN"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Test Info Panel -->
+                                <materialDesign:Card UniformCornerRadius="8" Margin="0,16,0,0" 
+                                                  materialDesign:ShadowAssist.ShadowDepth="Depth0">
+                                    <StackPanel Margin="16">
+                                        <!-- Description -->
+                                        <TextBlock Text="Description" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <Border Background="#F5F5F5" Padding="12,8" CornerRadius="4" Margin="0,0,0,16">
+                                            <TextBlock Text="{Binding SelectedTestCase.Description}" 
+                                                     TextWrapping="Wrap" Foreground="{StaticResource SecondaryText}"/>
+                                        </Border>
+
+                                        <!-- Test Info -->
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Function: " 
+                                                     FontWeight="Medium" Margin="0,0,12,8"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTestCase.FunctionName}"/>
+                                            
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Type: " 
+                                                     FontWeight="Medium" Margin="0,0,12,8"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTestCase.Type}"/>
+                                            
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Created: " 
+                                                     FontWeight="Medium" Margin="0,0,12,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedTestCase.CreatedDate, StringFormat='{}{0:MM/dd/yyyy hh:mm tt}'}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </materialDesign:Card>
+
+                                <!-- Test Data -->
+                                <TabControl Style="{StaticResource MaterialDesignFilledTabControl}" Margin="0,16,0,0">
+                                    <TabItem Header="Inputs">
+                                        <DataGrid ItemsSource="{Binding SelectedTestCase.InputVariables}" 
+                                                Style="{StaticResource ModernDataGridStyle}" Margin="0,8">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="180" 
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="140"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </TabItem>
+                                    <TabItem Header="Expected Outputs">
+                                        <DataGrid ItemsSource="{Binding SelectedTestCase.OutputVariables}" 
+                                                Style="{StaticResource ModernDataGridStyle}" Margin="0,8">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="180" 
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="140"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </TabItem>
+                                    <TabItem Header="Actual Results">
+                                        <DataGrid ItemsSource="{Binding SelectedTestCase.ActualOutputs}" 
+                                                Style="{StaticResource ModernDataGridStyle}" Margin="0,8">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="170" 
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="120"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"
+                                                                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,4"/>
+                                                <DataGridTemplateColumn Header="Status" Width="80"
+                                                                      materialDesign:DataGridAssist.ColumnHeaderPadding="8,4">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Grid>
+                                                                <materialDesign:PackIcon Kind="Check" Width="18" Height="18"
+                                                                                      Foreground="{StaticResource SuccessColor}"
+                                                                                      VerticalAlignment="Center"
+                                                                                      HorizontalAlignment="Center"
+                                                                                      Visibility="{Binding IsMatch, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                <materialDesign:PackIcon x:Name="errorIcon" Kind="Close" Width="18" Height="18"
+                                                                                      Foreground="{StaticResource ErrorColor}"
+                                                                                      VerticalAlignment="Center"
+                                                                                      HorizontalAlignment="Center"
+                                                                                      Visibility="{Binding IsMatch, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </TabItem>
+                                </TabControl>
+
+                                <!-- Actions -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+                                    <Button Content="Edit" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,12,0"
+                                          Command="{Binding EditTestCaseCommand}" CommandParameter="{Binding SelectedTestCase}">
+                                        <Button.ContentTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="Pencil" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </Button.ContentTemplate>
+                                    </Button>
+                                    <Button Content="Run Test" Style="{StaticResource PrimaryButtonStyle}"
+                                          Command="{Binding RunTestCaseCommand}" CommandParameter="{Binding SelectedTestCase}">
+                                        <Button.ContentTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="Play" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </Button.ContentTemplate>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </materialDesign:Card>
+        </Grid>
+    </Grid>
+</UserControl>

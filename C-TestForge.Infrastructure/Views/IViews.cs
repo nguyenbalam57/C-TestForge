@@ -7,27 +7,79 @@ using System.Threading.Tasks;
 namespace C_TestForge.Infrastructure.Views
 {
     /// <summary>
-    /// Marker interface for TestCaseManagementView
+    /// Base interface for views
     /// </summary>
-    public interface ITestCaseManagementView { }
+    public interface IView
+    {
+    }
 
     /// <summary>
-    /// Marker interface for TestCaseEditorDialog
+    /// Dashboard view interface
     /// </summary>
-    public interface ITestCaseEditorDialog { }
+    public interface IDashboardView : IView
+    {
+    }
 
     /// <summary>
-    /// Marker interface for TestCaseComparisonDialog
+    /// Project explorer view interface
     /// </summary>
-    public interface ITestCaseComparisonDialog { }
+    public interface IProjectExplorerView : IView
+    {
+    }
 
     /// <summary>
-    /// Marker interface for GenerateTestCaseDialog
+    /// Source analysis view interface
     /// </summary>
-    public interface IGenerateTestCaseDialog { }
+    public interface ISourceAnalysisView : IView
+    {
+    }
 
     /// <summary>
-    /// Marker interface for ConfirmationDialog
+    /// Test cases management view interface
     /// </summary>
-    public interface IConfirmationDialog { }
+    public interface ITestCasesView : IView
+    {
+    }
+
+    /// <summary>
+    /// Test case management view interface
+    /// </summary>
+    public interface ITestCaseManagementView : IView
+    {
+    }
+
+    /// <summary>
+    /// Dialog interface for test case editor
+    /// </summary>
+    public interface ITestCaseEditorDialog : IView
+    {
+    }
+
+    /// <summary>
+    /// Dialog interface for test case comparison
+    /// </summary>
+    public interface ITestCaseComparisonDialog : IView
+    {
+    }
+
+    /// <summary>
+    /// Dialog interface for generating test cases
+    /// </summary>
+    public interface IGenerateTestCaseDialog : IView
+    {
+    }
+
+    /// <summary>
+    /// Dialog interface for confirmation
+    /// </summary>
+    public interface IConfirmationDialog : IView
+    {
+    }
+
+    /// <summary>
+    /// Type mapping manager view interface
+    /// </summary>
+    public interface ITypeMappingManagerView : IView
+    {
+    }
 }

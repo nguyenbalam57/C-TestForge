@@ -12,6 +12,7 @@ namespace C_TestForge.Models.Core
     public enum VariableType
     {
         Primitive,
+        Auto,
         /// <summary>
         /// Array type
         /// </summary>
@@ -36,14 +37,25 @@ namespace C_TestForge.Models.Core
         /// Floating point type
         /// </summary>
         Float,
+        Double,
+        LongDouble,
         /// <summary>
         /// Character type
         /// </summary>
         Char,
+        UChar,
         /// <summary>
         /// Boolean type
         /// </summary>
         Bool,
+        UShort,
+        ULong,
+        ULongLong,
+        UInt,
+        Short,
+        Int,
+        Long,
+        LongLong,
         /// <summary>
         /// Integer type
         /// </summary>

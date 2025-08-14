@@ -51,6 +51,20 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="fileName">Optional file name for the source</param>
         /// <returns>List of extracted functions</returns>
         Task<List<CFunction>> ExtractFunctionsFromCodeAsync(SourceFile sourceFile, string fileName = "inline.c");
+
+        /// <summary>
+        /// Phân tích toàn bộ dự án C/C++ theo quy trình hoàn chỉnh
+        /// </summary>
+        /// <param name="projectRootPath">Đường dẫn thư mục gốc của dự án</param>
+        /// <returns>Kết quả phân tích dự án hoàn chỉnh bao gồm biến, hàm, macro và phụ thuộc</returns>
+        Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(string projectRootPath);
+
+        /// <summary>
+        /// Trích xuất tất cả các điều kiện tiền xử lý từ kết quả phân tích dự án
+        /// </summary>
+        /// <param name="analysisResult">Kết quả phân tích dự án</param>
+        /// <returns>Danh sách các điều kiện tiền xử lý duy nhất</returns>
+        List<string> ExtractPreprocessorConditionsFromAnalysisResult(ProjectAnalysisResult analysisResult);
     }
 
 }

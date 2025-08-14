@@ -1,0 +1,373 @@
+<UserControl x:Class="C_TestForge.UI.Views.SourceAnalysisView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:C_TestForge.UI.Views"
+             xmlns:controls="clr-namespace:C_TestForge.UI.Controls"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800"
+             Background="{StaticResource AppBackground}">
+    
+    <Grid Margin="0">
+        <!-- Main Layout -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        
+        <!-- Header Section with Analysis Actions and Summary -->
+        <materialDesign:Card Grid.Row="0" Margin="16,16,16,0" UniformCornerRadius="8"
+                           materialDesign:ShadowAssist.ShadowDepth="Depth2">
+            <Grid Margin="24,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Title and Main Actions -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Header Title -->
+                    <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <materialDesign:PackIcon Kind="ChartAreaspline" 
+                                                   Foreground="{StaticResource AccentColor}" 
+                                                   VerticalAlignment="Center" Margin="0,0,12,0" Width="28" Height="28"/>
+                            <TextBlock Text="Source Code Analysis" Style="{StaticResource HeadingStyle}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedSourceFile.FileName, StringFormat='Current File: {0}'}" 
+                                 Style="{StaticResource SubheadingStyle}"
+                                 Visibility="{Binding SelectedSourceFile, Converter={StaticResource NullToVisibilityConverter}}"/>
+                        <TextBlock Text="{Binding ProjectAnalysisResult.ProjectPath, StringFormat='Project: {0}'}" 
+                                 Style="{StaticResource SubheadingStyle}"
+                                 Visibility="{Binding ProjectAnalysisResult, Converter={StaticResource NullToVisibilityConverter}}"/>
+                    </StackPanel>
+
+                    <!-- Analysis Action Buttons -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <ComboBox Width="200" ItemsSource="{Binding SourceFiles}" 
+                                    SelectedItem="{Binding SelectedSourceFile}"
+                                    DisplayMemberPath="FileName" 
+                                    materialDesign:HintAssist.Hint="Select source file"
+                                    Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                                    Margin="0,0,12,0"/>
+                            <Button Content="Analyze File" Style="{StaticResource PrimaryButtonStyle}" 
+                                  Command="{Binding AnalyzeSourceFileCommand}" 
+                                  CommandParameter="{Binding SelectedSourceFile}"
+                                  Margin="0,0,8,0" MinWidth="120">
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Microscope" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Analyze Complete Project" Style="{StaticResource SecondaryButtonStyle}" 
+                                  Command="{Binding AnalyzeCompleteProjectCommand}"
+                                  MinWidth="180">
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="FolderSearch" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                            <Button Content="Settings" Style="{StaticResource OutlinedButtonStyle}" 
+                                  Command="{Binding ShowAnalysisOptionsCommand}"
+                                  Margin="8,0,0,0" Width="80">
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <materialDesign:PackIcon Kind="Settings" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+                
+                <!-- Analysis Summary (if available) -->
+                <Grid Grid.Row="1" Margin="0,16,0,0" 
+                      Visibility="{Binding ProjectAnalysisResult, Converter={StaticResource NullToVisibilityConverter}}">
+                    <Border Background="{StaticResource AccentColorLight}" CornerRadius="8" Padding="16,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="FileMultiple" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProjectAnalysisResult.ProcessedFileCount, StringFormat='{}{0} Files'}" 
+                                         VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="Function" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProjectAnalysisResult.Functions.Count, StringFormat='{}{0} Functions'}" 
+                                         VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="Variable" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProjectAnalysisResult.Variables.Count, StringFormat='{}{0} Variables'}" 
+                                         VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="Pound" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProjectAnalysisResult.Macros.Count, StringFormat='{}{0} Macros'}" 
+                                         VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="Timer" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProjectAnalysisResult.Duration, StringFormat='{}{0:mm\\:ss}'}" 
+                                         VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="5" Content="View Detailed Report" Style="{StaticResource OutlinedButtonStyle}"
+                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                  Command="{Binding ShowProjectAnalysisReportCommand}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+                
+                <!-- Quick Stats for Current File (if available) -->
+                <Grid Grid.Row="2" Margin="0,12,0,0" 
+                      Visibility="{Binding SelectedSourceFile, Converter={StaticResource NullToVisibilityConverter}}">
+                    <Border Background="{StaticResource InfoColor}" CornerRadius="6" Padding="12,8" Opacity="0.1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Current File: " FontWeight="Medium" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding SelectedSourceFile.LineCount, StringFormat='{}{0} lines'}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding Functions.Count, StringFormat='{}{0} functions'}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding Variables.Count, StringFormat='{}{0} variables'}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding Definitions.Count, StringFormat='{}{0} definitions'}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </materialDesign:Card>
+
+        <!-- No Analysis Data State -->
+        <materialDesign:Card Grid.Row="1" Margin="16" UniformCornerRadius="8"
+                           Visibility="{Binding HasAnalysisData, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+            <Grid>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,64">
+                    <materialDesign:PackIcon Kind="ChartAreasplineVariant" Width="96" Height="96" 
+                                          HorizontalAlignment="Center" Foreground="{StaticResource DisabledText}"
+                                          Opacity="0.5"/>
+                    <TextBlock Text="Ready for Analysis" Style="{StaticResource HeadingStyle}"
+                             HorizontalAlignment="Center" Margin="0,24,0,8"/>
+                    <TextBlock Text="Select a source file or analyze a complete project to view detailed analysis results"
+                             Style="{StaticResource BodyTextStyle}" Foreground="{StaticResource SecondaryText}"
+                             HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" 
+                             MaxWidth="500" Margin="0,0,0,32"/>
+                    
+                    <!-- Quick Start Actions -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Content="Analyze Project Folder"
+                              Command="{Binding AnalyzeCompleteProjectCommand}"
+                              Margin="0,0,16,0" Padding="16,12" FontSize="14">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderSearch" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButtonStyle}" Content="Browse Project Explorer"
+                              Command="{Binding NavigateCommand}" CommandParameter="ProjectExplorer"
+                              Padding="16,12" FontSize="14">
+                            <Button.ContentTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderOpen" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </Button.ContentTemplate>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </materialDesign:Card>
+        
+        <!-- Analysis Results - Modular Tabs -->
+        <materialDesign:Card Grid.Row="1" Margin="16" UniformCornerRadius="8"
+                           Visibility="{Binding HasAnalysisData, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TabControl Style="{StaticResource MaterialDesignFilledTabControl}" 
+                      TabStripPlacement="Top" Background="Transparent">
+                
+                <!-- Project Overview Tab -->
+                <TabItem Visibility="{Binding ProjectAnalysisResult, Converter={StaticResource NullToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ViewDashboard" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Project Overview"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:ProjectOverviewControl DataContext="{Binding}"/>
+                </TabItem>
+                
+                <!-- Source Code Tab -->
+                <TabItem Visibility="{Binding SelectedSourceFile, Converter={StaticResource NullToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileDocument" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Source Code"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:SourceCodeViewer SourceCode="{Binding SelectedSourceFile.Content}"
+                                             HighlightedLine="{Binding SelectedLineNumber}"/>
+                </TabItem>
+
+                <!-- Definitions Tab -->
+                <TabItem Visibility="{Binding Definitions.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Pound" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Definitions"/>
+                            <Border Background="{StaticResource AccentColor}" CornerRadius="8" Padding="4,2" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Definitions.Count}" Foreground="White" FontSize="10"/>
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:DefinitionsAnalysisControl DataContext="{Binding}"/>
+                </TabItem>
+
+                <!-- Variables Tab -->
+                <TabItem Visibility="{Binding Variables.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Variable" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Variables"/>
+                            <Border Background="{StaticResource AccentColor}" CornerRadius="8" Padding="4,2" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Variables.Count}" Foreground="White" FontSize="10"/>
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:VariablesAnalysisControl DataContext="{Binding}"/>
+                </TabItem>
+
+                <!-- Functions Tab -->
+                <TabItem Visibility="{Binding Functions.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Function" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Functions"/>
+                            <Border Background="{StaticResource AccentColor}" CornerRadius="8" Padding="4,2" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Functions.Count}" Foreground="White" FontSize="10"/>
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:FunctionsAnalysisControl DataContext="{Binding}"/>
+                </TabItem>
+
+                <!-- Preprocessor Tab -->
+                <TabItem Visibility="{Binding ConditionalDirectives.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="CodeTags" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Preprocessor"/>
+                            <Border Background="{StaticResource AccentColor}" CornerRadius="8" Padding="4,2" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding ConditionalDirectives.Count}" Foreground="White" FontSize="10"/>
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <!-- Preprocessor analysis will be implemented separately -->
+                    <Grid Margin="32">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <materialDesign:PackIcon Kind="CodeTags" Width="48" Height="48" 
+                                                   HorizontalAlignment="Center" Foreground="{StaticResource AccentColor}"/>
+                            <TextBlock Text="Preprocessor Analysis" Style="{StaticResource HeadingStyle}"
+                                     HorizontalAlignment="Center" Margin="0,16,0,8"/>
+                            <TextBlock Text="Coming Soon - Advanced preprocessor directive analysis"
+                                     Style="{StaticResource BodyTextStyle}" Foreground="{StaticResource SecondaryText}"
+                                     HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+                
+                <!-- Dependencies Tab -->
+                <TabItem Visibility="{Binding ProjectAnalysisResult.DependencyGraph, Converter={StaticResource NullToVisibilityConverter}}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Graph" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Dependencies"/>
+                            <Border Background="{StaticResource AccentColor}" CornerRadius="8" Padding="4,2" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding ProjectAnalysisResult.DependencyGraph.SourceFiles.Count}" Foreground="White" FontSize="10"/>
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <controls:DependencyGraphControl DataContext="{Binding}"/>
+                </TabItem>
+            </TabControl>
+        </materialDesign:Card>
+        
+        <!-- Analysis Progress Overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="2" Background="{StaticResource DarkOverlay}"
+              Visibility="{Binding IsAnalyzing, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <materialDesign:Card Background="White" Width="380" Height="200" 
+                              UniformCornerRadius="12" Padding="32"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              materialDesign:ShadowAssist.ShadowDepth="Depth3">
+                <StackPanel VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="Loading" Width="56" Height="56" 
+                                           HorizontalAlignment="Center" Margin="0,0,0,20"
+                                           Foreground="{StaticResource AccentColor}"
+                                           RenderTransformOrigin="0.5,0.5">
+                        <materialDesign:PackIcon.RenderTransform>
+                            <RotateTransform x:Name="SpinTransform"/>
+                        </materialDesign:PackIcon.RenderTransform>
+                        <materialDesign:PackIcon.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="SpinTransform"
+                                                       Storyboard.TargetProperty="Angle"
+                                                       From="0" To="360" Duration="0:0:2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </materialDesign:PackIcon.Triggers>
+                    </materialDesign:PackIcon>
+                    
+                    <TextBlock Text="Analyzing Source Code..." 
+                             FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" 
+                             Margin="0,0,0,8" Foreground="{StaticResource PrimaryText}"/>
+                    <TextBlock Text="{Binding StatusMessage}" 
+                             FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,20"
+                             Foreground="{StaticResource SecondaryText}" TextWrapping="Wrap" TextAlignment="Center"/>
+                    
+                    <ProgressBar IsIndeterminate="True" Height="6" Width="320" 
+                               Background="{StaticResource BorderLight}" Foreground="{StaticResource AccentColor}"/>
+                    
+                    <TextBlock Text="This may take several minutes for large projects..." 
+                             Margin="0,20,0,0" FontSize="12" FontStyle="Italic"
+                             Foreground="{StaticResource SecondaryText}" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </materialDesign:Card>
+        </Grid>
+    </Grid>
+</UserControl>

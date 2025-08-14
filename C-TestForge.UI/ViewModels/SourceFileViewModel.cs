@@ -15,7 +15,7 @@ namespace C_TestForge.UI.ViewModels
 {
     public class SourceFileViewModel : ObservableObject
     {
-        private readonly IParser _parser;
+        private readonly IClangSharpParserService _parser;
         private readonly ILogger<SourceFileViewModel> _logger;
 
         private SourceFile _sourceFile;
@@ -30,7 +30,7 @@ namespace C_TestForge.UI.ViewModels
         private CVariable _selectedVariable;
         private CPreprocessorDirective _selectedPreprocessor;
 
-        public SourceFileViewModel(IParser parser, ILogger<SourceFileViewModel> logger)
+        public SourceFileViewModel(IClangSharpParserService parser, ILogger<SourceFileViewModel> logger)
         {
             _parser = parser;
             _logger = logger;

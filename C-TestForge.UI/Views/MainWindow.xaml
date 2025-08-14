@@ -4,236 +4,305 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:C_TestForge.UI.Views"
-        xmlns:vm="clr-namespace:C_TestForge.UI.ViewModels"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:prism="http://prismlibrary.com/"
         mc:Ignorable="d"
-        Title="{Binding ProjectName, StringFormat='C-TestForge - {0}'}" 
-        Height="800" Width="1200">
-
+        Title="C-TestForge - Source Analysis &amp; Test Generation Tool" 
+        Height="900" Width="1600"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        WindowStartupLocation="CenterScreen">
+    
     <Window.Resources>
-        <Style TargetType="TabItem">
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="15,5" />
-            <Setter Property="Margin" Value="5" />
-        </Style>
-        <Style TargetType="DataGrid">
-            <Setter Property="Margin" Value="5" />
-            <Setter Property="AutoGenerateColumns" Value="False" />
-            <Setter Property="IsReadOnly" Value="True" />
-            <Setter Property="SelectionMode" Value="Single" />
-            <Setter Property="HeadersVisibility" Value="All" />
-            <Setter Property="GridLinesVisibility" Value="All" />
-            <Setter Property="AlternatingRowBackground" Value="#FFF0F0F0" />
+        <!-- Navigation Button Style (Redesigned) -->
+        <Style x:Key="NavButtonStyle" TargetType="RadioButton" BasedOn="{StaticResource MaterialDesignTabRadioButton}">
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Foreground" Value="{StaticResource SidebarText}"/>
+            <Setter Property="materialDesign:RippleAssist.Feedback" Value="{StaticResource AccentLight}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="4,4,4,4"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <Border x:Name="Border" 
+                                Background="Transparent" 
+                                BorderBrush="Transparent" 
+                                CornerRadius="8" 
+                                Margin="4,2">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" TargetName="Border" Value="{StaticResource AccentLight}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" TargetName="Border" Value="{StaticResource SidebarBackgroundActive}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
+    <!-- Main Grid -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Main Menu -->
-        <Menu Grid.Row="0">
-            <MenuItem Header="File">
-                <MenuItem Header="New Project" Command="{Binding NewProjectCommand}" />
-                <MenuItem Header="Open Project" Command="{Binding OpenProjectCommand}" />
-                <MenuItem Header="Save Project" Command="{Binding SaveProjectCommand}" />
-                <Separator />
-                <MenuItem Header="Close Project" Command="{Binding CloseProjectCommand}" />
-                <Separator />
-                <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
-            </MenuItem>
-            <MenuItem Header="Project">
-                <MenuItem Header="Parse Source Files" Command="{Binding ParseSourceFilesCommand}" />
-                <MenuItem Header="Add Source File" Command="{Binding AddSourceFileCommand}" />
-                <MenuItem Header="Remove Source File" Command="{Binding RemoveSourceFileCommand}" 
-                          CommandParameter="{Binding SelectedSourceFile}" />
-            </MenuItem>
-            <MenuItem Header="Test Cases">
-                <MenuItem Header="Import Test Cases" Command="{Binding ImportTestCasesCommand}" />
-                <MenuItem Header="Export Test Cases" Command="{Binding ExportTestCasesCommand}" />
-                <Separator />
-                <MenuItem Header="Generate Test Cases" Command="{Binding GenerateTestCasesCommand}" />
-            </MenuItem>
-            <MenuItem Header="Tools">
-                <MenuItem Header="Project Settings" Command="{Binding ProjectSettingsCommand}" />
-                <MenuItem Header="Analysis Options" Command="{Binding AnalysisOptionsCommand}" />
-            </MenuItem>
-            <MenuItem Header="Help">
-                <MenuItem Header="About" Command="{Binding AboutCommand}" />
-            </MenuItem>
-        </Menu>
+        <!-- Left Navigation Panel -->
+        <Border x:Name="SidebarBorder" Grid.Column="0" 
+               Background="{StaticResource SidebarBackground}" 
+               BorderBrush="{StaticResource SidebarBorderBrush}" 
+               BorderThickness="0,0,1,0"
+               Width="{Binding SidebarWidth}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-        <!-- Main content area -->
-        <Grid Grid.Row="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <!-- Toolbar -->
-            <ToolBar Grid.Row="0">
-                <Button ToolTip="New Project" Command="{Binding NewProjectCommand}">
-                    <materialDesign:PackIcon Kind="File" />
+                <!-- Logo and App Name as Toggle -->
+                <Button Grid.Row="0" Margin="8,16,8,8" Background="Transparent" BorderThickness="0"
+                        ToolTip="Thu gọn/Mở rộng menu"
+                        Command="{Binding ToggleNavigationDrawerCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{StaticResource AccentLight}" CornerRadius="12" Padding="8" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialDesign:PackIcon Kind="TestTubeEmpty" Width="32" Height="32" Foreground="White"/>
+                                                <TextBlock Text="C-TestForge" FontSize="20" FontWeight="Medium" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
                 </Button>
-                <Button ToolTip="Open Project" Command="{Binding OpenProjectCommand}">
-                    <materialDesign:PackIcon Kind="FolderOpen" />
-                </Button>
-                <Button ToolTip="Save Project" Command="{Binding SaveProjectCommand}">
-                    <materialDesign:PackIcon Kind="ContentSave" />
-                </Button>
-                <Separator />
-                <Button ToolTip="Parse Source Files" Command="{Binding ParseSourceFilesCommand}">
-                    <materialDesign:PackIcon Kind="CodeTags" />
-                </Button>
-                <Button ToolTip="Analyze Source File" Command="{Binding AnalyzeSourceFileCommand}" 
-                        CommandParameter="{Binding SelectedSourceFile}">
-                    <materialDesign:PackIcon Kind="Microscope" />
-                </Button>
-                <Separator />
-                <Button ToolTip="Import Test Cases" Command="{Binding ImportTestCasesCommand}">
-                    <materialDesign:PackIcon Kind="Import" />
-                </Button>
-                <Button ToolTip="Export Test Cases" Command="{Binding ExportTestCasesCommand}">
-                    <materialDesign:PackIcon Kind="Export" />
-                </Button>
-            </ToolBar>
 
-            <!-- Main Content -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="300" />
-                    <ColumnDefinition Width="5" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                <!-- Navigation Items -->
+                <StackPanel Grid.Row="1" Margin="0,24,0,0">
+                    <!-- Dashboard -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=Dashboard, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Dashboard">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="ViewDashboard" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="Dashboard" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
 
-                <!-- Left Panel - Project Explorer -->
-                <Grid Grid.Column="0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                    <!-- Project Explorer -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=ProjectExplorer, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="ProjectExplorer">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="FileTreeOutline" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="Project Explorer" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
 
-                    <!-- Project Info Header -->
-                    <StackPanel Grid.Row="0" Margin="5">
-                        <TextBlock Text="Project Explorer" FontWeight="Bold" />
-                        <TextBlock Text="{Binding ProjectName}" Margin="0,5,0,0" />
-                    </StackPanel>
+                    <!-- Source Analysis -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=SourceAnalysis, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="SourceAnalysis">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="FileCodeOutline" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="Source Analysis" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
 
-                    <!-- Source Files Tree -->
-                    <TabControl Grid.Row="1" Margin="5">
-                        <TabItem Header="Source Files">
-                            <ListBox ItemsSource="{Binding SourceFiles}" 
-                                     SelectedItem="{Binding SelectedSourceFile, Mode=TwoWay}"
-                                     DisplayMemberPath="FileName" />
-                        </TabItem>
-                        <TabItem Header="Test Cases">
-                            <ListBox ItemsSource="{Binding TestCases}" 
-                                     SelectedItem="{Binding SelectedTestCase, Mode=TwoWay}"
-                                     DisplayMemberPath="Name" />
-                        </TabItem>
-                    </TabControl>
-                </Grid>
+                    <!-- Test Cases -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=TestCases, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="TestCases">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="ClipboardCheckOutline" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="Test Cases" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
+                    
+                    <!-- Separator -->
+                    <Separator Background="#30363D" Margin="16,16"/>
+                    
+                    <!-- Settings -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=Settings, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Settings">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="CogOutline" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="Settings" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
 
-                <!-- Splitter -->
-                <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" />
+                    <!-- About -->
+                    <RadioButton Style="{StaticResource NavButtonStyle}" 
+                                IsChecked="{Binding SelectedMenuItem, ConverterParameter=About, Converter={StaticResource EqualityConverter}}"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="About">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="InformationOutline" Width="24" Height="24" Margin="12,0,0,0" Foreground="{StaticResource SidebarIcon}"/>
+                            <TextBlock Text="About" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsNavigationDrawerExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
 
-                <!-- Right Panel - Analysis Results -->
-                <Grid Grid.Column="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Source File Info Header -->
-                    <StackPanel Grid.Row="0" Margin="5">
-                        <TextBlock Text="Source File:" FontWeight="Bold" />
-                        <TextBlock Text="{Binding SelectedSourceFile.FilePath}" />
-                    </StackPanel>
-
-                    <!-- Analysis Results Tabs -->
-                    <TabControl Grid.Row="1" Margin="5">
-                        <TabItem Header="Source Code">
-                            <TextBox Text="{Binding SelectedSourceFile.Content, Mode=OneWay}" 
-                                     IsReadOnly="True"
-                                     FontFamily="Consolas"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     VerticalScrollBarVisibility="Auto" />
-                        </TabItem>
-
-                        <TabItem Header="Definitions">
-                            <DataGrid ItemsSource="{Binding Definitions}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150" />
-                                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
-                                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100" />
-                                    <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
-                                    <DataGridCheckBoxColumn Header="Is Macro" Binding="{Binding IsMacro}" Width="70" />
-                                    <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsActive}" Width="70" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </TabItem>
-
-                        <TabItem Header="Variables">
-                            <DataGrid ItemsSource="{Binding Variables}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150" />
-                                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="120" />
-                                    <DataGridTextColumn Header="Scope" Binding="{Binding Scope}" Width="80" />
-                                    <DataGridTextColumn Header="Value" Binding="{Binding DefaultValue}" Width="*" />
-                                    <DataGridCheckBoxColumn Header="Is Static" Binding="{Binding IsStatic}" Width="70" />
-                                    <DataGridCheckBoxColumn Header="Is Const" Binding="{Binding IsConst}" Width="70" />
-                                    <DataGridCheckBoxColumn Header="Is Array" Binding="{Binding IsArray}" Width="70" />
-                                    <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </TabItem>
-
-                        <TabItem Header="Functions">
-                            <DataGrid ItemsSource="{Binding Functions}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="180" />
-                                    <DataGridTextColumn Header="Return Type" Binding="{Binding ReturnType}" Width="120" />
-                                    <DataGridTextColumn Header="Parameters" Binding="{Binding ParameterCount}" Width="80" />
-                                    <DataGridTextColumn Header="Complexity" Binding="{Binding Complexity}" Width="80" />
-                                    <DataGridCheckBoxColumn Header="Is Static" Binding="{Binding IsStatic}" Width="70" />
-                                    <DataGridCheckBoxColumn Header="Is Inline" Binding="{Binding IsInline}" Width="70" />
-                                    <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
-                                    <DataGridTextColumn Header="Source File" Binding="{Binding SourceFile}" Width="*" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </TabItem>
-
-                        <TabItem Header="Preprocessor">
-                            <DataGrid ItemsSource="{Binding ConditionalDirectives}">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100" />
-                                    <DataGridTextColumn Header="Condition" Binding="{Binding Condition}" Width="*" />
-                                    <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
-                                    <DataGridCheckBoxColumn Header="Is Active" Binding="{Binding IsActive}" Width="70" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </TabItem>
-                    </TabControl>
-                </Grid>
+                <!-- App Version -->
+                <StackPanel Grid.Row="2" Margin="16,8" HorizontalAlignment="Left">
+                    <TextBlock Text="v1.0.0" FontSize="12" Foreground="#8B949E"/>
+                </StackPanel>
             </Grid>
-        </Grid>
+        </Border>
 
-        <!-- Status Bar -->
-        <StatusBar Grid.Row="2">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}" />
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem>
-                <ProgressBar Width="100" Height="15" IsIndeterminate="{Binding IsAnalyzing}" 
-                             Visibility="{Binding IsAnalyzing, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            </StatusBarItem>
-        </StatusBar>
+        <!-- Content Area -->
+        <Grid Grid.Column="1" Background="{StaticResource AppBackground}">
+            <!-- Header -->
+            <Grid VerticalAlignment="Top" Height="64" Background="{StaticResource HeaderBackground}">
+                <Grid.Effect>
+                    <DropShadowEffect ShadowDepth="1" BlurRadius="5" Opacity="0.2"/>
+                </Grid.Effect>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- Breadcrumbs + Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="24,0,0,0">
+                    <!-- Breadcrumbs placeholder (có thể binding sau) -->
+                    <!--<ItemsControl ItemsSource="{Binding Breadcrumbs}" ... />-->
+                    <TextBlock Text="{Binding SelectedMenuItem}" FontSize="20" FontWeight="Medium" VerticalAlignment="Center"/>
+                </StackPanel>
+                <!-- Status (giữa) -->
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="14" Foreground="Gray" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                <!-- Search + Notification + User (phải) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
+                    <!-- Search (giữ nguyên) -->
+                    <materialDesign:ColorZone Mode="Standard" CornerRadius="4" Height="40" Width="240" Padding="8,4" Margin="8,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <materialDesign:PackIcon Kind="Magnify" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.6"/>
+                            <TextBox Grid.Column="1" materialDesign:HintAssist.Hint="Search..." BorderThickness="0" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
+                    </materialDesign:ColorZone>
+                    <!-- Notification -->
+                    <Button Style="{StaticResource MaterialDesignToolButton}" ToolTip="Thông báo" Margin="8,0,0,0">
+                        <materialDesign:PackIcon Kind="BellOutline" Width="24" Height="24"/>
+                    </Button>
+                    <!-- User profile (giữ nguyên) -->
+                    <materialDesign:PopupBox PlacementMode="BottomAndAlignRightEdges" StaysOpen="False">
+                        <materialDesign:PopupBox.ToggleContent>
+                            <materialDesign:Chip Content="User" IconBackground="{StaticResource AccentLight}" IconForeground="White">
+                                <materialDesign:Chip.Icon>
+                                    <materialDesign:PackIcon Kind="Account"/>
+                                </materialDesign:Chip.Icon>
+                            </materialDesign:Chip>
+                        </materialDesign:PopupBox.ToggleContent>
+                        <StackPanel>
+                            <Button Content="Profile" Command="{Binding NavigateCommand}" CommandParameter="UserProfile"/>
+                            <Button Content="Settings" Command="{Binding NavigateCommand}" CommandParameter="Settings"/>
+                            <Separator/>
+                            <Button Content="Sign Out" Command="{Binding SignOutCommand}"/>
+                        </StackPanel>
+                    </materialDesign:PopupBox>
+                </StackPanel>
+            </Grid>
+            
+            <!-- Main Content Region -->
+            <ContentControl prism:RegionManager.RegionName="MainRegion" 
+                          Margin="0,64,0,0"/>
+        </Grid>
     </Grid>
 </Window>

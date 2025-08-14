@@ -1,0 +1,130 @@
+<UserControl x:Class="C_TestForge.UI.Views.AboutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:C_TestForge.UI.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="1200"
+             Background="{StaticResource AppBackground}">
+    
+    <Grid Margin="24">
+        <materialDesign:Card UniformCornerRadius="8" VerticalAlignment="Center" MaxWidth="800" Margin="24" HorizontalAlignment="Center">
+            <Grid Margin="32">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Logo and App Name -->
+                <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,32">
+                    <Border Width="100" Height="100" Background="{StaticResource AccentColor}" CornerRadius="50">
+                        <materialDesign:PackIcon Kind="TestTubeEmpty" Width="64" Height="64"
+                                              Foreground="White" HorizontalAlignment="Center" 
+                                              VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="C-TestForge" FontSize="32" FontWeight="Light" 
+                             HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                    <TextBlock Text="Version 1.0.0" FontSize="14" Foreground="{StaticResource SecondaryText}" 
+                             HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- Description -->
+                <TextBlock Grid.Row="1" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,24">
+                    <Run Text="C-TestForge is a comprehensive tool for analyzing C source code, managing, and automatically generating test cases."/>
+                    <Run Text="It provides a full suite of tools to help developers create robust test suites for C codebases."/>
+                </TextBlock>
+
+                <!-- Features -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,24">
+                    <TextBlock Text="Key Features" FontSize="18" FontWeight="Medium" Margin="0,0,0,16"/>
+                    <UniformGrid Columns="2" Rows="3">
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="CodeBraces" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Advanced C source code analysis using ClangSharp" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="TestTube" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Automated test case generation with Z3 Solver" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="Compare" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Source code comparison and change tracking" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="Function" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Function and variable analysis with relationship mapping" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="Import" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Import and export test cases in multiple formats" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="8">
+                            <materialDesign:PackIcon Kind="AccountMultiple" Width="24" Height="24" 
+                                                  VerticalAlignment="Top" Margin="0,0,16,0"/>
+                            <TextBlock Text="Team collaboration with shared projects" 
+                                     TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </UniformGrid>
+                </StackPanel>
+
+                <!-- Technologies -->
+                <StackPanel Grid.Row="3" Margin="0,0,0,24">
+                    <TextBlock Text="Built With" FontSize="18" FontWeight="Medium" Margin="0,0,0,16"/>
+                    <WrapPanel Orientation="Horizontal">
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text=".NET 9" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="C#" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="WPF" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="Material Design" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="Prism MVVM" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="ClangSharp" />
+                        </Border>
+                        <Border Background="#F0F0F0" CornerRadius="4" Margin="4" Padding="8,4">
+                            <TextBlock Text="Z3 Theorem Prover" />
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+
+                <!-- Credits -->
+                <StackPanel Grid.Row="4" Margin="0,0,0,24">
+                    <TextBlock Text="Credits" FontSize="18" FontWeight="Medium" Margin="0,0,0,16"/>
+                    <TextBlock TextWrapping="Wrap">
+                        <Run Text="Developed by the C-TestForge Team."/>
+                        <LineBreak/>
+                        <Run Text="Special thanks to the open source community and all contributors."/>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Copyright -->
+                <TextBlock Grid.Row="5" Text="? 2023-2024 C-TestForge Team. All rights reserved."
+                         HorizontalAlignment="Center" Foreground="{StaticResource SecondaryText}"/>
+            </Grid>
+        </materialDesign:Card>
+    </Grid>
+</UserControl>

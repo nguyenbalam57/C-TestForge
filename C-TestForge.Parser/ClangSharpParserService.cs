@@ -19,10 +19,16 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
+// Sử dụng alias để tránh xung đột namespace
+using ModelIncludeStatement = C_TestForge.Models.Projects.IncludeStatement;
+using ModelConditionalBlock = C_TestForge.Models.Projects.ConditionalBlock;
+using ModelIncludeDependencyGraph = C_TestForge.Models.Projects.IncludeDependencyGraph;
+using ModelSourceFileDependency = C_TestForge.Models.Projects.SourceFileDependency;
+
 namespace C_TestForge.Parser
 {
     /// <summary>
-    /// Implementation of the parser service using ClangSharp
+    /// Service chính phân tích mã nguồn C sử dụng ClangSharp
     /// </summary>
     public class ClangSharpParserService : IParserService, IClangSharpParserService
     {
@@ -35,6 +41,7 @@ namespace C_TestForge.Parser
         private readonly IConfigurationService _configurationService;
         private readonly ITypeManager _typeManager;
         private readonly ISourceFileService _sourceFileService;
+        private readonly IFileScannerService _fileScannerService;
 
         /// <summary>
         /// Constructor for ClangSharpParserService
@@ -48,6 +55,7 @@ namespace C_TestForge.Parser
             IFileService fileService,
             ITypeManager typeManager,
             ISourceFileService sourceFileService,
+            IFileScannerService fileScannerService,
             IConfigurationService configurationService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -58,6 +66,7 @@ namespace C_TestForge.Parser
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
             _typeManager = typeManager ?? throw new ArgumentNullException(nameof(typeManager));
             _sourceFileService = sourceFileService ?? throw new ArgumentNullException(nameof(sourceFileService));
+            _fileScannerService = fileScannerService ?? throw new ArgumentNullException(nameof(fileScannerService));
             _configurationService = configurationService;
 
             // Đảm bảo hỗ trợ các bảng mã cho xử lý file
@@ -619,6 +628,165 @@ namespace C_TestForge.Parser
             }
         }
 
+        /// <summary>
+        /// Quét một thư mục để tìm tất cả các tệp C (.c) và header (.h)
+        /// </summary>
+        /// <param name="directoryPath">Đường dẫn thư mục cần quét</param>
+        /// <param name="recursive">Quét đệ quy các thư mục con</param>
+        /// <returns>Danh sách tất cả các tệp C và header được tìm thấy</returns>
+        public async Task<List<string>> ScanDirectoryForCFilesAsync(string directoryPath, bool recursive = true)
+        {
+            return await _fileScannerService.ScanDirectoryForCFilesAsync(directoryPath, recursive);
+        }
+
+        /// <summary>
+        /// Tìm tất cả các thư mục include tiềm năng trong một dự án
+        /// </summary>
+        /// <param name="rootDirectoryPath">Đường dẫn thư mục gốc của dự án</param>
+        /// <returns>Danh sách các thư mục có chứa tệp header</returns>
+        public async Task<List<string>> FindPotentialIncludeDirectoriesAsync(string rootDirectoryPath)
+        {
+            return await _fileScannerService.FindPotentialIncludeDirectoriesAsync(rootDirectoryPath);
+        }
+
+        /// <summary>
+        /// Phân tích các câu lệnh include từ một tệp mã nguồn
+        /// </summary>
+        /// <param name="filePath">Đường dẫn đến tệp mã nguồn</param>
+        /// <returns>Danh sách các đường dẫn include từ tệp này</returns>
+        public async Task<List<ModelIncludeStatement>> ParseIncludeStatementsAsync(string filePath)
+        {
+            var interfaceResults = await _fileScannerService.ParseIncludeStatementsAsync(filePath);
+            return ConvertIncludeStatements(interfaceResults);
+        }
+
+        /// <summary>
+        /// Xây dựng đồ thị phụ thuộc include cho một tập hợp các tệp
+        /// </summary>
+        /// <param name="filePaths">Danh sách các đường dẫn tệp để phân tích</param>
+        /// <param name="includePaths">Danh sách các thư mục include để tìm kiếm</param>
+        /// <returns>Đồ thị phụ thuộc include</returns>
+        public async Task<ModelIncludeDependencyGraph> BuildIncludeDependencyGraphAsync(List<string> filePaths, List<string> includePaths)
+        {
+            var interfaceResult = await _fileScannerService.BuildIncludeDependencyGraphAsync(filePaths, includePaths);
+            return ConvertIncludeDependencyGraph(interfaceResult);
+        }
+
+        /// <summary>
+        /// Phân tích các directive tiền xử lý điều kiện (#if, #ifdef, v.v.) từ một tệp
+        /// </summary>
+        /// <param name="filePath">Đường dẫn đến tệp</param>
+        /// <returns>Danh sách các directive tiền xử lý</returns>
+        public async Task<List<ModelConditionalBlock>> ParsePreprocessorConditionalsAsync(string filePath)
+        {
+            var interfaceResults = await _fileScannerService.ParsePreprocessorConditionalsAsync(filePath);
+            return ConvertConditionalBlocks(interfaceResults);
+        }
+
+        #region Conversion Methods
+
+        /// <summary>
+        /// Chuyển đổi IncludeStatement từ interface sang model
+        /// </summary>
+        private List<ModelIncludeStatement> ConvertIncludeStatements(List<Core.Interfaces.Projects.IncludeStatement> interfaceStatements)
+        {
+            return interfaceStatements.Select(s => new ModelIncludeStatement
+            {
+                FileName = s.FileName,
+                RawIncludePath = s.RawIncludePath,
+                NormalizedIncludePath = s.NormalizedIncludePath,
+                ResolvedPath = s.ResolvedPath,
+                IsSystemInclude = s.IsSystemInclude,
+                LineNumber = s.LineNumber,
+                Conditional = ConvertConditionalBlock(s.Conditional)
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Chuyển đổi ConditionalBlock từ interface sang model
+        /// </summary>
+        private ModelConditionalBlock ConvertConditionalBlock(Core.Interfaces.Projects.ConditionalBlock interfaceBlock)
+        {
+            if (interfaceBlock == null) return null;
+
+            return new ModelConditionalBlock
+            {
+                DirectiveType = interfaceBlock.DirectiveType,
+                Condition = interfaceBlock.Condition,
+                StartLine = interfaceBlock.StartLine,
+                EndLine = interfaceBlock.EndLine,
+                NestedBlocks = ConvertConditionalBlocks(interfaceBlock.NestedBlocks),
+                Includes = ConvertIncludeStatements(interfaceBlock.Includes),
+                Parent = ConvertConditionalBlock(interfaceBlock.Parent)
+            };
+        }
+
+        /// <summary>
+        /// Chuyển đổi danh sách ConditionalBlock từ interface sang model
+        /// </summary>
+        private List<ModelConditionalBlock> ConvertConditionalBlocks(List<Core.Interfaces.Projects.ConditionalBlock> interfaceBlocks)
+        {
+            return interfaceBlocks?.Select(ConvertConditionalBlock).ToList() ?? new List<ModelConditionalBlock>();
+        }
+
+        /// <summary>
+        /// Chuyển đổi IncludeDependencyGraph từ interface sang model
+        /// </summary>
+        private ModelIncludeDependencyGraph ConvertIncludeDependencyGraph(Core.Interfaces.Projects.IncludeDependencyGraph interfaceGraph)
+        {
+            var modelGraph = new ModelIncludeDependencyGraph
+            {
+                IncludePaths = interfaceGraph.IncludePaths?.ToList() ?? new List<string>()
+            };
+
+            // Chuyển đổi source files
+            if (interfaceGraph.SourceFiles != null)
+            {
+                foreach (var interfaceFile in interfaceGraph.SourceFiles)
+                {
+                    var modelFile = new ModelSourceFileDependency
+                    {
+                        FilePath = interfaceFile.FilePath,
+                        FileType = interfaceFile.FileType,
+                        Parsed = interfaceFile.Parsed,
+                        Includes = ConvertIncludeStatements(interfaceFile.Includes),
+                        ConditionalBlocks = ConvertConditionalBlocks(interfaceFile.ConditionalBlocks)
+                    };
+
+                    modelGraph.SourceFiles.Add(modelFile);
+                }
+
+                // Thiết lập dependencies sau khi tất cả files đã được tạo
+                for (int i = 0; i < interfaceGraph.SourceFiles.Count; i++)
+                {
+                    var interfaceFile = interfaceGraph.SourceFiles[i];
+                    var modelFile = modelGraph.SourceFiles[i];
+
+                    // Chuyển đổi direct dependencies
+                    foreach (var interfaceDep in interfaceFile.DirectDependencies)
+                    {
+                        var modelDep = modelGraph.SourceFiles.FirstOrDefault(f => f.FilePath == interfaceDep.FilePath);
+                        if (modelDep != null)
+                        {
+                            modelFile.DirectDependencies.Add(modelDep);
+                        }
+                    }
+
+                    // Chuyển đổi dependent files
+                    foreach (var interfaceDep in interfaceFile.DependentFiles)
+                    {
+                        var modelDep = modelGraph.SourceFiles.FirstOrDefault(f => f.FilePath == interfaceDep.FilePath);
+                        if (modelDep != null)
+                        {
+                            modelFile.DependentFiles.Add(modelDep);
+                        }
+                    }
+                }
+            }
+
+            return modelGraph;
+        }
+
         #endregion
 
         #region Helper Methods
@@ -1148,6 +1316,515 @@ namespace C_TestForge.Parser
                     Console.Error.WriteLine($"Error visiting AST node: {ex.Message}");
                 }
             }
+        }
+
+        #endregion
+
+        #endregion
+
+        /// <summary>
+        /// Phân tích toàn bộ dự án C/C++ theo quy trình hoàn chỉnh
+        /// </summary>
+        /// <param name="projectRootPath">Đường dẫn thư mục gốc của dự án</param>
+        /// <returns>Kết quả phân tích dự án hoàn chỉnh bao gồm biến, hàm, macro và phụ thuộc</returns>
+        public async Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(string projectRootPath)
+        {
+            if (string.IsNullOrEmpty(projectRootPath))
+            {
+                throw new ArgumentException("Project root path cannot be null or empty", nameof(projectRootPath));
+            }
+
+            if (!Directory.Exists(projectRootPath))
+            {
+                throw new DirectoryNotFoundException($"Project directory not found: {projectRootPath}");
+            }
+
+            _logger.LogInformation($"Bắt đầu phân tích toàn bộ dự án: {projectRootPath}");
+
+            var analysisResult = new ProjectAnalysisResult
+            {
+                ProjectPath = projectRootPath,
+                StartTime = DateTime.Now
+            };
+
+            try
+            {
+                // Bước 1: Quét và xác định phạm vi dự án
+                _logger.LogInformation("Bước 1: Quét dự án và xác định phạm vi tệp tin");
+                var allFiles = await ScanDirectoryForCFilesAsync(projectRootPath, true);
+                _logger.LogInformation($"Đã tìm thấy {allFiles.Count} tệp C/C++ trong dự án");
+
+                // Bước 2: Tìm các thư mục include tiềm năng
+                _logger.LogInformation("Bước 2: Tìm các thư mục include tiềm năng");
+                var includeDirs = await FindPotentialIncludeDirectoriesAsync(projectRootPath);
+                _logger.LogInformation($"Đã tìm thấy {includeDirs.Count} thư mục include tiềm năng");
+
+                // Thêm các đường dẫn include từ configuration nếu có
+                if (_configurationService != null)
+                {
+                    var config = _configurationService.GetActiveConfiguration();
+                    if (config != null && config.IncludePaths != null)
+                    {
+                        foreach (var path in config.IncludePaths)
+                        {
+                            if (!includeDirs.Contains(path) && Directory.Exists(path))
+                            {
+                                includeDirs.Add(path);
+                            }
+                        }
+                    }
+                }
+
+                // Bước 3: Xây dựng đồ thị phụ thuộc include
+                _logger.LogInformation("Bước 3: Xây dựng đồ thị phụ thuộc include");
+                var dependencyGraph = await BuildIncludeDependencyGraphAsync(allFiles, includeDirs);
+                analysisResult.DependencyGraph = dependencyGraph;
+                _logger.LogInformation($"Đã xây dựng đồ thị phụ thuộc với {dependencyGraph.SourceFiles.Count} tệp");
+
+                // Bước 4: Phân tích typedef từ các tệp header trước
+                _logger.LogInformation("Bước 4: Phân tích và thu thập typedef từ các tệp header");
+                await AnalyzeTypedefsFromHeadersAsync(dependencyGraph);
+
+                // Bước 5: Sắp xếp tệp theo thứ tự phụ thuộc (các tệp không có include hoặc ít phụ thuộc trước)
+                _logger.LogInformation("Bước 5: Sắp xếp tệp theo thứ tự phụ thuộc");
+                var sortedFiles = SortFilesByDependencies(dependencyGraph);
+                _logger.LogInformation($"Đã sắp xếp {sortedFiles.Count} tệp theo thứ tự phụ thuộc");
+
+                // Bước 6: Phân tích từng tệp theo thứ tự đã sắp xếp
+                _logger.LogInformation("Bước 6: Phân tích từng tệp theo thứ tự phụ thuộc");
+                
+                var processedMacros = new Dictionary<string, CDefinition>(StringComparer.OrdinalIgnoreCase);
+                var processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var file in sortedFiles)
+                {
+                    try
+                    {
+                        await AnalyzeSingleFileInContext(file.FilePath, analysisResult, processedMacros, processedFiles);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Lỗi khi phân tích tệp {file.FilePath}: {ex.Message}");
+                        analysisResult.Errors.Add($"Error analyzing file {file.FilePath}: {ex.Message}");
+                    }
+                }
+
+                // Bước 7: Phân tích mối quan hệ giữa các thành phần
+                _logger.LogInformation("Bước 7: Phân tích mối quan hệ giữa các thành phần");
+                await AnalyzeComponentRelationships(analysisResult);
+
+                // Bước 8: Tối ưu hóa và hoàn thành kết quả
+                _logger.LogInformation("Bước 8: Tối ưu hóa và hoàn thiện kết quả");
+                OptimizeAnalysisResult(analysisResult);
+
+                analysisResult.EndTime = DateTime.Now;
+                analysisResult.Duration = analysisResult.EndTime - analysisResult.StartTime;
+
+                _logger.LogInformation($"Hoàn thành phân tích dự án trong {analysisResult.Duration.TotalSeconds:F2} giây");
+                _logger.LogInformation($"Kết quả: {analysisResult.Functions.Count} hàm, {analysisResult.Variables.Count} biến, {analysisResult.Macros.Count} macro");
+
+                return analysisResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi nghiêm trọng khi phân tích dự án: {ex.Message}");
+                analysisResult.EndTime = DateTime.Now;
+                analysisResult.Duration = analysisResult.EndTime - analysisResult.StartTime;
+                analysisResult.Errors.Add($"Critical error: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Trích xuất tất cả các điều kiện tiền xử lý từ kết quả phân tích dự án
+        /// </summary>
+        /// <param name="analysisResult">Kết quả phân tích dự án</param>
+        /// <returns>Danh sách các điều kiện tiền xử lý duy nhất</returns>
+        public List<string> ExtractPreprocessorConditionsFromAnalysisResult(ProjectAnalysisResult analysisResult)
+        {
+            if (analysisResult?.DependencyGraph == null)
+                return new List<string>();
+
+            return ExtractPreprocessorConditionsFromGraph(analysisResult.DependencyGraph);
+        }
+
+        #region Project Analysis Helper Methods
+
+        /// <summary>
+        /// Phân tích một tệp đơn lẻ trong ngữ cảnh của toàn bộ dự án
+        /// </summary>
+        /// <param name="filePath">Đường dẫn tệp cần phân tích</param>
+        /// <param name="analysisResult">Kết quả phân tích dự án để cập nhật</param>
+        /// <param name="processedMacros">Danh sách các macro đã được xử lý</param>
+        /// <param name="processedFiles">Danh sách các tệp đã được xử lý</param>
+        /// <returns>Task</returns>
+        private async Task AnalyzeSingleFileInContext(string filePath, ProjectAnalysisResult analysisResult,
+            Dictionary<string, CDefinition> processedMacros, HashSet<string> processedFiles)
+        {
+            if (processedFiles.Contains(filePath))
+            {
+                return;
+            }
+
+            processedFiles.Add(filePath);
+
+            try
+            {
+                var sourceFile = await ParseSourceFileAsync(filePath);
+                
+                var options = new ParseOptions
+                {
+                    AnalyzeFunctions = true,
+                    AnalyzeVariables = true,
+                    ParsePreprocessorDefinitions = true,
+                    IncludePaths = analysisResult.DependencyGraph.IncludePaths,
+                    MacroDefinitions = processedMacros.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value ?? "")
+                };
+
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
+
+                // Thu thập macro definitions mới
+                foreach (var definition in parseResult.Definitions)
+                {
+                    if (!processedMacros.ContainsKey(definition.Name))
+                    {
+                        processedMacros[definition.Name] = definition;
+                        analysisResult.Macros.Add(definition);
+                    }
+                }
+
+                // Thu thập functions
+                foreach (var function in parseResult.Functions)
+                {
+                    if (!analysisResult.Functions.Any(f => f.Name == function.Name && f.SourceFile == function.SourceFile))
+                    {
+                        analysisResult.Functions.Add(function);
+                    }
+                }
+
+                // Thu thập variables
+                foreach (var variable in parseResult.Variables)
+                {
+                    if (!analysisResult.Variables.Any(v => v.Name == variable.Name && v.SourceFile == variable.SourceFile))
+                    {
+                        analysisResult.Variables.Add(variable);
+                    }
+                }
+
+                analysisResult.ProcessedFiles.Add(filePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi phân tích tệp {filePath}: {ex.Message}");
+                analysisResult.Errors.Add($"Error analyzing {filePath}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Phân tích typedef từ các tệp header
+        /// </summary>
+        private async Task AnalyzeTypedefsFromHeadersAsync(ModelIncludeDependencyGraph dependencyGraph)
+        {
+            var headerFiles = dependencyGraph.SourceFiles
+                .Where(f => f.FileType == SourceFileType.CHeader || f.FileType == SourceFileType.CPPHeader)
+                .Select(f => f.FilePath)
+                .ToList();
+
+            if (headerFiles.Any())
+            {
+                await _typeManager.AnalyzeHeaderFilesAsync(headerFiles);
+                await _typeManager.SaveTypedefConfigAsync();
+            }
+        }
+
+        /// <summary>
+        /// Sắp xếp tệp theo thứ tự phụ thuộc
+        /// </summary>
+        private List<ModelSourceFileDependency> SortFilesByDependencies(ModelIncludeDependencyGraph dependencyGraph)
+        {
+            var result = new List<ModelSourceFileDependency>();
+            var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var processing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Tìm các tệp không có phụ thuộc hoặc chỉ phụ thuộc vào tệp hệ thống
+            var independentFiles = dependencyGraph.SourceFiles
+                .Where(f => f.DirectDependencies.Count == 0)
+                .OrderBy(f => f.FileType) // Header files trước
+                .ToList();
+
+            // Xử lý các tệp độc lập trước
+            foreach (var file in independentFiles)
+            {
+                if (!processed.Contains(file.FilePath))
+                {
+                    result.Add(file);
+                    processed.Add(file.FilePath);
+                }
+            }
+
+            // Xử lý các tệp còn lại bằng thuật toán topo sort
+            foreach (var file in dependencyGraph.SourceFiles)
+            {
+                if (!processed.Contains(file.FilePath))
+                {
+                    TopologicalSort(file, dependencyGraph, result, processed, processing);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Thuật toán sắp xếp topo để sắp xếp tệp theo phụ thuộc
+        /// </summary>
+        private void TopologicalSort(
+            ModelSourceFileDependency file,
+            ModelIncludeDependencyGraph dependencyGraph,
+            List<ModelSourceFileDependency> result,
+            HashSet<string> processed,
+            HashSet<string> processing)
+        {
+            if (processed.Contains(file.FilePath))
+                return;
+
+            if (processing.Contains(file.FilePath))
+            {
+                // Phát hiện vòng lặp phụ thuộc
+                _logger.LogWarning($"Phát hiện vòng lặp phụ thuộc liên quan đến tệp: {file.FilePath}");
+                return;
+            }
+
+            processing.Add(file.FilePath);
+
+            // Xử lý các phụ thuộc trước
+            foreach (var dependency in file.DirectDependencies)
+            {
+                if (!processed.Contains(dependency.FilePath))
+                {
+                    TopologicalSort(dependency, dependencyGraph, result, processed, processing);
+                }
+            }
+
+            processing.Remove(file.FilePath);
+            
+            if (!processed.Contains(file.FilePath))
+            {
+                result.Add(file);
+                processed.Add(file.FilePath);
+            }
+        }
+
+        /// <summary>
+        /// Phân tích mối quan hệ giữa các thành phần
+        /// </summary>
+        private async Task AnalyzeComponentRelationships(ProjectAnalysisResult analysisResult)
+        {
+            try
+            {
+                // Phân tích mối quan hệ hàm
+                if (analysisResult.Functions.Count > 0)
+                {
+                    var functionRelationships = await _functionAnalysisService.AnalyzeFunctionRelationshipsAsync(analysisResult.Functions);
+                    analysisResult.FunctionRelationships.AddRange(functionRelationships);
+                }
+
+                // Phân tích ràng buộc biến
+                if (analysisResult.Variables.Count > 0)
+                {
+                    var variableConstraints = await _variableAnalysisService.AnalyzeVariablesAsync(
+                        analysisResult.Variables, analysisResult.Functions, analysisResult.Macros);
+                    
+                    // Gắn ràng buộc với biến
+                    foreach (var constraint in variableConstraints)
+                    {
+                        if (!string.IsNullOrEmpty(constraint.VariableName))
+                        {
+                            var variable = analysisResult.Variables.FirstOrDefault(v => v.Name == constraint.VariableName);
+                            if (variable != null && !variable.Constraints.Any(c => c.Id == constraint.Id))
+                            {
+                                variable.Constraints.Add(constraint);
+                            }
+                        }
+                    }
+                }
+
+                // Phân tích mối quan hệ macro
+                if (analysisResult.Macros.Count > 0)
+                {
+                    await _macroAnalysisService.AnalyzeMacroRelationshipsAsync(analysisResult.Macros, analysisResult.ConditionalDirectives);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi phân tích mối quan hệ thành phần: {ex.Message}");
+                analysisResult.Errors.Add($"Error analyzing component relationships: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tối ưu hóa kết quả phân tích
+        /// </summary>
+        private void OptimizeAnalysisResult(ProjectAnalysisResult analysisResult)
+        {
+            try
+            {
+                // Loại bỏ các hàm trùng lặp
+                var uniqueFunctions = new List<CFunction>();
+                var functionSignatures = new HashSet<string>();
+
+                foreach (var function in analysisResult.Functions)
+                {
+                    string signature = $"{function.Name}_{function.SourceFile}_{function.StartLineNumber}";
+                    if (!functionSignatures.Contains(signature))
+                    {
+                        functionSignatures.Add(signature);
+                        uniqueFunctions.Add(function);
+                    }
+                }
+                analysisResult.Functions = uniqueFunctions;
+
+                // Loại bỏ các biến trùng lặp
+                var uniqueVariables = new List<CVariable>();
+                var variableSignatures = new HashSet<string>();
+
+                foreach (var variable in analysisResult.Variables)
+                {
+                    string signature = $"{variable.Name}_{variable.SourceFile}_{variable.LineNumber}";
+                    if (!variableSignatures.Contains(signature))
+                    {
+                        variableSignatures.Add(signature);
+                        uniqueVariables.Add(variable);
+                    }
+                }
+                analysisResult.Variables = uniqueVariables;
+
+                // Loại bỏ các macro trùng lặp
+                var uniqueMacros = new List<CDefinition>();
+                var macroSignatures = new HashSet<string>();
+
+                foreach (var macro in analysisResult.Macros)
+                {
+                    string signature = $"{macro.Name}_{macro.SourceFile}";
+                    if (!macroSignatures.Contains(signature))
+                    {
+                        macroSignatures.Add(signature);
+                        uniqueMacros.Add(macro);
+                    }
+                }
+                analysisResult.Macros = uniqueMacros;
+
+                _logger.LogDebug($"Tối ưu hóa hoàn thành: {analysisResult.Functions.Count} hàm duy nhất, " +
+                    $"{analysisResult.Variables.Count} biến duy nhất, {analysisResult.Macros.Count} macro duy nhất");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi tối ưu hóa kết quả: {ex.Message}");
+                analysisResult.Errors.Add($"Error optimizing results: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Trích xuất tất cả các điều kiện tiền xử lý từ các tệp trong đồ thị phụ thuộc
+        /// </summary>
+        /// <param name="dependencyGraph">Đồ thị phụ thuộc</param>
+        /// <returns>Danh sách các điều kiện tiền xử lý duy nhất được sử dụng trong dự án</returns>
+        public List<string> ExtractPreprocessorConditionsFromGraph(ModelIncludeDependencyGraph dependencyGraph)
+        {
+            _logger.LogInformation("Trích xuất các điều kiện tiền xử lý từ đồ thị phụ thuộc");
+
+            var conditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var sourceFile in dependencyGraph.SourceFiles)
+            {
+                // Chỉ xử lý các tệp header vì chúng thường chứa nhiều điều kiện tiền xử lý
+                if (sourceFile.FileType != SourceFileType.CHeader && 
+                    sourceFile.FileType != SourceFileType.CPPHeader)
+                    continue;
+
+                foreach (var block in sourceFile.ConditionalBlocks)
+                {
+                    ExtractConditionsRecursively(block, conditions);
+                }
+            }
+
+            _logger.LogInformation($"Đã trích xuất {conditions.Count} điều kiện tiền xử lý duy nhất");
+            return conditions.ToList();
+        }
+
+        /// <summary>
+        /// Trích xuất tất cả các điều kiện từ một khối điều kiện và các khối con của nó
+        /// </summary>
+        private void ExtractConditionsRecursively(ModelConditionalBlock block, HashSet<string> conditions)
+        {
+            if (!string.IsNullOrEmpty(block.Condition))
+            {
+                // Loại bỏ khoảng trắng và comment
+                string cleanCondition = block.Condition.Trim();
+                
+                if (block.DirectiveType == "ifdef" || block.DirectiveType == "ifndef")
+                {
+                    // Đơn giản hóa cho #ifdef/#ifndef - chỉ lấy tên macro
+                    conditions.Add(cleanCondition);
+                }
+                else if (block.DirectiveType == "if" || block.DirectiveType == "elif")
+                {
+                    // Cho #if/#elif, phân tách biểu thức để lấy tên các macro
+                    var macros = ExtractMacrosFromExpression(cleanCondition);
+                    foreach (var macro in macros)
+                    {
+                        conditions.Add(macro);
+                    }
+                }
+            }
+
+            // Đệ quy vào các khối con
+            foreach (var nestedBlock in block.NestedBlocks)
+            {
+                ExtractConditionsRecursively(nestedBlock, conditions);
+            }
+        }
+
+        /// <summary>
+        /// Trích xuất tên các macro từ một biểu thức điều kiện
+        /// </summary>
+        private List<string> ExtractMacrosFromExpression(string expression)
+        {
+            var macros = new List<string>();
+            
+            // Tìm các định danh trong biểu thức
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                expression, 
+                @"[A-Za-z_][A-Za-z0-9_]*", 
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                string potential = match.Value;
+                
+                // Bỏ qua các từ khóa C
+                if (!IsKeyword(potential))
+                {
+                    macros.Add(potential);
+                }
+            }
+            
+            return macros;
+        }
+
+        /// <summary>
+        /// Kiểm tra xem một chuỗi có phải là từ khóa C không
+        /// </summary>
+        private bool IsKeyword(string word)
+        {
+            string[] keywords = {
+                "if", "else", "for", "while", "do", "switch", "case", "default",
+                "break", "continue", "return", "goto", "typedef", "sizeof", "struct",
+                "union", "enum", "extern", "static", "auto", "register", "void",
+                "char", "short", "int", "long", "float", "double", "signed", "unsigned",
+                "const", "volatile", "defined", "ifdef", "ifndef", "endif", "elif", "true", "false"
+            };
+            
+            return keywords.Contains(word.ToLowerInvariant());
         }
 
         #endregion

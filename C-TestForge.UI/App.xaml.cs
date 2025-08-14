@@ -8,6 +8,7 @@ using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Interfaces.UI;
 using C_TestForge.Core.Logging;
 using C_TestForge.Infrastructure;
+using C_TestForge.Infrastructure.Views;
 using C_TestForge.Parser;
 using C_TestForge.Parser.Analysis;
 using C_TestForge.Parser.Projects;
@@ -16,6 +17,7 @@ using C_TestForge.Parser.UI;
 using C_TestForge.SolverServices;
 using C_TestForge.UI.Controls;
 using C_TestForge.UI.Services;
+using C_TestForge.UI.Utilities;
 using C_TestForge.UI.ViewModels;
 using C_TestForge.UI.Views;
 using MaterialDesignThemes.Wpf;
@@ -26,6 +28,7 @@ using Prism.Unity;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Windows;
 using static Microsoft.WindowsAPICodePack.Shell.PropertySystem.SystemProperties.System;
 
@@ -63,6 +66,10 @@ namespace C_TestForge.UI
             // Register core services
             containerRegistry.RegisterSingleton<IFileService, FileService>();
             containerRegistry.RegisterSingleton<IConfigurationService, ConfigurationService>();
+
+            // Đăng ký dịch vụ quét tệp và phân tích phụ thuộc
+            containerRegistry.RegisterSingleton<IFileScannerService, FileScannerService>();
+            containerRegistry.RegisterSingleton<IDashboardView, DashboardView>();
 
             // Register parser services
             containerRegistry.RegisterSingleton<ISourceCodeService, SourceCodeService>();
@@ -115,10 +122,10 @@ namespace C_TestForge.UI
             containerRegistry.RegisterSingleton<IDialogService, MaterialDialogService>();
 
             // Register views
-            //containerRegistry.RegisterForNavigation<SourceCodeView, SourceCodeViewModel>();
-            //containerRegistry.RegisterForNavigation<TestCaseView, TestCaseViewModel>();
-            //containerRegistry.RegisterForNavigation<TestGenerationView, TestGenerationViewModel>();
-            //containerRegistry.RegisterForNavigation<SettingsView, SettingsViewModel>();
+            containerRegistry.RegisterForNavigation<SourceCodeView, SourceCodeViewModel>();
+            containerRegistry.RegisterForNavigation<TestCaseView, TestCaseViewModel>();
+            containerRegistry.RegisterForNavigation<TestGenerationView, TestGenerationViewModel>();
+            containerRegistry.RegisterForNavigation<SettingsView, SettingsViewModel>();
         }
 
         /// <summary>
@@ -144,10 +151,13 @@ namespace C_TestForge.UI
         /// </summary>
         protected override void OnInitialized()
         {
-            // Đăng ký encoding provider
-            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            // Cấu hình hỗ trợ đa ngôn ngữ và encoding
+            ConfigureMultilanguageSupport();
 
             base.OnInitialized();
+
+            // Kiểm tra font hỗ trợ
+            FontUtils.ValidateFontSupport();
 
             // Set up exception handling
             AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
@@ -165,6 +175,45 @@ namespace C_TestForge.UI
             if (!Directory.Exists(appDataPath))
             {
                 Directory.CreateDirectory(appDataPath);
+            }
+        }
+
+        /// <summary>
+        /// Application startup event
+        /// </summary>
+        /// <param name="e">Startup event arguments</param>
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            // Load settings
+            var settingsViewModel = Container.Resolve<SettingsViewModel>();
+            //settingsViewModel.LoadSettings();
+        }
+
+        /// <summary>
+        /// Cấu hình hỗ trợ đa ngôn ngữ và encoding
+        /// </summary>
+        private void ConfigureMultilanguageSupport()
+        {
+            try
+            {
+                // Đăng ký các encoding cần thiết cho tiếng Việt và tiếng Nhật
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                // Hỗ trợ các encoding thông dụng cho tiếng Việt và tiếng Nhật
+                Encoding.GetEncoding("windows-1258"); // Vietnamese
+                Encoding.GetEncoding("shift_jis");    // Japanese
+                Encoding.GetEncoding("euc-jp");       // Japanese
+                Encoding.GetEncoding("iso-2022-jp");  // Japanese
+                Encoding.GetEncoding("utf-8");        // Universal
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi khởi tạo hỗ trợ đa ngôn ngữ: {ex.Message}", 
+                    "Lỗi khởi tạo", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
             }
         }
 

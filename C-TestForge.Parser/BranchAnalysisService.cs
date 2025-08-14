@@ -1,6 +1,7 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Models.CodeAnalysis.BranchAnalysis;
+using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,17 +29,13 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Analyzes branches in the given function
         /// </summary>
-        public async Task<BranchAnalysisResult> AnalyzeBranchesAsync(string functionName, string filePath)
+        public async Task<BranchAnalysisResult> AnalyzeBranchesAsync(string functionName, SourceFile sourceFile)
         {
             if (string.IsNullOrEmpty(functionName))
                 throw new ArgumentNullException(nameof(functionName));
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
 
             // Get function analysis
-            var functionAnalysis = await _parserService.AnalyzeFunctionAsync(functionName, filePath);
+            var functionAnalysis = await _parserService.AnalyzeFunctionParserAsync(functionName, sourceFile);
             if (functionAnalysis == null)
                 throw new InvalidOperationException($"Function not found: {functionName}");
 
@@ -102,19 +99,15 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Finds paths through the function that cover the given branches
         /// </summary>
-        public async Task<List<CFunctionPath>> FindPathsCoveringBranchesAsync(string functionName, string filePath, IEnumerable<int> branchIds)
+        public async Task<List<CFunctionPath>> FindPathsCoveringBranchesAsync(string functionName, SourceFile sourceFile, IEnumerable<int> branchIds)
         {
             if (string.IsNullOrEmpty(functionName))
                 throw new ArgumentNullException(nameof(functionName));
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
             if (branchIds == null)
                 throw new ArgumentNullException(nameof(branchIds));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
 
             // Get branch analysis
-            var branchAnalysis = await AnalyzeBranchesAsync(functionName, filePath);
+            var branchAnalysis = await AnalyzeBranchesAsync(functionName, sourceFile);
 
             // Find paths that cover the branches
             var branchIdSet = new HashSet<int>(branchIds);
@@ -135,17 +128,13 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Determines if a branch is feasible (can be executed)
         /// </summary>
-        public async Task<bool> IsBranchFeasibleAsync(string functionName, string filePath, int branchId)
+        public async Task<bool> IsBranchFeasibleAsync(string functionName, SourceFile sourceFile, int branchId)
         {
             if (string.IsNullOrEmpty(functionName))
                 throw new ArgumentNullException(nameof(functionName));
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
 
             // Get branch analysis
-            var branchAnalysis = await AnalyzeBranchesAsync(functionName, filePath);
+            var branchAnalysis = await AnalyzeBranchesAsync(functionName, sourceFile);
 
             // Find the branch
             var branch = branchAnalysis.Branches.FirstOrDefault(b => b.Id == branchId);

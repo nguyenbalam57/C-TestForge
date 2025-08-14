@@ -24,7 +24,7 @@ namespace C_TestForge.Core.Interfaces.Projects
         /// </summary>
         /// <param name="content">Source content</param>
         /// <returns>Tuple containing processed content and list of replacements</returns>
-        (string processedContent, List<TypeReplacement> replacements) ReplaceTypes(string content);
+        (string processedContent, List<TypeReplacement> replacements) ReplaceTypes(string content, List<int> lineStartPositions = null);
 
         /// <summary>
         /// Find all type occurrences in content without replacing
