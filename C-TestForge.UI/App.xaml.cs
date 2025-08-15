@@ -125,6 +125,7 @@ namespace C_TestForge.UI
             containerRegistry.RegisterForNavigation<SourceCodeView, SourceCodeViewModel>();
             containerRegistry.RegisterForNavigation<TestCaseView, TestCaseViewModel>();
             containerRegistry.RegisterForNavigation<TestGenerationView, TestGenerationViewModel>();
+            containerRegistry.RegisterSingleton<SettingsViewModel>();
             containerRegistry.RegisterForNavigation<SettingsView, SettingsViewModel>();
         }
 
@@ -187,7 +188,7 @@ namespace C_TestForge.UI
             base.OnStartup(e);
 
             // Load settings
-            var settingsViewModel = Container.Resolve<SettingsViewModel>();
+            //var settingsViewModel = Container.Resolve<SettingsViewModel>();
             //settingsViewModel.LoadSettings();
         }
 

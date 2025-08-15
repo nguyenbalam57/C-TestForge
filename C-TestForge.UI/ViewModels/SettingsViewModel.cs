@@ -62,7 +62,7 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _projects, value);
         }
 
-        private Project _selectedProject;
+        private Project _selectedProject = null;
         public Project SelectedProject
         {
             get => _selectedProject;
@@ -143,6 +143,8 @@ namespace C_TestForge.UI.ViewModels
 
         private void OnSelectedProjectChanged()
         {
+            // Đảm bảo PropertyChanged được raise
+            OnPropertyChanged(nameof(SelectedProject));
             // TODO: Gọi reload dữ liệu toàn bộ ứng dụng khi đổi dự án
             // Có thể raise event hoặc gọi callback tới MainWindowViewModel
         }

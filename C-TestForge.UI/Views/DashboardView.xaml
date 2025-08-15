@@ -18,99 +18,88 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             
-            <!-- Welcome Header -->
+            <!-- Phần chào mừng -->
             <materialDesign:Card Grid.Row="0" Margin="0,0,0,24" UniformCornerRadius="8"
                                Background="{StaticResource AccentColor}">
                 <Grid>
                     <Image Source="/Resources/Images/dashboard-header-bg.jpg" Stretch="Fill" Opacity="0.2"/>
                     <StackPanel Margin="24">
-                        <TextBlock Text="Welcome to C-TestForge" 
+                        <TextBlock Text="Chào mừng đến với C-TestForge" 
                                    FontSize="32" FontWeight="Light" Foreground="White"/>
-                        <TextBlock Text="C Source Code Analysis and Test Case Generation Tool" 
+                        <TextBlock Text="Công cụ phân tích mã nguồn C và sinh ca kiểm thử" 
                                    FontSize="18" Foreground="White" Opacity="0.9" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Grid>
             </materialDesign:Card>
             
-            <!-- Project Info Cards (multiple projects) -->
-            <ItemsControl Grid.Row="1" Margin="0,0,0,24"
-                          ItemsSource="{Binding AvailableProjects}"
-                          Visibility="{Binding AvailableProjects.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Vertical"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <materialDesign:Card Margin="0,0,0,16" UniformCornerRadius="8" materialDesign:ShadowAssist.ShadowDepth="Depth1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <!-- Project Icon -->
-                                <Border Grid.Column="0" Background="{StaticResource AccentLight}" Width="100">
-                                    <materialDesign:PackIcon Kind="FolderOpenOutline" Width="64" Height="64" 
-                                                           Foreground="White" HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"/>
-                                </Border>
-                                <!-- Project Details -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,16">
-                                    <TextBlock Text="Project" FontSize="14" Foreground="{StaticResource SecondaryText}"/>
-                                    <TextBlock Text="{Binding Name}" FontSize="24" FontWeight="Medium" Margin="0,4,0,8"/>
-                                    <WrapPanel Orientation="Horizontal">
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,24,0">
-                                            <materialDesign:PackIcon Kind="FileOutline" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                            <TextBlock Text="{Binding SourceFiles.Count, StringFormat='{}{0} source files'}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <!-- Add more project stats here if needed -->
-                                    </WrapPanel>
-                                </StackPanel>
-                                <!-- Quick Actions -->
-                                <Border Grid.Column="2" Background="#F5F5F5" Width="200">
-                                    <StackPanel VerticalAlignment="Center" Margin="16">
-                                        <Button Style="{StaticResource PrimaryButtonStyle}" Content="Xem dự án"
-                                               Command="{Binding DataContext.ViewProjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                               CommandParameter="{Binding}" Margin="0,0,0,12"
-                                               HorizontalAlignment="Stretch"/>
-                                        <Button Style="{StaticResource SecondaryButtonStyle}" Content="Đóng dự án"
-                                               Command="{Binding DataContext.CloseProjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                               CommandParameter="{Binding}" HorizontalAlignment="Stretch"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </materialDesign:Card>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            
-            <!-- No Project Card (when no project is open) -->
+            <!-- Thông tin dự án (1 dự án) -->
             <materialDesign:Card Grid.Row="1" Margin="0,0,0,24" UniformCornerRadius="8"
-                               Visibility="{Binding AvailableProjects.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"
-                               materialDesign:ShadowAssist.ShadowDepth="Depth1">
+                   Visibility="{Binding HasProject, Converter={StaticResource BoolToVisibilityConverter}}"
+                   materialDesign:ShadowAssist.ShadowDepth="Depth1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Biểu tượng dự án -->
+                    <Border Grid.Column="0" Background="{StaticResource AccentLight}" Width="100">
+                        <materialDesign:PackIcon Kind="FolderOpenOutline" Width="64" Height="64" 
+                                               Foreground="White" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Chi tiết dự án -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,16">
+                        <TextBlock Text="Dự án hiện tại" FontSize="14" Foreground="{StaticResource SecondaryText}"/>
+                        <TextBlock Text="{Binding ProjectName}" FontSize="24" FontWeight="Medium" Margin="0,4,0,8"/>
+                        <WrapPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="FileOutline" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding CurrentProject.SourceFiles.Count, StringFormat='{}{0} tệp nguồn'}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="FileDocumentOutline" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding CurrentProject.ProjectFilePath}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialDesign:PackIcon Kind="CalendarClock" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding CurrentProject.LastModified, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding CurrentProject.Description}" FontSize="14" Foreground="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="500"/>
+                    </StackPanel>
+                    <Grid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Tạo dự án mới" Command="{Binding NewProjectCommand}"/>
+                        </ContextMenu>
+                    </Grid.ContextMenu>
+                </Grid>
+            </materialDesign:Card>
+            
+            <!-- Không có dự án nào -->
+            <materialDesign:Card Grid.Row="1" Margin="0,0,0,24" UniformCornerRadius="8"
+                   Visibility="{Binding HasProject, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                   materialDesign:ShadowAssist.ShadowDepth="Depth1">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <!-- Empty State Message -->
+                    <!-- Trạng thái rỗng -->
                     <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="24,32,24,24">
                         <materialDesign:PackIcon Kind="FolderOpenOutline" Width="80" Height="80" 
                                                HorizontalAlignment="Center" Foreground="{StaticResource DisabledText}"/>
-                        <TextBlock Text="No Project Open" Style="{StaticResource HeadingStyle}"
+                        <TextBlock Text="Chưa có dự án nào" Style="{StaticResource HeadingStyle}"
                                  HorizontalAlignment="Center" Margin="0,16,0,8"/>
-                        <TextBlock Text="Start by creating a new project or open an existing one"
+                        <TextBlock Text="Hãy bắt đầu bằng cách tạo mới hoặc mở một dự án có sẵn"
                                  Style="{StaticResource BodyTextStyle}" Foreground="{StaticResource SecondaryText}"
                                  HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" 
                                  MaxWidth="400"/>
                     </StackPanel>
                     
-                    <!-- Action Buttons -->
+                    <!-- Nút hành động -->
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,32">
-                        <Button Content="Create New Project" Command="{Binding NewProjectCommand}"
+                        <Button Content="Tạo dự án mới" Command="{Binding NewProjectCommand}"
                                Style="{StaticResource PrimaryButtonStyle}" Margin="8,0">
                             <Button.ContentTemplate>
                                 <DataTemplate>
@@ -121,7 +110,7 @@
                                 </DataTemplate>
                             </Button.ContentTemplate>
                         </Button>
-                        <Button Content="Open Project" Command="{Binding OpenProjectCommand}"
+                        <Button Content="Mở dự án" Command="{Binding OpenProjectCommand}"
                                Style="{StaticResource SecondaryButtonStyle}" Margin="8,0">
                             <Button.ContentTemplate>
                                 <DataTemplate>
@@ -136,15 +125,14 @@
                 </Grid>
             </materialDesign:Card>
             
-            <!-- Feature Cards -->
+            <!-- ...các thẻ tính năng... -->
             <ItemsControl Grid.Row="2" Margin="0,0,0,24">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <WrapPanel Orientation="Horizontal"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
-                
-                <!-- Source Analysis Card -->
+                <!-- Phân tích mã nguồn -->
                 <materialDesign:Card Style="{StaticResource ModernCardStyle}" Width="380" Height="220" Margin="0,8,16,8">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -152,8 +140,6 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
-                        <!-- Card Header -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Width="40" Height="40" Background="{StaticResource AccentLight}" 
                                    CornerRadius="20" Margin="0,0,16,0">
@@ -161,24 +147,18 @@
                                                        Foreground="White" HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Source Code Analysis" FontSize="18" FontWeight="Medium" 
+                            <TextBlock Text="Phân tích mã nguồn" FontSize="18" FontWeight="Medium" 
                                      VerticalAlignment="Center"/>
                         </StackPanel>
-                        
-                        <!-- Card Content -->
                         <TextBlock Grid.Row="1" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap">
-                            Parse and analyze C source code structure. Detect variables, functions,
-                            definitions, and preprocessing conditions to support test case generation.
+                            Phân tích cấu trúc mã nguồn C. Phát hiện biến, hàm, định nghĩa, điều kiện tiền xử lý để hỗ trợ sinh ca kiểm thử.
                         </TextBlock>
-                        
-                        <!-- Card Action -->
-                        <Button Grid.Row="2" Content="View Analysis" HorizontalAlignment="Right" 
+                        <Button Grid.Row="2" Content="Xem phân tích" HorizontalAlignment="Right" 
                                Style="{StaticResource SecondaryButtonStyle}"
                                Command="{Binding NavigateCommand}" CommandParameter="SourceAnalysis"/>
                     </Grid>
                 </materialDesign:Card>
-                
-                <!-- Test Case Generation Card -->
+                <!-- Sinh ca kiểm thử -->
                 <materialDesign:Card Style="{StaticResource ModernCardStyle}" Width="380" Height="220" Margin="0,8,16,8">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -186,8 +166,6 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
-                        <!-- Card Header -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Width="40" Height="40" Background="{StaticResource AccentLight}" 
                                    CornerRadius="20" Margin="0,0,16,0">
@@ -195,24 +173,18 @@
                                                        Foreground="White" HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Test Case Generation" FontSize="18" FontWeight="Medium" 
+                            <TextBlock Text="Sinh ca kiểm thử" FontSize="18" FontWeight="Medium" 
                                      VerticalAlignment="Center"/>
                         </StackPanel>
-                        
-                        <!-- Card Content -->
                         <TextBlock Grid.Row="1" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap">
-                            Automatically generate test cases for functions based on source code analysis. 
-                            Uses Z3 Solver to find optimal input values for code testing.
+                            Tự động sinh ca kiểm thử cho hàm dựa trên phân tích mã nguồn. Sử dụng Z3 Solver để tìm giá trị đầu vào tối ưu cho kiểm thử.
                         </TextBlock>
-                        
-                        <!-- Card Action -->
-                        <Button Grid.Row="2" Content="Manage Test Cases" HorizontalAlignment="Right" 
+                        <Button Grid.Row="2" Content="Quản lý ca kiểm thử" HorizontalAlignment="Right" 
                                Style="{StaticResource SecondaryButtonStyle}"
                                Command="{Binding NavigateCommand}" CommandParameter="TestCases"/>
                     </Grid>
                 </materialDesign:Card>
-                
-                <!-- Type Mapping Card -->
+                <!-- Quản lý ánh xạ kiểu dữ liệu -->
                 <materialDesign:Card Style="{StaticResource ModernCardStyle}" Width="380" Height="220" Margin="0,8,16,8">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -220,8 +192,6 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
-                        <!-- Card Header -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Width="40" Height="40" Background="{StaticResource AccentLight}" 
                                    CornerRadius="20" Margin="0,0,16,0">
@@ -229,24 +199,18 @@
                                                        Foreground="White" HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Type Mapping Management" FontSize="18" FontWeight="Medium" 
+                            <TextBlock Text="Quản lý ánh xạ kiểu dữ liệu" FontSize="18" FontWeight="Medium" 
                                      VerticalAlignment="Center"/>
                         </StackPanel>
-                        
-                        <!-- Card Content -->
                         <TextBlock Grid.Row="1" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap">
-                            Manage mappings from user-defined types to basic types and define value constraints
-                            for each data type to support accurate test case generation.
+                            Quản lý ánh xạ từ kiểu do người dùng định nghĩa sang kiểu cơ bản và khai báo ràng buộc giá trị cho từng kiểu dữ liệu để hỗ trợ sinh ca kiểm thử chính xác.
                         </TextBlock>
-                        
-                        <!-- Card Action -->
-                        <Button Grid.Row="2" Content="Configure Types" HorizontalAlignment="Right" 
+                        <Button Grid.Row="2" Content="Cấu hình kiểu dữ liệu" HorizontalAlignment="Right" 
                                Style="{StaticResource SecondaryButtonStyle}"
                                Command="{Binding NavigateCommand}" CommandParameter="TypeMappings"/>
                     </Grid>
                 </materialDesign:Card>
-                
-                <!-- Function Analysis Card -->
+                <!-- Phân tích hàm -->
                 <materialDesign:Card Style="{StaticResource ModernCardStyle}" Width="380" Height="220" Margin="0,8,16,8">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -254,8 +218,6 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
-                        <!-- Card Header -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Width="40" Height="40" Background="{StaticResource AccentLight}" 
                                    CornerRadius="20" Margin="0,0,16,0">
@@ -263,31 +225,26 @@
                                                        Foreground="White" HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Function Analysis" FontSize="18" FontWeight="Medium" 
+                            <TextBlock Text="Phân tích hàm" FontSize="18" FontWeight="Medium" 
                                      VerticalAlignment="Center"/>
                         </StackPanel>
-                        
-                        <!-- Card Content -->
                         <TextBlock Grid.Row="1" Style="{StaticResource BodyTextStyle}" TextWrapping="Wrap">
-                            Detailed analysis of functions in source code, including parameters, return values,
-                            complexity, and dependencies between functions.
+                            Phân tích chi tiết các hàm trong mã nguồn, gồm tham số, giá trị trả về, độ phức tạp và phụ thuộc giữa các hàm.
                         </TextBlock>
-                        
-                        <!-- Card Action -->
-                        <Button Grid.Row="2" Content="View Functions" HorizontalAlignment="Right" 
+                        <Button Grid.Row="2" Content="Xem danh sách hàm" HorizontalAlignment="Right" 
                                Style="{StaticResource SecondaryButtonStyle}"
                                Command="{Binding NavigateCommand}" CommandParameter="Functions"/>
                     </Grid>
                 </materialDesign:Card>
             </ItemsControl>
             
-            <!-- Footer Info -->
+            <!-- Thông tin chân trang -->
             <Border Grid.Row="3" BorderBrush="{StaticResource BorderLight}" 
                    BorderThickness="0,1,0,0" Padding="0,20,0,0" Margin="0,8,0,0">
                 <StackPanel HorizontalAlignment="Center">
                     <TextBlock Text="C-TestForge v1.0" FontSize="14" Foreground="{StaticResource SecondaryText}"
                              HorizontalAlignment="Center"/>
-                    <TextBlock Text="Developed with .NET 9 and ClangSharp" FontSize="12" 
+                    <TextBlock Text="Phát triển với .NET 9 và ClangSharp" FontSize="12" 
                              Foreground="{StaticResource DisabledText}" HorizontalAlignment="Center" 
                              Margin="0,4,0,0"/>
                 </StackPanel>

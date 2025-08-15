@@ -1,34 +1,31 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Input;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using System.Windows.Data;
-using System.ComponentModel;
-using C_TestForge.Core.Interfaces.Analysis;
+﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
+using C_TestForge.Models.Core;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
-using C_TestForge.Models.Core;
 using C_TestForge.Models.TestCases;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
-using C_TestForge.Core.Interfaces.Projects;
 using Prism.Regions;
-using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using Prism.Ioc;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Windows;
+using System.Windows.Input;
 
 namespace C_TestForge.UI.ViewModels
 {
+    /// <summary>
+    /// ViewModel chính cho MainWindow, quản lý trạng thái và logic của toàn bộ ứng dụng
+    /// </summary>
     public partial class MainWindowViewModel : ObservableObject
     {
         private readonly IProjectService _projectService;
@@ -41,7 +38,6 @@ namespace C_TestForge.UI.ViewModels
         private readonly IRegionManager _regionManager;
         private readonly SettingsViewModel _settingsViewModel;
 
-        private Project? _currentProject;
         private string _statusMessage = string.Empty;
         private SourceFile? _selectedSourceFile;
         private ObservableCollection<SourceFile> _sourceFiles = new();
@@ -63,9 +59,6 @@ namespace C_TestForge.UI.ViewModels
         private ObservableCollection<CFunction> _functions = new();
         private ObservableCollection<ConditionalDirective> _conditionalDirectives = new();
 
-        private ObservableCollection<Project> _openProjects = new();
-        private ObservableCollection<Project> _availableProjects = new();
-
         public MainWindowViewModel(
             IProjectService projectService,
             ITestCaseService testCaseService,
@@ -86,6 +79,11 @@ namespace C_TestForge.UI.ViewModels
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _regionManager = regionManager ?? throw new ArgumentNullException(nameof(regionManager));
             _settingsViewModel = settingsViewModel;
+
+            // Listen for project change from settings
+            // _settingsViewModel.PropertyChanged += SettingsViewModel_PropertyChanged;
+            // Always use project from settings
+            OnPropertyChanged(nameof(CurrentProject));
 
             // Initialize commands
             NewProjectCommand = new AsyncRelayCommand(NewProjectAsync);
@@ -132,6 +130,7 @@ namespace C_TestForge.UI.ViewModels
             AnalyzeSingleFunctionCommand = new AsyncRelayCommand<CFunction>(AnalyzeSingleFunctionAsync);
             GenerateTestCasesForFunctionCommand = new AsyncRelayCommand<CFunction>(GenerateTestCasesForFunctionAsync);
             ShowAnalysisOptionsCommand = new RelayCommand(ShowAnalysisOptions);
+            ReloadDataCommand = new RelayCommand(ReloadData);
             
             // UI commands
             NavigateCommand = new RelayCommand<string>(Navigate);
@@ -160,7 +159,7 @@ namespace C_TestForge.UI.ViewModels
             InitializeFilterOptions();
 
             // Set default status
-            StatusMessage = "Ready";
+            StatusMessage = "Sẵn sàng";
             
             // Navigate to Dashboard by default
             Navigate("Dashboard");
@@ -169,41 +168,43 @@ namespace C_TestForge.UI.ViewModels
         private void InitializeFilterOptions()
         {
             // Initialize scope options
-            AvailableScopes = new List<string> { "All", "Global", "Local", "Static", "Extern", "Parameter" };
+            AvailableScopes = new List<string> { "Tất cả", "Toàn cục", "Địa phương", "Tĩnh", "Ngoại", "Tham số" };
             
             // Initialize type options  
-            AvailableTypes = new List<string> { "All", "int", "char", "float", "double", "void", "bool", "struct", "union", "enum" };
+            AvailableTypes = new List<string> { "Tất cả", "int", "char", "float", "double", "void", "bool", "struct", "union", "enum" };
             
             // Initialize return type options
-            AvailableReturnTypes = new List<string> { "All", "void", "int", "char", "float", "double", "bool", "struct*", "char*" };
+            AvailableReturnTypes = new List<string> { "Tất cả", "void", "int", "char", "float", "double", "bool", "struct*", "char*" };
             
             // Initialize parameter count options
-            ParameterCountOptions = new List<string> { "All", "0", "1", "2", "3", "4", "5+" };
+            ParameterCountOptions = new List<string> { "Tất cả", "0", "1", "2", "3", "4", "5+" };
             
             // Initialize file type options
-            AvailableFileTypes = new List<string> { "All", "CHeader", "CppHeader", "CSource", "CppSource" };
+            AvailableFileTypes = new List<string> { "Tất cả", "CHeader", "CppHeader", "CSource", "CppSource" };
         }
 
         // Properties
         public Project? CurrentProject
         {
-            get => _currentProject;
+            get => _settingsViewModel.SelectedProject;
             set
             {
-                SetProperty(ref _currentProject, value);
-                OnPropertyChanged(nameof(ProjectName));
-                OnPropertyChanged(nameof(HasProject));
-
-                // Update command can execute state
-                ((AsyncRelayCommand)SaveProjectCommand).NotifyCanExecuteChanged();
-                ((AsyncRelayCommand)ParseSourceFilesCommand).NotifyCanExecuteChanged();
-                ((AsyncRelayCommand)ImportTestCasesCommand).NotifyCanExecuteChanged();
-                ((AsyncRelayCommand)ExportTestCasesCommand).NotifyCanExecuteChanged();
-                ((RelayCommand)CloseProjectCommand).NotifyCanExecuteChanged();
+                if (_settingsViewModel.SelectedProject != value)
+                {
+                    _settingsViewModel.SelectedProject = value;
+                    // Không raise OnPropertyChanged ở đây, vì SettingsViewModel sẽ tự raise PropertyChanged
+                    // MainWindowViewModel đã lắng nghe sự kiện này và sẽ cập nhật UI khi cần thiết
+                    // Chỉ cần cập nhật trạng thái lệnh nếu cần
+                    ((AsyncRelayCommand)SaveProjectCommand).NotifyCanExecuteChanged();
+                    ((AsyncRelayCommand)ParseSourceFilesCommand).NotifyCanExecuteChanged();
+                    ((AsyncRelayCommand)ImportTestCasesCommand).NotifyCanExecuteChanged();
+                    ((AsyncRelayCommand)ExportTestCasesCommand).NotifyCanExecuteChanged();
+                    ((RelayCommand)CloseProjectCommand).NotifyCanExecuteChanged();
+                }
             }
         }
 
-        public string ProjectName => CurrentProject?.Name ?? "No Project Loaded";
+        public string ProjectName => CurrentProject?.Name ?? "Chưa có dự án nào được tải";
 
         public bool HasProject => CurrentProject != null;
 
@@ -618,8 +619,12 @@ namespace C_TestForge.UI.ViewModels
         public ICommand ShowAnalysisOptionsCommand { get; }
         public ICommand ToggleNavigationDrawerCommand { get; }
         public ICommand ViewProjectCommand => new RelayCommand<Project>(ViewProject);
+        public ICommand ReloadDataCommand { get; }
 
         // Helper methods
+        /// <summary>
+        /// Làm mới danh sách tệp nguồn của dự án hiện tại
+        /// </summary>
         private async Task RefreshSourceFilesAsync()
         {
             SourceFiles.Clear();
@@ -635,6 +640,9 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Làm mới danh sách test case của dự án hiện tại
+        /// </summary>
         private async Task RefreshTestCasesAsync()
         {
             TestCases.Clear();
@@ -651,6 +659,9 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Cập nhật kết quả phân tích vào các collection Observable
+        /// </summary>
         private void UpdateAnalysisResults(AnalysisResult? result)
         {
             if (result == null)
@@ -680,6 +691,9 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Cập nhật kết quả phân tích toàn dự án vào các collection Observable
+        /// </summary>
         private void UpdateProjectAnalysisResults(ProjectAnalysisResult? result)
         {
             if (result == null)
@@ -730,6 +744,9 @@ namespace C_TestForge.UI.ViewModels
                 $"Macros: {result.Macros?.Count}, Duration: {result.Duration.TotalSeconds:F2}s");
         }
 
+        /// <summary>
+        /// Xóa toàn bộ kết quả phân tích hiện tại
+        /// </summary>
         private void ClearAnalysisResults()
         {
             Definitions.Clear();
@@ -750,54 +767,43 @@ namespace C_TestForge.UI.ViewModels
 
         private bool CanShowProjectSettings() => CurrentProject != null;
 
-        /// <summary>
-        /// Lấy danh sách các project trong thư mục DefaultProjectLocation
-        /// </summary>
-        public List<string> GetProjectFilesFromDefaultLocation()
-        {
-            var root = _settingsViewModel.DefaultProjectLocation;
-            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
-                return new List<string>();
-            return Directory.GetFiles(root, "*.ctproj", SearchOption.TopDirectoryOnly).ToList();
-        }
-
         // Navigation Command implementation
+        /// <summary>
+        /// Chuyển hướng sang view tương ứng
+        /// </summary>
         private void Navigate(string? viewName)
         {
             if (string.IsNullOrEmpty(viewName))
                 return;
-
-            if (viewName == "Dashboard")
-            {
-                // Load project list mỗi khi vào Dashboard
-                _ = LoadProjectsFromDefaultLocationAsync();
-            }
             try
             {
-                // Update the selected menu item
                 SelectedMenuItem = viewName;
-                // Navigate to the selected view
                 _regionManager.RequestNavigate("MainRegion", viewName + "View");
-                // Update status message
-                StatusMessage = $"Viewing {viewName}";
+                StatusMessage = $"Đang xem {viewName}";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error navigating to view: {viewName}");
-                StatusMessage = $"Error: Could not navigate to {viewName}";
+                _logger.LogError(ex, $"Lỗi chuyển hướng tới view: {viewName}");
+                StatusMessage = $"Lỗi: Không thể chuyển hướng tới {viewName}";
             }
         }
 
+        /// <summary>
+        /// Đăng xuất khỏi ứng dụng (chưa triển khai)
+        /// </summary>
         private void SignOut()
         {
             MessageBox.Show(
-                "Sign out functionality will be implemented in a future version.",
-                "Sign Out",
+                "Chức năng đăng xuất sẽ được bổ sung trong phiên bản sau.",
+                "Đăng xuất",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
 
         // Command implementations
+        /// <summary>
+        /// Tạo mới một dự án
+        /// </summary>
         private async Task NewProjectAsync()
         {
             try
@@ -805,17 +811,14 @@ namespace C_TestForge.UI.ViewModels
                 var dialog = new Dialogs.NewProjectDialog();
                 if (dialog.ShowDialog() == true)
                 {
-                    StatusMessage = $"Creating new project: {dialog.ProjectName}...";
+                    StatusMessage = $"Đang tạo dự án mới: {dialog.ProjectName}...";
 
                     var newProject = await _projectService.CreateProjectAsync(
                         dialog.ProjectName,
                         dialog.SourceDirectory);
 
-                    if (!_openProjects.Contains(newProject))
-                        _openProjects.Add(newProject);
-
-                    CurrentProject = newProject;
-                    StatusMessage = $"Created new project: {newProject.Name}";
+                    SetCurrentProject(newProject);
+                    StatusMessage = $"Đã tạo dự án mới: {newProject.Name}";
 
                     // Refresh UI
                     await RefreshSourceFilesAsync();
@@ -827,34 +830,34 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating new project");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error creating project: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi tạo dự án mới");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi tạo dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Mở một dự án từ file
+        /// </summary>
         private async Task OpenProjectAsync()
         {
             try
             {
                 var openFileDialog = new OpenFileDialog
                 {
-                    Filter = "C-TestForge Project Files|*.ctproj|All Files|*.*",
-                    Title = "Open Project"
+                    Filter = "Tệp dự án C-TestForge|*.ctproj|Tất cả tệp|*.*",
+                    Title = "Mở dự án"
                 };
 
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    StatusMessage = $"Opening project: {Path.GetFileNameWithoutExtension(openFileDialog.FileName)}...";
+                    StatusMessage = $"Đang mở dự án: {Path.GetFileNameWithoutExtension(openFileDialog.FileName)}...";
 
                     var project = await _projectService.LoadProjectAsync(openFileDialog.FileName);
                     if (project != null)
                     {
-                        if (!_openProjects.Contains(project))
-                            _openProjects.Add(project);
-
-                        CurrentProject = project;
-                        StatusMessage = $"Opened project: {project.Name}";
+                        SetCurrentProject(project);
+                        StatusMessage = $"Đã mở dự án: {project.Name}";
 
                         // Refresh UI
                         await RefreshSourceFilesAsync();
@@ -867,66 +870,64 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error opening project");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error opening project: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi mở dự án");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi mở dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Lưu dự án hiện tại
+        /// </summary>
         private async Task SaveProjectAsync()
         {
             try
             {
                 if (CurrentProject == null) return;
                 
-                StatusMessage = $"Saving project: {CurrentProject.Name}...";
+                StatusMessage = $"Đang lưu dự án: {CurrentProject.Name}...";
 
                 bool result = await _projectService.SaveProjectAsync(CurrentProject);
                 if (result)
                 {
-                    StatusMessage = $"Saved project: {CurrentProject.Name}";
+                    StatusMessage = $"Đã lưu dự án: {CurrentProject.Name}";
 
                     // Reset unsaved changes flag
                     HasUnsavedChanges = false;
                 }
                 else
                 {
-                    StatusMessage = $"Failed to save project: {CurrentProject.Name}";
+                    StatusMessage = $"Lưu dự án thất bại: {CurrentProject.Name}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving project");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error saving project: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi lưu dự án");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi lưu dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private bool CanSaveProject() => CurrentProject != null;
-
+        /// <summary>
+        /// Đóng dự án hiện tại
+        /// </summary>
         private void CloseProject()
         {
-            // Clear all data
-            CurrentProject = null;
-            SourceFiles.Clear();
-            TestCases.Clear();
-            ClearAnalysisResults();
-            ProjectAnalysisResult = null;
-            StatusMessage = "Project closed";
-            
-            // Navigate to Dashboard
+            SetCurrentProject(null);
+            StatusMessage = "Đã đóng dự án";
             Navigate("Dashboard");
         }
 
-        private bool CanCloseProject() => CurrentProject != null;
-
+        /// <summary>
+        /// Phân tích lại các tệp nguồn của dự án
+        /// </summary>
         private async Task ParseSourceFilesAsync()
         {
             try
             {
                 if (CurrentProject == null) return;
                 
-                StatusMessage = "Parsing source files...";
+                StatusMessage = "Đang phân tích tệp nguồn...";
                 IsAnalyzing = true;
 
                 // Clear existing source files
@@ -942,7 +943,7 @@ namespace C_TestForge.UI.ViewModels
                 }
 
                 IsAnalyzing = false;
-                StatusMessage = $"Parsed {sourceFiles.Count} source files";
+                StatusMessage = $"Đã phân tích {sourceFiles.Count} tệp nguồn";
                 
                 // Navigate to Source Analysis
                 Navigate("SourceAnalysis");
@@ -950,27 +951,28 @@ namespace C_TestForge.UI.ViewModels
             catch (Exception ex)
             {
                 IsAnalyzing = false;
-                _logger.LogError(ex, "Error parsing source files");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error parsing source files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi phân tích tệp nguồn");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi phân tích tệp nguồn: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private bool CanParseSourceFiles() => CurrentProject != null && CurrentProject.SourceFiles.Count > 0;
-
+        /// <summary>
+        /// Nhập test case từ file
+        /// </summary>
         private async Task ImportTestCasesAsync()
         {
             try
             {
                 var dialog = new OpenFileDialog
                 {
-                    Filter = "Test Case Files|*.tst;*.csv;*.xlsx;*.json|TST Files|*.tst|CSV Files|*.csv|Excel Files|*.xlsx|JSON Files|*.json|All Files|*.*",
-                    Title = "Import Test Cases"
+                    Filter = "Tệp test case|*.tst;*.csv;*.xlsx;*.json|Tất cả tệp|*.*",
+                    Title = "Nhập test case"
                 };
 
                 if (dialog.ShowDialog() == true)
                 {
-                    StatusMessage = $"Importing test cases from {Path.GetFileName(dialog.FileName)}...";
+                    StatusMessage = $"Đang nhập test case từ {Path.GetFileName(dialog.FileName)}...";
 
                     // Import test cases
                     // Uncomment when test case service is implemented
@@ -979,7 +981,7 @@ namespace C_TestForge.UI.ViewModels
                     // Refresh test cases
                     await RefreshTestCasesAsync();
 
-                    StatusMessage = $"Imported test cases from {Path.GetFileName(dialog.FileName)}";
+                    StatusMessage = $"Đã nhập test case từ {Path.GetFileName(dialog.FileName)}";
                     
                     // Navigate to Test Cases view
                     Navigate("TestCases");
@@ -987,46 +989,48 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error importing test cases");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error importing test cases: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi nhập test case");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi nhập test case: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private bool CanImportTestCases() => CurrentProject != null;
-
+        /// <summary>
+        /// Xuất test case ra file
+        /// </summary>
         private async Task ExportTestCasesAsync()
         {
             try
             {
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "TST Files|*.tst|CSV Files|*.csv|Excel Files|*.xlsx|JSON Files|*.json|All Files|*.*",
-                    Title = "Export Test Cases",
+                    Filter = "Tệp TST|*.tst|Tệp CSV|*.csv|Tệp Excel|*.xlsx|Tệp JSON|*.json|Tất cả tệp|*.*",
+                    Title = "Xuất test case",
                     DefaultExt = ".tst"
                 };
 
                 if (dialog.ShowDialog() == true)
                 {
-                    StatusMessage = $"Exporting test cases to {Path.GetFileName(dialog.FileName)}...";
+                    StatusMessage = $"Đang xuất test case ra {Path.GetFileName(dialog.FileName)}...";
 
                     // Export test cases
                     // Uncomment when test case service is implemented
                     // await _testCaseService.ExportTestCasesToFileAsync(TestCases.ToList(), dialog.FileName);
 
-                    StatusMessage = $"Exported test cases to {Path.GetFileName(dialog.FileName)}";
+                    StatusMessage = $"Đã xuất test case ra {Path.GetFileName(dialog.FileName)}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting test cases");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error exporting test cases: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất test case");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi xuất test case: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private bool CanExportTestCases() => CurrentProject != null;
-
+        /// <summary>
+        /// Phân tích một tệp nguồn cụ thể
+        /// </summary>
         private async Task AnalyzeSourceFileAsync(SourceFile? sourceFile)
         {
             if (sourceFile == null)
@@ -1036,7 +1040,7 @@ namespace C_TestForge.UI.ViewModels
 
             try
             {
-                StatusMessage = $"Analyzing source file: {sourceFile.FileName}...";
+                StatusMessage = $"Đang phân tích tệp nguồn: {sourceFile.FileName}...";
                 IsAnalyzing = true;
 
                 // Clear previous analysis results
@@ -1055,7 +1059,7 @@ namespace C_TestForge.UI.ViewModels
                 UpdateAnalysisResults(_analysisResult);
 
                 IsAnalyzing = false;
-                StatusMessage = $"Analysis complete for {sourceFile.FileName}";
+                StatusMessage = $"Đã phân tích xong {sourceFile.FileName}";
                 
                 // Navigate to Source Analysis view after analysis is complete
                 Navigate("SourceAnalysis");
@@ -1063,9 +1067,9 @@ namespace C_TestForge.UI.ViewModels
             catch (Exception ex)
             {
                 IsAnalyzing = false;
-                _logger.LogError(ex, $"Error analyzing source file: {sourceFile.FilePath}");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error analyzing source file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, $"Lỗi khi phân tích tệp nguồn: {sourceFile.FilePath}");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi phân tích tệp nguồn: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1081,7 +1085,7 @@ namespace C_TestForge.UI.ViewModels
                 // Nếu không có path được truyền, sử dụng folder picker
                 var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
                 {
-                    Description = "Select project root directory for complete analysis",
+                    Description = "Chọn thư mục gốc của dự án để phân tích toàn bộ",
                     UseDescriptionForTitle = true,
                     Multiselect = false
                 };
@@ -1097,8 +1101,8 @@ namespace C_TestForge.UI.ViewModels
             if (!Directory.Exists(projectPath))
             {
                 MessageBox.Show(
-                    $"Directory does not exist: {projectPath}",
-                    "Invalid Directory",
+                    $"Thư mục không tồn tại: {projectPath}",
+                    "Thư mục không hợp lệ",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 return;
@@ -1106,27 +1110,27 @@ namespace C_TestForge.UI.ViewModels
 
             try
             {
-                StatusMessage = $"Starting complete project analysis: {projectPath}...";
+                StatusMessage = $"Bắt đầu phân tích toàn bộ dự án: {projectPath}...";
                 IsAnalyzing = true;
 
                 // Show confirmation dialog with analysis details
                 var confirmResult = MessageBox.Show(
-                    $"This will perform a complete analysis of the project at:\n{projectPath}\n\n" +
-                    "The analysis will:\n" +
-                    "• Scan all C/C++ files in the directory\n" +
-                    "• Build dependency graph\n" +
-                    "• Extract functions, variables, and macros\n" +
-                    "• Analyze relationships and constraints\n\n" +
-                    "This process may take several minutes for large projects.\n\n" +
-                    "Do you want to continue?",
-                    "Complete Project Analysis",
+                    $"Điều này sẽ thực hiện phân tích toàn bộ dự án tại:\n{projectPath}\n\n" +
+                    "Phân tích sẽ:\n" +
+                    "• Quét tất cả các tệp C/C++ trong thư mục\n" +
+                    "• Xây dựng đồ thị phụ thuộc\n" +
+                    "• Trích xuất hàm, biến và macro\n" +
+                    "• Phân tích mối quan hệ và ràng buộc\n\n" +
+                    "Quá trình này có thể mất vài phút đối với các dự án lớn.\n\n" +
+                    "Bạn có muốn tiếp tục không?",
+                    "Phân tích toàn bộ dự án",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
                 if (confirmResult != MessageBoxResult.Yes)
                 {
                     IsAnalyzing = false;
-                    StatusMessage = "Project analysis cancelled";
+                    StatusMessage = "Đã hủy phân tích dự án";
                     return;
                 }
 
@@ -1139,8 +1143,8 @@ namespace C_TestForge.UI.ViewModels
                 // Show completion summary
                 var summaryReport = analysisResult.GenerateSummaryReport();
                 
-                StatusMessage = $"Complete project analysis finished - {analysisResult.Functions?.Count} functions, " +
-                    $"{analysisResult.Variables?.Count} variables, {analysisResult.Macros?.Count} macros found";
+                StatusMessage = $"Hoàn thành phân tích dự án - {analysisResult.Functions?.Count} hàm, " +
+                    $"{analysisResult.Variables?.Count} biến, {analysisResult.Macros?.Count} macro đã tìm thấy";
 
                 // Navigate to Source Analysis view to show results
                 Navigate("SourceAnalysis");
@@ -1152,11 +1156,11 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error during complete project analysis: {ex.Message}");
-                StatusMessage = $"Error during project analysis: {ex.Message}";
+                _logger.LogError(ex, $"Lỗi trong quá trình phân tích toàn bộ dự án: {ex.Message}");
+                StatusMessage = $"Lỗi trong quá trình phân tích dự án: {ex.Message}";
                 MessageBox.Show(
-                    $"Error during complete project analysis:\n\n{ex.Message}",
-                    "Analysis Error",
+                    $"Lỗi trong quá trình phân tích toàn bộ dự án:\n\n{ex.Message}",
+                    "Lỗi phân tích",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -1166,6 +1170,9 @@ namespace C_TestForge.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Xóa một tệp nguồn khỏi dự án
+        /// </summary>
         private async Task RemoveSourceFileAsync(SourceFile? sourceFile)
         {
             if (sourceFile == null || CurrentProject == null)
@@ -1176,14 +1183,14 @@ namespace C_TestForge.UI.ViewModels
             try
             {
                 var result = MessageBox.Show(
-                    $"Are you sure you want to remove the source file '{sourceFile.FileName}' from the project?",
-                    "Remove Source File",
+                    $"Bạn có chắc chắn muốn xóa tệp nguồn '{sourceFile.FileName}' khỏi dự án không?",
+                    "Xóa tệp nguồn",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    StatusMessage = $"Removing source file: {sourceFile.FileName}...";
+                    StatusMessage = $"Đang xóa tệp nguồn: {sourceFile.FileName}...";
 
                     bool success = await _projectService.RemoveSourceFileAsync(CurrentProject, sourceFile.FilePath);
 
@@ -1195,31 +1202,32 @@ namespace C_TestForge.UI.ViewModels
                         // Refresh source files
                         await RefreshSourceFilesAsync();
 
-                        StatusMessage = $"Removed source file: {sourceFile.FileName}";
+                        StatusMessage = $"Đã xóa tệp nguồn: {sourceFile.FileName}";
                     }
                     else
                     {
-                        StatusMessage = $"Failed to remove source file: {sourceFile.FileName}";
+                        StatusMessage = $"Không thể xóa tệp nguồn: {sourceFile.FileName}";
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error removing source file: {sourceFile.FilePath}");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error removing source file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, $"Lỗi khi xóa tệp nguồn: {sourceFile.FilePath}");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi xóa tệp nguồn: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Sinh test case tự động (chưa triển khai)
+        /// </summary>
         private async Task GenerateTestCasesAsync()
         {
             try
             {
-                // This would typically show a dialog to select functions to generate test cases for
-                // For now, we'll just show a placeholder message
                 MessageBox.Show(
-                    "Test case generation functionality will be implemented in a future version.",
-                    "Generate Test Cases",
+                    "Chức năng sinh test case sẽ được bổ sung trong phiên bản sau.",
+                    "Sinh test case",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 
@@ -1227,21 +1235,22 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating test cases");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error generating test cases: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi sinh test case");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi sinh test case: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Hiển thị hộp thoại cài đặt dự án (chưa triển khai)
+        /// </summary>
         private void ShowProjectSettings()
         {
             try
             {
-                // This would typically show a dialog to edit project settings
-                // For now, we'll just show a placeholder message
                 MessageBox.Show(
-                    "Project settings dialog will be implemented in a future version.",
-                    "Project Settings",
+                    "Hộp thoại cài đặt dự án sẽ được bổ sung trong phiên bản sau.",
+                    "Cài đặt dự án",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 
@@ -1250,59 +1259,67 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing project settings");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error showing project settings: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi hiển thị cài đặt dự án");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi hiển thị cài đặt dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Hiển thị hộp thoại tuỳ chọn phân tích (chưa triển khai)
+        /// </summary>
         private void ShowAnalysisOptions()
         {
             try
             {
-                // This would typically show a dialog to edit analysis options
-                // For now, we'll just show a placeholder message
                 MessageBox.Show(
-                    "Analysis options dialog will be implemented in a future version.",
-                    "Analysis Options",
+                    "Hộp thoại tuỳ chọn phân tích sẽ được bổ sung trong phiên bản sau.",
+                    "Tuỳ chọn phân tích",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing analysis options");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error showing analysis options: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi hiển thị tuỳ chọn phân tích");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi hiển thị tuỳ chọn phân tích: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /// <summary>
+        /// Hiển thị hộp thoại giới thiệu phần mềm
+        /// </summary>
         private void ShowAboutDialog()
         {
             MessageBox.Show(
-                "C-TestForge v1.0\n\nA comprehensive tool for analyzing, managing, and automatically generating test cases for C code.\n\nDeveloped using ClangSharp and Z3 Theorem Prover.",
-                "About C-TestForge",
+                "C-TestForge v1.0\n\nCông cụ phân tích, quản lý và sinh test case tự động cho mã nguồn C.\n\nPhát triển dựa trên ClangSharp và Z3 Theorem Prover.",
+                "Giới thiệu C-TestForge",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
 
+        /// <summary>
+        /// Thoát ứng dụng
+        /// </summary>
         private void Exit()
         {
-            // This will trigger the Window_Closing event in MainWindow.xaml.cs
-            // which will check for unsaved changes
             Application.Current.MainWindow?.Close();
         }
 
+        /// <summary>
+        /// Thêm tệp nguồn vào dự án (có thể chọn nhiều chế độ)
+        /// </summary>
         private async Task AddSourceFileAsync()
         {
             try
             {
                 // Show a menu to choose between adding files, analyzing folder, or complete project analysis
                 var choice = MessageBox.Show(
-                    "Choose an option:\n\n" +
-                    "• Yes: Add individual source files to project\n" +
-                    "• No: Analyze entire folder/directory\n" +
-                    "• Cancel: Cancel operation",
-                    "Add Source Files",
+                    "Chọn một tuỳ chọn:\n\n" +
+                    "• Yes: Thêm từng tệp nguồn vào dự án\n" +
+                    "• No: Phân tích toàn bộ thư mục\n" +
+                    "• Cancel: Hủy thao tác",
+                    "Thêm tệp nguồn",
                     MessageBoxButton.YesNoCancel,
                     MessageBoxImage.Question);
 
@@ -1320,14 +1337,14 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in AddSourceFileAsync");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi thêm tệp nguồn");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Add individual source files to the project
+        /// Thêm từng tệp nguồn riêng lẻ vào dự án
         /// </summary>
         private async Task AddIndividualFilesAsync()
         {
@@ -1335,18 +1352,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 var dialog = new OpenFileDialog
                 {
-                    Filter = "C/C++ Source Files|*.c;*.h;*.cpp;*.hpp;*.cc;*.cxx;*.hxx|" +
-                            "C Files|*.c|" +
-                            "C++ Files|*.cpp;*.cc;*.cxx|" +
-                            "Header Files|*.h;*.hpp;*.hxx|" +
-                            "All Files|*.*",
-                    Title = "Add Source Files to Project",
+                    Filter = "Tệp nguồn C/C++|*.c;*.h;*.cpp;*.hpp;*.cc;*.cxx;*.hxx|Tất cả tệp|*.*",
+                    Title = "Thêm tệp nguồn vào dự án",
                     Multiselect = true
                 };
 
                 if (dialog.ShowDialog() == true && CurrentProject != null)
                 {
-                    StatusMessage = "Adding source files to project...";
+                    StatusMessage = "Đang thêm tệp nguồn vào dự án...";
                     IsAnalyzing = true;
 
                     foreach (var filePath in dialog.FileNames)
@@ -1360,7 +1373,7 @@ namespace C_TestForge.UI.ViewModels
                     // Refresh source files
                     await RefreshSourceFilesAsync();
 
-                    StatusMessage = $"Added {dialog.FileNames.Length} source file(s) to project";
+                    StatusMessage = $"Đã thêm {dialog.FileNames.Length} tệp nguồn vào dự án";
                     
                     // Navigate to Project Explorer
                     Navigate("ProjectExplorer");
@@ -1368,9 +1381,9 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error adding individual files");
-                StatusMessage = $"Error adding files: {ex.Message}";
-                MessageBox.Show($"Error adding source files: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi thêm tệp nguồn riêng lẻ");
+                StatusMessage = $"Lỗi khi thêm tệp: {ex.Message}";
+                MessageBox.Show($"Lỗi khi thêm tệp nguồn: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1379,7 +1392,7 @@ namespace C_TestForge.UI.ViewModels
         }
 
         /// <summary>
-        /// Analyze an entire folder and add all C/C++ files found
+        /// Phân tích toàn bộ thư mục và thêm các tệp C/C++ tìm thấy
         /// </summary>
         private async Task AnalyzeFolderAsync()
         {
@@ -1388,7 +1401,7 @@ namespace C_TestForge.UI.ViewModels
                 // Use Ookii.Dialogs for better WPF integration
                 var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
                 {
-                    Description = "Select folder to analyze for C/C++ source files",
+                    Description = "Chọn thư mục để phân tích tệp nguồn C/C++",
                     UseDescriptionForTitle = true,
                     Multiselect = false
                 };
@@ -1399,12 +1412,12 @@ namespace C_TestForge.UI.ViewModels
                     
                     // Show options for folder analysis
                     var analysisChoice = MessageBox.Show(
-                        $"Selected folder: {selectedPath}\n\n" +
-                        "Choose analysis mode:\n\n" +
-                        "• Yes: Quick scan and add files to current project\n" +
-                        "• No: Complete project analysis with full dependency mapping\n" +
-                        "• Cancel: Cancel operation",
-                        "Folder Analysis Options",
+                        $"Đã chọn thư mục: {selectedPath}\n\n" +
+                        "Chọn chế độ phân tích:\n\n" +
+                        "• Yes: Quét nhanh và thêm tệp vào dự án hiện tại\n" +
+                        "• No: Phân tích toàn bộ dự án với đồ thị phụ thuộc\n" +
+                        "• Cancel: Hủy thao tác",
+                        "Tùy chọn phân tích thư mục",
                         MessageBoxButton.YesNoCancel,
                         MessageBoxImage.Question);
 
@@ -1417,16 +1430,15 @@ namespace C_TestForge.UI.ViewModels
                     }
                     else if (analysisChoice == MessageBoxResult.No)
                     {
-                        // Use complete project analysis
                         await AnalyzeCompleteProjectAsync(selectedPath);
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing folder");
-                StatusMessage = $"Error analyzing folder: {ex.Message}";
-                MessageBox.Show($"Error analyzing folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi phân tích thư mục");
+                StatusMessage = $"Lỗi khi phân tích thư mục: {ex.Message}";
+                MessageBox.Show($"Lỗi khi phân tích thư mục: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1435,19 +1447,19 @@ namespace C_TestForge.UI.ViewModels
         }
 
         /// <summary>
-        /// Quick scan of folder to find and add C/C++ files to project
+        /// Quét nhanh thư mục để tìm và thêm tệp C/C++ vào dự án
         /// </summary>
         private async Task QuickFolderScanAsync(string folderPath)
         {
             try
             {
-                StatusMessage = $"Scanning folder: {folderPath}...";
+                StatusMessage = $"Đang quét thư mục: {folderPath}...";
                 IsAnalyzing = true;
 
                 // Ask if user wants recursive scan
                 var recursive = MessageBox.Show(
-                    "Include subdirectories in scan?",
-                    "Recursive Scan",
+                    "Bao gồm cả thư mục con trong quét không?",
+                    "Quét đệ quy",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question) == MessageBoxResult.Yes;
 
@@ -1456,10 +1468,10 @@ namespace C_TestForge.UI.ViewModels
 
                 if (foundFiles.Count == 0)
                 {
-                    StatusMessage = "No C/C++ source files found in selected folder";
+                    StatusMessage = "Không tìm thấy tệp nguồn C/C++ nào trong thư mục đã chọn";
                     MessageBox.Show(
-                        "No C/C++ source files (.c, .h, .cpp, .hpp) were found in the selected folder.",
-                        "No Files Found",
+                        "Không tìm thấy tệp nguồn C/C++ (.c, .h, .cpp, .hpp) trong thư mục đã chọn.",
+                        "Không tìm thấy tệp",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
@@ -1468,17 +1480,17 @@ namespace C_TestForge.UI.ViewModels
                 // Show preview of found files
                 var fileList = string.Join("\n", foundFiles.Take(10));
                 if (foundFiles.Count > 10)
-                    fileList += $"\n... and {foundFiles.Count - 10} more files";
+                    fileList += $"\n... và {foundFiles.Count - 10} tệp khác";
 
                 var addFiles = MessageBox.Show(
-                    $"Found {foundFiles.Count} C/C++ files:\n\n{fileList}\n\nAdd all files to project?",
-                    "Files Found",
+                    $"Đã tìm thấy {foundFiles.Count} tệp nguồn C/C++:\n\n{fileList}\n\nThêm tất cả các tệp này vào dự án không?",
+                    "Tệp đã tìm thấy",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
                 if (addFiles == MessageBoxResult.Yes && CurrentProject != null)
                 {
-                    StatusMessage = $"Adding {foundFiles.Count} files to project...";
+                    StatusMessage = $"Đang thêm {foundFiles.Count} tệp vào dự án...";
 
                     // Add files to project
                     foreach (var filePath in foundFiles)
@@ -1492,7 +1504,7 @@ namespace C_TestForge.UI.ViewModels
                     // Refresh source files
                     await RefreshSourceFilesAsync();
 
-                    StatusMessage = $"Added {foundFiles.Count} source files from folder scan";
+                    StatusMessage = $"Đã thêm {foundFiles.Count} tệp nguồn từ quét thư mục";
                     
                     // Navigate to Project Explorer
                     Navigate("ProjectExplorer");
@@ -1500,13 +1512,13 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in quick folder scan: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi trong quá trình quét thư mục: {ex.Message}");
                 throw;
             }
         }
 
         /// <summary>
-        /// Simple file scanner for C/C++ files
+        /// Quét thư mục để tìm các tệp C/C++ (hỗ trợ đệ quy)
         /// </summary>
         private async Task<List<string>> ScanDirectoryForFilesAsync(string directoryPath, bool recursive)
         {
@@ -1526,7 +1538,7 @@ namespace C_TestForge.UI.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error scanning directory {directoryPath}");
+                    _logger.LogError(ex, $"Lỗi khi quét thư mục {directoryPath}");
                 }
                 
                 return files.Distinct().ToList();
@@ -1534,7 +1546,7 @@ namespace C_TestForge.UI.ViewModels
         }
 
         /// <summary>
-        /// Show detailed analysis report in a message box or dialog
+        /// Hiển thị báo cáo phân tích chi tiết trong hộp thoại
         /// </summary>
         private void ShowAnalysisReport(string report)
         {
@@ -1544,18 +1556,18 @@ namespace C_TestForge.UI.ViewModels
                 // In a real application, you might want to create a dedicated dialog
                 MessageBox.Show(
                     report,
-                    "Detailed Analysis Report",
+                    "Báo cáo phân tích chi tiết",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error showing analysis report: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi hiển thị báo cáo phân tích: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Direct folder analysis command - can be used from menu/toolbar
+        /// Lệnh phân tích thư mục trực tiếp (từ menu/thanh công cụ)
         /// </summary>
         private async Task AnalyzeFolderDirectlyAsync()
         {
@@ -1565,17 +1577,16 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in direct folder analysis");
-                StatusMessage = $"Error: {ex.Message}";
-                MessageBox.Show($"Error analyzing folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi trong phân tích thư mục trực tiếp");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi phân tích thư mục: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        #region Legacy Support Methods (kept for backward compatibility)
+        #region Legacy Support Methods (giữ lại cho tương thích cũ)
 
         /// <summary>
-        /// Deep analysis of entire folder with dependency mapping and insights (Legacy)
-        /// This method is kept for backward compatibility but now uses AnalyzeCompleteProjectAsync
+        /// Phân tích sâu toàn bộ thư mục với đồ thị phụ thuộc (Legacy)
         /// </summary>
         private async Task DeepFolderAnalysisAsync(string folderPath)
         {
@@ -1586,8 +1597,8 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in deep folder analysis: {ex.Message}");
-                MessageBox.Show($"Error in deep analysis: {ex.Message}", "Analysis Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, $"Lỗi trong phân tích sâu thư mục: {ex.Message}");
+                MessageBox.Show($"Lỗi trong phân tích sâu: {ex.Message}", "Lỗi phân tích", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1596,7 +1607,7 @@ namespace C_TestForge.UI.ViewModels
         #region Export and Report Methods
 
         /// <summary>
-        /// Show detailed project analysis report
+        /// Hiển thị báo cáo phân tích dự án chi tiết
         /// </summary>
         private void ShowProjectAnalysisReport()
         {
@@ -1604,7 +1615,7 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (ProjectAnalysisResult == null)
                 {
-                    MessageBox.Show("No project analysis data available.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có dữ liệu phân tích dự án.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -1613,13 +1624,13 @@ namespace C_TestForge.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing project analysis report");
-                MessageBox.Show($"Error showing report: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi hiển thị báo cáo phân tích dự án");
+                MessageBox.Show($"Lỗi khi hiển thị báo cáo: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export source file content to file
+        /// Xuất nội dung tệp nguồn ra file
         /// </summary>
         private async Task ExportSourceFileAsync(SourceFile? sourceFile)
         {
@@ -1630,26 +1641,26 @@ namespace C_TestForge.UI.ViewModels
             {
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "Text Files|*.txt|All Files|*.*",
-                    Title = "Export Source File",
+                    Filter = "Tệp văn bản|*.txt|Tất cả tệp|*.*",
+                    Title = "Xuất tệp nguồn",
                     FileName = $"{sourceFile.FileName}_exported.txt"
                 };
 
                 if (dialog.ShowDialog() == true)
                 {
                     await File.WriteAllTextAsync(dialog.FileName, sourceFile.Content);
-                    StatusMessage = $"Exported source file to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất tệp nguồn đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting source file");
-                MessageBox.Show($"Error exporting source file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất tệp nguồn");
+                MessageBox.Show($"Lỗi khi xuất tệp nguồn: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export definitions to CSV file
+        /// Xuất các định nghĩa (macro) ra file CSV hoặc JSON
         /// </summary>
         private async Task ExportDefinitionsAsync()
         {
@@ -1657,14 +1668,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (Definitions.Count == 0)
                 {
-                    MessageBox.Show("No definitions to export.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có định nghĩa nào để xuất.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv|JSON Files|*.json|All Files|*.*",
-                    Title = "Export Definitions",
+                    Filter = "Tệp CSV|*.csv|Tệp JSON|*.json|Tất cả tệp|*.*",
+                    Title = "Xuất Định Nghĩa",
                     FileName = "definitions.csv"
                 };
 
@@ -1690,18 +1701,18 @@ namespace C_TestForge.UI.ViewModels
                         await File.WriteAllTextAsync(dialog.FileName, csv.ToString());
                     }
 
-                    StatusMessage = $"Exported {Definitions.Count} definitions to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất {Definitions.Count} định nghĩa đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting definitions");
-                MessageBox.Show($"Error exporting definitions: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất định nghĩa");
+                MessageBox.Show($"Lỗi khi xuất định nghĩa: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export variables to CSV file
+        /// Xuất biến ra file CSV hoặc JSON
         /// </summary>
         private async Task ExportVariablesAsync()
         {
@@ -1709,14 +1720,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (Variables.Count == 0)
                 {
-                    MessageBox.Show("No variables to export.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có biến nào để xuất.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv|JSON Files|*.json|All Files|*.*",
-                    Title = "Export Variables",
+                    Filter = "Tệp CSV|*.csv|Tệp JSON|*.json|Tất cả tệp|*.*",
+                    Title = "Xuất Biến",
                     FileName = "variables.csv"
                 };
 
@@ -1742,18 +1753,18 @@ namespace C_TestForge.UI.ViewModels
                         await File.WriteAllTextAsync(dialog.FileName, csv.ToString());
                     }
 
-                    StatusMessage = $"Exported {Variables.Count} variables to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất {Variables.Count} biến đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting variables");
-                MessageBox.Show($"Error exporting variables: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất biến");
+                MessageBox.Show($"Lỗi khi xuất biến: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export functions to CSV file
+        /// Xuất hàm ra file CSV hoặc JSON
         /// </summary>
         private async Task ExportFunctionsAsync()
         {
@@ -1761,14 +1772,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (Functions.Count == 0)
                 {
-                    MessageBox.Show("No functions to export.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có hàm nào để xuất.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv|JSON Files|*.json|All Files|*.*",
-                    Title = "Export Functions",
+                    Filter = "Tệp CSV|*.csv|Tệp JSON|*.json|Tất cả tệp|*.*",
+                    Title = "Xuất Hàm",
                     FileName = "functions.csv"
                 };
 
@@ -1794,18 +1805,18 @@ namespace C_TestForge.UI.ViewModels
                         await File.WriteAllTextAsync(dialog.FileName, csv.ToString());
                     }
 
-                    StatusMessage = $"Exported {Functions.Count} functions to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất {Functions.Count} hàm đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting functions");
-                MessageBox.Show($"Error exporting functions: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất hàm");
+                MessageBox.Show($"Lỗi khi xuất hàm: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export conditional directives to CSV file
+        /// Xuất các chỉ thị điều kiện ra file CSV hoặc JSON
         /// </summary>
         private async Task ExportDirectivesAsync()
         {
@@ -1813,14 +1824,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (ConditionalDirectives.Count == 0)
                 {
-                    MessageBox.Show("No directives to export.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có chỉ thị nào để xuất.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv|JSON Files|*.json|All Files|*.*",
-                    Title = "Export Directives",
+                    Filter = "Tệp CSV|*.csv|Tệp JSON|*.json|Tất cả tệp|*.*",
+                    Title = "Xuất Chỉ Thị",
                     FileName = "directives.csv"
                 };
 
@@ -1846,18 +1857,18 @@ namespace C_TestForge.UI.ViewModels
                         await File.WriteAllTextAsync(dialog.FileName, csv.ToString());
                     }
 
-                    StatusMessage = $"Exported {ConditionalDirectives.Count} directives to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất {ConditionalDirectives.Count} chỉ thị đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting directives");
-                MessageBox.Show($"Error exporting directives: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất chỉ thị");
+                MessageBox.Show($"Lỗi khi xuất chỉ thị: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Export dependency graph to file
+        /// Xuất đồ thị phụ thuộc ra file
         /// </summary>
         private async Task ExportDependencyGraphAsync()
         {
@@ -1865,14 +1876,14 @@ namespace C_TestForge.UI.ViewModels
             {
                 if (ProjectAnalysisResult?.DependencyGraph?.SourceFiles == null || ProjectAnalysisResult.DependencyGraph.SourceFiles.Count == 0)
                 {
-                    MessageBox.Show("No dependency graph to export.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có đồ thị phụ thuộc nào để xuất.", "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 var dialog = new SaveFileDialog
                 {
-                    Filter = "JSON Files|*.json|CSV Files|*.csv|All Files|*.*",
-                    Title = "Export Dependency Graph",
+                    Filter = "Tệp JSON|*.json|Tệp CSV|*.csv|Tất cả tệp|*.*",
+                    Title = "Xuất Đồ Thị Phụ Thuộc",
                     FileName = "dependency_graph.json"
                 };
 
@@ -1898,48 +1909,57 @@ namespace C_TestForge.UI.ViewModels
                         await File.WriteAllTextAsync(dialog.FileName, csv.ToString());
                     }
 
-                    StatusMessage = $"Exported dependency graph to {dialog.FileName}";
+                    StatusMessage = $"Đã xuất đồ thị phụ thuộc đến {dialog.FileName}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting dependency graph");
-                MessageBox.Show($"Error exporting dependency graph: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.LogError(ex, "Lỗi khi xuất đồ thị phụ thuộc");
+                MessageBox.Show($"Lỗi khi xuất đồ thị phụ thuộc: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         #endregion
 
-        #region Additional Command Implementations
+        #region Các lệnh bổ sung cho phân tích và lọc
 
+        /// <summary>
+        /// Làm mới danh sách macro/định nghĩa
+        /// </summary>
         private void RefreshDefinitions()
         {
             try
             {
                 OnPropertyChanged(nameof(Definitions));
-                StatusMessage = "Definitions refreshed";
+                StatusMessage = "Đã làm mới danh sách định nghĩa";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error refreshing definitions");
-                StatusMessage = $"Error refreshing definitions: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi làm mới định nghĩa");
+                StatusMessage = $"Lỗi làm mới định nghĩa: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Tìm kiếm macro/định nghĩa
+        /// </summary>
         private void SearchDefinitions()
         {
             try
             {
                 OnPropertyChanged(nameof(Definitions));
-                StatusMessage = $"Search applied: {DefinitionSearchText}";
+                StatusMessage = $"Đã áp dụng tìm kiếm: {DefinitionSearchText}";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error searching definitions");
-                StatusMessage = $"Error searching definitions: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi tìm kiếm định nghĩa");
+                StatusMessage = $"Lỗi tìm kiếm định nghĩa: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Xóa bộ lọc macro/định nghĩa
+        /// </summary>
         private void ClearDefinitionFilters()
         {
             try
@@ -1948,31 +1968,37 @@ namespace C_TestForge.UI.ViewModels
                 ShowFunctionLikeMacros = true;
                 ShowEnabledOnly = false;
                 OnPropertyChanged(nameof(Definitions));
-                StatusMessage = "Definition filters cleared";
+                StatusMessage = "Đã xóa bộ lọc định nghĩa";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error clearing definition filters");
-                StatusMessage = $"Error clearing filters: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi xóa bộ lọc định nghĩa");
+                StatusMessage = $"Lỗi xóa bộ lọc: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Phân tích ràng buộc biến (chưa triển khai)
+        /// </summary>
         private async Task AnalyzeVariableConstraintsAsync()
         {
             try
             {
-                StatusMessage = "Analyzing variable constraints...";
+                StatusMessage = "Đang phân tích ràng buộc biến...";
                 // Implement variable constraint analysis
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = "Variable constraint analysis completed";
+                StatusMessage = "Phân tích ràng buộc biến hoàn tất";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing variable constraints");
-                StatusMessage = $"Error analyzing constraints: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi phân tích ràng buộc biến");
+                StatusMessage = $"Lỗi phân tích ràng buộc: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Xóa bộ lọc biến
+        /// </summary>
         private void ClearVariableFilters()
         {
             try
@@ -1985,45 +2011,54 @@ namespace C_TestForge.UI.ViewModels
                 SelectedScopeFilter = null;
                 SelectedTypeFilter = null;
                 OnPropertyChanged(nameof(Variables));
-                StatusMessage = "Variable filters cleared";
+                StatusMessage = "Đã xóa bộ lọc biến";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error clearing variable filters");
-                StatusMessage = $"Error clearing filters: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi xóa bộ lọc biến");
+                StatusMessage = $"Lỗi xóa bộ lọc: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Phân tích quan hệ giữa các hàm (chưa triển khai)
+        /// </summary>
         private async Task AnalyzeFunctionRelationshipsAsync()
         {
             try
             {
-                StatusMessage = "Analyzing function relationships...";
+                StatusMessage = "Đang phân tích quan hệ giữa các hàm...";
                 // Implement function relationship analysis
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = "Function relationship analysis completed";
+                StatusMessage = "Phân tích quan hệ hàm hoàn tất";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing function relationships");
-                StatusMessage = $"Error analyzing relationships: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi phân tích quan hệ hàm");
+                StatusMessage = $"Lỗi phân tích quan hệ: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Hiển thị tìm kiếm nâng cao (chưa triển khai)
+        /// </summary>
         private void ShowAdvancedSearch()
         {
             try
             {
-                MessageBox.Show("Advanced search dialog will be implemented in a future version.", 
-                    "Advanced Search", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Hộp thoại tìm kiếm nâng cao sẽ được bổ sung trong phiên bản sau.", 
+                    "Tìm kiếm nâng cao", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing advanced search");
-                StatusMessage = $"Error: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi hiển thị tìm kiếm nâng cao");
+                StatusMessage = $"Lỗi: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Xóa bộ lọc hàm
+        /// </summary>
         private void ClearFunctionFilters()
         {
             try
@@ -2036,203 +2071,250 @@ namespace C_TestForge.UI.ViewModels
                 SelectedReturnTypeFilter = null;
                 SelectedParameterCountFilter = null;
                 OnPropertyChanged(nameof(Functions));
-                StatusMessage = "Function filters cleared";
+                StatusMessage = "Đã xóa bộ lọc hàm";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error clearing function filters");
-                StatusMessage = $"Error clearing filters: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi xóa bộ lọc hàm");
+                StatusMessage = $"Lỗi xóa bộ lọc: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Hiển thị đồ thị phụ thuộc (chưa triển khai)
+        /// </summary>
         private void VisualizeDependencyGraph()
         {
             try
             {
                 if (ProjectAnalysisResult?.DependencyGraph == null)
                 {
-                    MessageBox.Show("No dependency graph available to visualize.", 
-                        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Không có đồ thị phụ thuộc nào để hiển thị.", 
+                        "Không có dữ liệu", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
-                MessageBox.Show("Dependency graph visualization will be implemented in a future version.", 
-                    "Visualize Graph", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Chức năng hiển thị đồ thị phụ thuộc sẽ được bổ sung trong phiên bản sau.", 
+                    "Hiển thị đồ thị phụ thuộc", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error visualizing dependency graph");
-                StatusMessage = $"Error: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi hiển thị đồ thị phụ thuộc");
+                StatusMessage = $"Lỗi: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Phân tích chu trình phụ thuộc (chưa triển khai)
+        /// </summary>
         private async Task AnalyzeDependencyCyclesAsync()
         {
             try
             {
-                StatusMessage = "Analyzing dependency cycles...";
+                StatusMessage = "Đang phân tích chu trình phụ thuộc...";
                 // Implement cycle detection
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = "Dependency cycle analysis completed";
+                StatusMessage = "Phân tích chu trình phụ thuộc hoàn tất";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing dependency cycles");
-                StatusMessage = $"Error analyzing cycles: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi phân tích chu trình phụ thuộc");
+                StatusMessage = $"Lỗi phân tích chu trình: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Xem các tệp phụ thuộc của một tệp (chưa triển khai)
+        /// </summary>
         private void ViewDependencies(object? file)
         {
             try
             {
                 if (file == null) return;
-                MessageBox.Show("Dependency viewer will be implemented in a future version.", 
-                    "View Dependencies", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Chức năng xem các tệp phụ thuộc sẽ được bổ sung trong phiên bản sau.", 
+                    "Xem các tệp phụ thuộc", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error viewing dependencies");
-                StatusMessage = $"Error: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi xem các tệp phụ thuộc");
+                StatusMessage = $"Lỗi: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Xem các tệp phụ thuộc ngược của một tệp (chưa triển khai)
+        /// </summary>
         private void ViewDependents(object? file)
         {
             try
             {
                 if (file == null) return;
-                MessageBox.Show("Dependent files viewer will be implemented in a future version.", 
-                    "View Dependents", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Chức năng xem các tệp phụ thuộc ngược sẽ được bổ sung trong phiên bản sau.", 
+                    "Xem các tệp phụ thuộc ngược", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error viewing dependents");
-                StatusMessage = $"Error: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi xem các tệp phụ thuộc ngược");
+                StatusMessage = $"Lỗi: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Phân tích một tệp bất kỳ (chưa triển khai)
+        /// </summary>
         private async Task AnalyzeFileAsync(object? file)
         {
             try
             {
                 if (file == null) return;
-                StatusMessage = "Analyzing file...";
+                StatusMessage = "Đang phân tích tệp...";
                 // Implement file analysis
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = "File analysis completed";
+                StatusMessage = "Phân tích tệp hoàn tất";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error analyzing file");
-                StatusMessage = $"Error analyzing file: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi phân tích tệp");
+                StatusMessage = $"Lỗi phân tích tệp: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Mở tệp bất kỳ (chưa triển khai)
+        /// </summary>
         private void OpenFile(object? file)
         {
             try
             {
                 if (file == null) return;
-                MessageBox.Show("File opener will be implemented in a future version.", 
-                    "Open File", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Chức năng mở tệp sẽ được bổ sung trong phiên bản sau.", 
+                    "Mở tệp", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error opening file");
-                StatusMessage = $"Error: {ex.Message}";
+                _logger.LogError(ex, "Lỗi khi mở tệp");
+                StatusMessage = $"Lỗi: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Phân tích một hàm cụ thể (chưa triển khai)
+        /// </summary>
         private async Task AnalyzeSingleFunctionAsync(CFunction? function)
         {
             try
             {
                 if (function == null) return;
-                StatusMessage = $"Analyzing function: {function.Name}...";
+                StatusMessage = $"Đang phân tích hàm: {function.Name}...";
                 // Implement single function analysis
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = $"Function analysis completed for {function.Name}";
+                StatusMessage = $"Phân tích hàm hoàn tất cho {function.Name}";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error analyzing function: {function?.Name}");
-                StatusMessage = $"Error analyzing function: {ex.Message}";
+                _logger.LogError(ex, $"Lỗi khi phân tích hàm: {function?.Name}");
+                StatusMessage = $"Lỗi phân tích hàm: {ex.Message}";
             }
         }
 
+        /// <summary>
+        /// Sinh test case cho một hàm cụ thể (chưa triển khai)
+        /// </summary>
         private async Task GenerateTestCasesForFunctionAsync(CFunction? function)
         {
             try
             {
                 if (function == null) return;
-                StatusMessage = $"Generating test cases for function: {function.Name}...";
+                StatusMessage = $"Đang sinh test case cho hàm: {function.Name}...";
                 // Implement test case generation for specific function
                 await Task.Delay(1000); // Placeholder
-                StatusMessage = $"Test case generation completed for {function.Name}";
+                StatusMessage = $"Sinh test case hoàn tất cho {function.Name}";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error generating test cases for function: {function?.Name}");
-                StatusMessage = $"Error generating test cases: {ex.Message}";
+                _logger.LogError(ex, $"Lỗi khi sinh test case cho hàm: {function?.Name}");
+                StatusMessage = $"Lỗi sinh test case: {ex.Message}";
             }
         }
 
         #endregion
 
-        // Add this method for toggling the navigation drawer
+        /// <summary>
+        /// Đảo trạng thái mở rộng/thu gọn menu điều hướng
+        /// </summary>
         private void ToggleNavigationDrawer()
         {
             IsNavigationDrawerExpanded = !IsNavigationDrawerExpanded;
         }
 
+        /// <summary>
+        /// Xem chi tiết một dự án
+        /// </summary>
         private void ViewProject(Project? project)
         {
             if (project == null) return;
             CurrentProject = project;
-            StatusMessage = $"Viewing project: {project.Name}";
+            StatusMessage = $"Đang xem dự án: {project.Name}";
             Navigate("ProjectExplorer");
         }
 
-        private void CloseProjectFromList(Project? project)
+        /// <summary>
+        /// Đặt dự án hiện tại
+        /// </summary>
+        private void SetCurrentProject(Project? project)
         {
-            if (project == null) return;
-            if (_openProjects.Contains(project))
+            CurrentProject = project;
+            if (project != null)
             {
-                _openProjects.Remove(project);
-                if (CurrentProject == project)
-                {
-                    CurrentProject = _openProjects.FirstOrDefault();
-                    if (CurrentProject == null)
-                    {
-                        SourceFiles.Clear();
-                        TestCases.Clear();
-                        ClearAnalysisResults();
-                        ProjectAnalysisResult = null;
-                        StatusMessage = "Project closed";
-                        Navigate("Dashboard");
-                    }
-                }
+                StatusMessage = $"Đã chọn dự án: {project.Name}";
+                // Refresh UI
+                _ = RefreshSourceFilesAsync();
+                _ = RefreshTestCasesAsync();
+                ClearAnalysisResults();
+                ProjectAnalysisResult = null;
+                Navigate("ProjectExplorer");
+            }
+            else
+            {
+                StatusMessage = "Đã đóng dự án";
+                SourceFiles.Clear();
+                TestCases.Clear();
+                ClearAnalysisResults();
+                ProjectAnalysisResult = null;
+                Navigate("Dashboard");
             }
         }
 
-        public async Task LoadProjectsFromDefaultLocationAsync()
+        /// <summary>
+        /// Tải lại dữ liệu dự án hiện tại
+        /// </summary>
+        public async void ReloadData()
         {
-            _availableProjects.Clear();
-            var projectFiles = GetProjectFilesFromDefaultLocation();
-            foreach (var file in projectFiles)
+            OnPropertyChanged(nameof(CurrentProject));
+            OnPropertyChanged(nameof(ProjectName));
+            OnPropertyChanged(nameof(HasProject));
+            _ = RefreshSourceFilesAsync();
+            _ = RefreshTestCasesAsync();
+            ClearAnalysisResults();
+            ProjectAnalysisResult = null;
+            StatusMessage = "Đã tải lại dữ liệu dự án.";
+
+            if (SelectedMenuItem == "Dashboard")
             {
-                try
-                {
-                    var project = await _projectService.LoadProjectAsync(file);
-                    if (project != null)
-                        _availableProjects.Add(project);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error loading project: {file}");
-                }
+                OnPropertyChanged(nameof(CurrentProject));
+                OnPropertyChanged(nameof(ProjectName));
+                OnPropertyChanged(nameof(HasProject));
+                OnPropertyChanged(nameof(SourceFiles));
+                OnPropertyChanged(nameof(TestCases));
+                OnPropertyChanged(nameof(ProjectAnalysisResult));
             }
         }
+
+        // Các phương thức kiểm tra điều kiện cho lệnh (command)
+        private bool CanSaveProject() => CurrentProject != null;
+        private bool CanCloseProject() => CurrentProject != null;
+        private bool CanParseSourceFiles() => CurrentProject != null && CurrentProject.SourceFiles.Count > 0;
+        private bool CanImportTestCases() => CurrentProject != null;
+        private bool CanExportTestCases() => CurrentProject != null;
     }
 }

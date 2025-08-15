@@ -277,6 +277,13 @@
                             <TextBox Grid.Column="1" materialDesign:HintAssist.Hint="Search..." BorderThickness="0" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
                         </Grid>
                     </materialDesign:ColorZone>
+                    <!-- Reload Button -->
+                    <Button Style="{StaticResource MaterialDesignToolButton}"
+                            ToolTip="Reload project data"
+                            Margin="8,0,0,0"
+                            Command="{Binding ReloadDataCommand}">
+                        <materialDesign:PackIcon Kind="Refresh" Width="24" Height="24"/>
+                    </Button>
                     <!-- Notification -->
                     <Button Style="{StaticResource MaterialDesignToolButton}" ToolTip="Thông báo" Margin="8,0,0,0">
                         <materialDesign:PackIcon Kind="BellOutline" Width="24" Height="24"/>
