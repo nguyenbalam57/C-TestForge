@@ -120,7 +120,7 @@ namespace C_TestForge.Models.Parse
         /// <summary>
         /// Đường dẫn thư mục gốc của dự án
         /// </summary>
-        public string ProjectPath { get; set; } = string.Empty;
+        public List<string> ProjectPath { get; set; }
 
         /// <summary>
         /// Đồ thị phụ thuộc include của dự án
@@ -283,7 +283,11 @@ namespace C_TestForge.Models.Parse
             var report = new System.Text.StringBuilder();
             
             report.AppendLine("=== BÁO CÁO PHÂN TÍCH DỰ ÁN C/C++ ===");
-            report.AppendLine($"Dự án: {ProjectPath}");
+            report.AppendLine($"Dự án file: {ProjectPath.Count}");
+            //foreach( var path in ProjectPath)
+            //{
+            //    report.AppendLine($"- {path}");
+            //}
             report.AppendLine($"Thời gian phân tích: {Duration.TotalSeconds:F2} giây");
             report.AppendLine($"Hoàn thành: {CompletionPercentage:F1}%");
             report.AppendLine();

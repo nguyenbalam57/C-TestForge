@@ -19,11 +19,6 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
-// Sử dụng alias để tránh xung đột namespace
-using ModelIncludeStatement = C_TestForge.Models.Projects.IncludeStatement;
-using ModelConditionalBlock = C_TestForge.Models.Projects.ConditionalBlock;
-using ModelIncludeDependencyGraph = C_TestForge.Models.Projects.IncludeDependencyGraph;
-using ModelSourceFileDependency = C_TestForge.Models.Projects.SourceFileDependency;
 
 namespace C_TestForge.Parser
 {
@@ -92,17 +87,6 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Parsing source file: {filePath}");
 
-                // Get active configuration if available
-                ParseOptions options = ParseOptions.Default;
-                if (_configurationService != null)
-                {
-                    var config = _configurationService.GetActiveConfiguration();
-                    if (config != null)
-                    {
-                        options = _configurationService.CreateParseOptionsFromConfiguration(config);
-                    }
-                }
-
                 // Đọc nội dung file
                 string sourceContent = await _fileService.ReadFileAsync(filePath);
 
@@ -121,11 +105,8 @@ namespace C_TestForge.Parser
                 };
 
                 // Xử lý code để thay đổi type biến
-                if(string.IsNullOrEmpty(sourceFile.ProcessedContent))
+                if (string.IsNullOrEmpty(sourceFile.ProcessedContent))
                     _sourceFileService.ProcessTypeReplacements(sourceFile);
-
-                // Lấy mã nguồn đã được raplace types
-                var pa = await ParseSourceCodeAsync(sourceFile);
 
                 return sourceFile;
             }
@@ -169,7 +150,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, string fileName = "inline.c")
+        public async Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, ParseOptions options, string fileName = "inline.c")
         {
 
             if (string.IsNullOrEmpty(fileName))
@@ -181,46 +162,11 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Parsing source code with name: {fileName}");
 
-                // Get active configuration if available
-                ParseOptions options = ParseOptions.Default;
-                if (_configurationService != null)
-                {
-                    var config = _configurationService.GetActiveConfiguration();
-                    if (config != null)
-                    {
-                        options = _configurationService.CreateParseOptionsFromConfiguration(config);
-                    }
-                }
-
                 // Lấy mã nguồn từ source đã được raplace types
                 var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
                 // Ghi ParseResult vào SourceFile
                 sourceFile.ParseResult = parseResult;
-
-                // Xây dựng từ điển includes
-                var includeDirectives = parseResult.PreprocessorDirectives
-                    .Where(d => d.Type == "include")
-                    .ToList();
-
-                foreach (var directive in includeDirectives)
-                {
-                    string value = directive.Value;
-                    // Loại bỏ ngoặc " hoặc <> để lấy đường dẫn
-                    if (value.StartsWith("\"") && value.EndsWith("\""))
-                    {
-                        value = value.Substring(1, value.Length - 2);
-                    }
-                    else if (value.StartsWith("<") && value.EndsWith(">"))
-                    {
-                        value = value.Substring(1, value.Length - 2);
-                    }
-
-                    if (!string.IsNullOrEmpty(value))
-                    {
-                        sourceFile.Includes[value] = $"#include {directive.Value}";
-                    }
-                }
 
                 return sourceFile;
             }
@@ -306,6 +252,7 @@ namespace C_TestForge.Parser
 
                 // Parse the source code
                 return await ParseSourceCodeParserAsync(sourceFile, options);
+
             }
             catch (Exception ex)
             {
@@ -403,7 +350,9 @@ namespace C_TestForge.Parser
                         // Parse the translation unit
                         // Convert filename and source code to byte arrays
                         byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.FileName + "\0");
-                        byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.ProcessedContent);
+                        byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.Content);
+                        if (sourceFile.ProcessedContent.Count() > 0)
+                            sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.ProcessedContent);
 
                         // Allocate memory for arguments
                         var argPtrs = new List<IntPtr>();
@@ -642,11 +591,12 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Tìm tất cả các thư mục include tiềm năng trong một dự án
         /// </summary>
-        /// <param name="rootDirectoryPath">Đường dẫn thư mục gốc của dự án</param>
+        /// <param name="rootDirectoryPath">Đường dẫn tất cả các file</param>
         /// <returns>Danh sách các thư mục có chứa tệp header</returns>
-        public async Task<List<string>> FindPotentialIncludeDirectoriesAsync(string rootDirectoryPath)
+        public async Task<List<string>> FindPotentialIncludeDirectoriesAsync(List<string> files)
         {
-            return await _fileScannerService.FindPotentialIncludeDirectoriesAsync(rootDirectoryPath);
+            var headerFiles = files.Where(f => f.EndsWith(".h", StringComparison.OrdinalIgnoreCase)).ToList();
+            return headerFiles;
         }
 
         /// <summary>
@@ -654,7 +604,7 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="filePath">Đường dẫn đến tệp mã nguồn</param>
         /// <returns>Danh sách các đường dẫn include từ tệp này</returns>
-        public async Task<List<ModelIncludeStatement>> ParseIncludeStatementsAsync(string filePath)
+        public async Task<List<IncludeStatement>> ParseIncludeStatementsAsync(string filePath)
         {
             var interfaceResults = await _fileScannerService.ParseIncludeStatementsAsync(filePath);
             return ConvertIncludeStatements(interfaceResults);
@@ -666,7 +616,7 @@ namespace C_TestForge.Parser
         /// <param name="filePaths">Danh sách các đường dẫn tệp để phân tích</param>
         /// <param name="includePaths">Danh sách các thư mục include để tìm kiếm</param>
         /// <returns>Đồ thị phụ thuộc include</returns>
-        public async Task<ModelIncludeDependencyGraph> BuildIncludeDependencyGraphAsync(List<string> filePaths, List<string> includePaths)
+        public async Task<IncludeDependencyGraph> BuildIncludeDependencyGraphAsync(List<string> filePaths, List<string> includePaths)
         {
             var interfaceResult = await _fileScannerService.BuildIncludeDependencyGraphAsync(filePaths, includePaths);
             return ConvertIncludeDependencyGraph(interfaceResult);
@@ -677,7 +627,7 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="filePath">Đường dẫn đến tệp</param>
         /// <returns>Danh sách các directive tiền xử lý</returns>
-        public async Task<List<ModelConditionalBlock>> ParsePreprocessorConditionalsAsync(string filePath)
+        public async Task<List<ConditionalBlock>> ParsePreprocessorConditionalsAsync(string filePath)
         {
             var interfaceResults = await _fileScannerService.ParsePreprocessorConditionalsAsync(filePath);
             return ConvertConditionalBlocks(interfaceResults);
@@ -688,9 +638,9 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Chuyển đổi IncludeStatement từ interface sang model
         /// </summary>
-        private List<ModelIncludeStatement> ConvertIncludeStatements(List<Core.Interfaces.Projects.IncludeStatement> interfaceStatements)
+        private List<IncludeStatement> ConvertIncludeStatements(List<IncludeStatement> interfaceStatements)
         {
-            return interfaceStatements.Select(s => new ModelIncludeStatement
+            return interfaceStatements.Select(s => new IncludeStatement
             {
                 FileName = s.FileName,
                 RawIncludePath = s.RawIncludePath,
@@ -705,36 +655,52 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Chuyển đổi ConditionalBlock từ interface sang model
         /// </summary>
-        private ModelConditionalBlock ConvertConditionalBlock(Core.Interfaces.Projects.ConditionalBlock interfaceBlock)
+        private ConditionalBlock ConvertConditionalBlock(ConditionalBlock interfaceBlock,
+            HashSet<ConditionalBlock> visited = null)
         {
             if (interfaceBlock == null) return null;
+            visited ??= new HashSet<ConditionalBlock>();
 
-            return new ModelConditionalBlock
+            // Nêús đã duyệt block này rồi thì trả về null để tránh vòng lặp vô hạn
+            if (!visited.Add(interfaceBlock))
+            {
+                _logger.LogWarning($"Circular reference detected in conditional block: {interfaceBlock.DirectiveType} at line {interfaceBlock.StartLine}");
+                return null;
+            }
+
+            var model = new ConditionalBlock
             {
                 DirectiveType = interfaceBlock.DirectiveType,
                 Condition = interfaceBlock.Condition,
                 StartLine = interfaceBlock.StartLine,
                 EndLine = interfaceBlock.EndLine,
-                NestedBlocks = ConvertConditionalBlocks(interfaceBlock.NestedBlocks),
+                NestedBlocks = ConvertConditionalBlocks(interfaceBlock.NestedBlocks, visited),
                 Includes = ConvertIncludeStatements(interfaceBlock.Includes),
-                Parent = ConvertConditionalBlock(interfaceBlock.Parent)
+                Parent = ConvertConditionalBlock(interfaceBlock.Parent, visited)
             };
+
+            // Sau khi xử lý xong node này, có thể bỏ ra khỏi visited nếu muốn cho các nhánh khác dùng lại
+            visited.Remove(interfaceBlock);
+
+            return model;
         }
 
         /// <summary>
         /// Chuyển đổi danh sách ConditionalBlock từ interface sang model
         /// </summary>
-        private List<ModelConditionalBlock> ConvertConditionalBlocks(List<Core.Interfaces.Projects.ConditionalBlock> interfaceBlocks)
+        private List<ConditionalBlock> ConvertConditionalBlocks(List<ConditionalBlock> interfaceBlocks,
+            HashSet<ConditionalBlock> visited = null)
         {
-            return interfaceBlocks?.Select(ConvertConditionalBlock).ToList() ?? new List<ModelConditionalBlock>();
+            if (interfaceBlocks == null) return new List<ConditionalBlock>();
+            return interfaceBlocks?.Select(b => ConvertConditionalBlock(b, visited)).ToList();
         }
 
         /// <summary>
         /// Chuyển đổi IncludeDependencyGraph từ interface sang model
         /// </summary>
-        private ModelIncludeDependencyGraph ConvertIncludeDependencyGraph(Core.Interfaces.Projects.IncludeDependencyGraph interfaceGraph)
+        private IncludeDependencyGraph ConvertIncludeDependencyGraph(IncludeDependencyGraph interfaceGraph)
         {
-            var modelGraph = new ModelIncludeDependencyGraph
+            var modelGraph = new IncludeDependencyGraph
             {
                 IncludePaths = interfaceGraph.IncludePaths?.ToList() ?? new List<string>()
             };
@@ -744,7 +710,7 @@ namespace C_TestForge.Parser
             {
                 foreach (var interfaceFile in interfaceGraph.SourceFiles)
                 {
-                    var modelFile = new ModelSourceFileDependency
+                    var modelFile = new SourceFileDependency
                     {
                         FilePath = interfaceFile.FilePath,
                         FileType = interfaceFile.FileType,
@@ -1327,16 +1293,19 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="projectRootPath">Đường dẫn thư mục gốc của dự án</param>
         /// <returns>Kết quả phân tích dự án hoàn chỉnh bao gồm biến, hàm, macro và phụ thuộc</returns>
-        public async Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(string projectRootPath)
+        public async Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(List<string> projectRootPath)
         {
-            if (string.IsNullOrEmpty(projectRootPath))
+            if (projectRootPath == null)
             {
                 throw new ArgumentException("Project root path cannot be null or empty", nameof(projectRootPath));
             }
 
-            if (!Directory.Exists(projectRootPath))
+            foreach (var path in projectRootPath)
             {
-                throw new DirectoryNotFoundException($"Project directory not found: {projectRootPath}");
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    throw new ArgumentException("Project root path contains null or empty string", nameof(projectRootPath));
+                }
             }
 
             _logger.LogInformation($"Bắt đầu phân tích toàn bộ dự án: {projectRootPath}");
@@ -1351,7 +1320,8 @@ namespace C_TestForge.Parser
             {
                 // Bước 1: Quét và xác định phạm vi dự án
                 _logger.LogInformation("Bước 1: Quét dự án và xác định phạm vi tệp tin");
-                var allFiles = await ScanDirectoryForCFilesAsync(projectRootPath, true);
+                //var allFiles = await ScanDirectoryForCFilesAsync(projectRootPath, true);
+                var allFiles = projectRootPath;
                 _logger.LogInformation($"Đã tìm thấy {allFiles.Count} tệp C/C++ trong dự án");
 
                 // Bước 2: Tìm các thư mục include tiềm năng
@@ -1392,7 +1362,7 @@ namespace C_TestForge.Parser
 
                 // Bước 6: Phân tích từng tệp theo thứ tự đã sắp xếp
                 _logger.LogInformation("Bước 6: Phân tích từng tệp theo thứ tự phụ thuộc");
-                
+
                 var processedMacros = new Dictionary<string, CDefinition>(StringComparer.OrdinalIgnoreCase);
                 var processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1448,6 +1418,46 @@ namespace C_TestForge.Parser
             return ExtractPreprocessorConditionsFromGraph(analysisResult.DependencyGraph);
         }
 
+        /// <summary>
+        /// Lấy danh sách các thư mục chứa file header (.h, .hpp, ...) từ sortedFiles, chuẩn hóa về absolute path kiểu Unix, loại bỏ trùng lặp.
+        /// </summary>
+        /// <param name="sortedFiles">Danh sách các file đã sắp xếp</param>
+        /// <returns>Danh sách đường dẫn thư mục duy nhất, dạng /usr/include</returns>
+        private List<string> GetUniqueHeaderDirectoriesAsUnixPaths(List<string> pathFiles)
+        {
+            var dirSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var file in pathFiles)
+            {
+                var dir = _fileService.GetDirectoryName(file);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    string unixPath = ToUnixStylePath(Path.GetFullPath(dir));
+                    dirSet.Add(unixPath);
+                }
+            }
+
+            return dirSet.ToList();
+        }
+
+        private string ToUnixStylePath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+
+            // Nếu là UNC path (bắt đầu bằng \\), chuyển thành /server/share/...
+            if (path.StartsWith(@"\\"))
+            {
+                // Bỏ 2 dấu \\ đầu, thay \ thành /
+                string unix = path.TrimStart('\\').Replace('\\', '/');
+                // Thêm dấu / đầu cho đúng chuẩn Unix
+                return "/" + unix;
+            }
+            // Nếu là path Windows thông thường (C:\...), cũng chuyển \ thành /
+            return path.Replace('\\', '/');
+        }
+
+
         #region Project Analysis Helper Methods
 
         /// <summary>
@@ -1471,15 +1481,40 @@ namespace C_TestForge.Parser
             try
             {
                 var sourceFile = await ParseSourceFileAsync(filePath);
-                
-                var options = new ParseOptions
+
+                // Get active configuration if available
+                ParseOptions options = ParseOptions.Default;
+                if (_configurationService != null)
                 {
-                    AnalyzeFunctions = true,
-                    AnalyzeVariables = true,
-                    ParsePreprocessorDefinitions = true,
-                    IncludePaths = analysisResult.DependencyGraph.IncludePaths,
-                    MacroDefinitions = processedMacros.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value ?? "")
-                };
+                    var config = _configurationService.GetActiveConfiguration();
+                    if (config != null)
+                    {
+                        options = _configurationService.CreateParseOptionsFromConfiguration(config);
+                    }
+                }
+                var pathFiles = GetUniqueHeaderDirectoriesAsUnixPaths(analysisResult.DependencyGraph.IncludePaths);
+                // Thêm include paths từ dependency graph 
+                if (pathFiles.Count > 0)
+                {
+                    foreach (var includePath in pathFiles)
+                    {
+                        if (!options.IncludePaths.Contains(includePath))
+                        {
+                            options.IncludePaths.Add(includePath);
+                        }
+                    }
+                }
+                // Thêm macro definitions từ dependency graph
+                if (processedMacros != null)
+                {
+                    foreach (var macro in processedMacros)
+                    {
+                        if (!options.MacroDefinitions.ContainsKey(macro.Key))
+                        {
+                            options.MacroDefinitions[macro.Key] = macro.Value.Value;
+                        }
+                    }
+                }
 
                 var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
@@ -1523,7 +1558,7 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Phân tích typedef từ các tệp header
         /// </summary>
-        private async Task AnalyzeTypedefsFromHeadersAsync(ModelIncludeDependencyGraph dependencyGraph)
+        private async Task AnalyzeTypedefsFromHeadersAsync(IncludeDependencyGraph dependencyGraph)
         {
             var headerFiles = dependencyGraph.SourceFiles
                 .Where(f => f.FileType == SourceFileType.CHeader || f.FileType == SourceFileType.CPPHeader)
@@ -1540,9 +1575,9 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Sắp xếp tệp theo thứ tự phụ thuộc
         /// </summary>
-        private List<ModelSourceFileDependency> SortFilesByDependencies(ModelIncludeDependencyGraph dependencyGraph)
+        private List<SourceFileDependency> SortFilesByDependencies(IncludeDependencyGraph dependencyGraph)
         {
-            var result = new List<ModelSourceFileDependency>();
+            var result = new List<SourceFileDependency>();
             var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var processing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1578,9 +1613,9 @@ namespace C_TestForge.Parser
         /// Thuật toán sắp xếp topo để sắp xếp tệp theo phụ thuộc
         /// </summary>
         private void TopologicalSort(
-            ModelSourceFileDependency file,
-            ModelIncludeDependencyGraph dependencyGraph,
-            List<ModelSourceFileDependency> result,
+            SourceFileDependency file,
+            IncludeDependencyGraph dependencyGraph,
+            List<SourceFileDependency> result,
             HashSet<string> processed,
             HashSet<string> processing)
         {
@@ -1606,7 +1641,7 @@ namespace C_TestForge.Parser
             }
 
             processing.Remove(file.FilePath);
-            
+
             if (!processed.Contains(file.FilePath))
             {
                 result.Add(file);
@@ -1633,7 +1668,7 @@ namespace C_TestForge.Parser
                 {
                     var variableConstraints = await _variableAnalysisService.AnalyzeVariablesAsync(
                         analysisResult.Variables, analysisResult.Functions, analysisResult.Macros);
-                    
+
                     // Gắn ràng buộc với biến
                     foreach (var constraint in variableConstraints)
                     {
@@ -1728,7 +1763,7 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="dependencyGraph">Đồ thị phụ thuộc</param>
         /// <returns>Danh sách các điều kiện tiền xử lý duy nhất được sử dụng trong dự án</returns>
-        public List<string> ExtractPreprocessorConditionsFromGraph(ModelIncludeDependencyGraph dependencyGraph)
+        public List<string> ExtractPreprocessorConditionsFromGraph(IncludeDependencyGraph dependencyGraph)
         {
             _logger.LogInformation("Trích xuất các điều kiện tiền xử lý từ đồ thị phụ thuộc");
 
@@ -1737,7 +1772,7 @@ namespace C_TestForge.Parser
             foreach (var sourceFile in dependencyGraph.SourceFiles)
             {
                 // Chỉ xử lý các tệp header vì chúng thường chứa nhiều điều kiện tiền xử lý
-                if (sourceFile.FileType != SourceFileType.CHeader && 
+                if (sourceFile.FileType != SourceFileType.CHeader &&
                     sourceFile.FileType != SourceFileType.CPPHeader)
                     continue;
 
@@ -1754,13 +1789,13 @@ namespace C_TestForge.Parser
         /// <summary>
         /// Trích xuất tất cả các điều kiện từ một khối điều kiện và các khối con của nó
         /// </summary>
-        private void ExtractConditionsRecursively(ModelConditionalBlock block, HashSet<string> conditions)
+        private void ExtractConditionsRecursively(ConditionalBlock block, HashSet<string> conditions)
         {
             if (!string.IsNullOrEmpty(block.Condition))
             {
                 // Loại bỏ khoảng trắng và comment
                 string cleanCondition = block.Condition.Trim();
-                
+
                 if (block.DirectiveType == "ifdef" || block.DirectiveType == "ifndef")
                 {
                     // Đơn giản hóa cho #ifdef/#ifndef - chỉ lấy tên macro
@@ -1790,24 +1825,24 @@ namespace C_TestForge.Parser
         private List<string> ExtractMacrosFromExpression(string expression)
         {
             var macros = new List<string>();
-            
+
             // Tìm các định danh trong biểu thức
             var matches = System.Text.RegularExpressions.Regex.Matches(
-                expression, 
-                @"[A-Za-z_][A-Za-z0-9_]*", 
+                expression,
+                @"[A-Za-z_][A-Za-z0-9_]*",
                 System.Text.RegularExpressions.RegexOptions.Compiled);
 
             foreach (System.Text.RegularExpressions.Match match in matches)
             {
                 string potential = match.Value;
-                
+
                 // Bỏ qua các từ khóa C
                 if (!IsKeyword(potential))
                 {
                     macros.Add(potential);
                 }
             }
-            
+
             return macros;
         }
 
@@ -1823,7 +1858,7 @@ namespace C_TestForge.Parser
                 "char", "short", "int", "long", "float", "double", "signed", "unsigned",
                 "const", "volatile", "defined", "ifdef", "ifndef", "endif", "elif", "true", "false"
             };
-            
+
             return keywords.Contains(word.ToLowerInvariant());
         }
 

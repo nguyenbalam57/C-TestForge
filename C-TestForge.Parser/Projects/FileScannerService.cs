@@ -1,4 +1,4 @@
-using C_TestForge.Core.Interfaces.ProjectManagement;
+﻿using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Models.Core;
 using C_TestForge.Models.Projects;
@@ -10,11 +10,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-// S? d?ng alias ?? tr?nh xung ??t namespace
-using InterfaceIncludeStatement = C_TestForge.Core.Interfaces.Projects.IncludeStatement;
-using InterfaceConditionalBlock = C_TestForge.Core.Interfaces.Projects.ConditionalBlock;
-using InterfaceIncludeDependencyGraph = C_TestForge.Core.Interfaces.Projects.IncludeDependencyGraph;
-using InterfaceSourceFileDependency = C_TestForge.Core.Interfaces.Projects.SourceFileDependency;
+// Sử dụng alias để tránh xung đột namespace
 using ModelIncludeStatement = C_TestForge.Models.Projects.IncludeStatement;
 using ModelConditionalBlock = C_TestForge.Models.Projects.ConditionalBlock;
 using ModelIncludeDependencyGraph = C_TestForge.Models.Projects.IncludeDependencyGraph;
@@ -23,7 +19,7 @@ using ModelSourceFileDependency = C_TestForge.Models.Projects.SourceFileDependen
 namespace C_TestForge.Parser.Projects
 {
     /// <summary>
-    /// D?ch v? qu?t v? ph?n t?ch c?c t?p m? ngu?n C/C++
+    /// Dịch vụ quét và phân tích các tệp mã nguồn C/C++
     /// </summary>
     public class FileScannerService : IFileScannerService
     {
@@ -31,10 +27,10 @@ namespace C_TestForge.Parser.Projects
         private readonly IFileService _fileService;
 
         /// <summary>
-        /// Kh?i t?o ??i t??ng FileScannerService
+        /// Khởi tạo đối tượng FileScannerService
         /// </summary>
-        /// <param name="logger">Logger</param>
-        /// <param name="fileService">D?ch v? t?p tin</param>
+        /// <param name="logger">Đối tượng ghi log</param>
+        /// <param name="fileService">Dịch vụ thao tác tệp tin</param>
         public FileScannerService(ILogger<FileScannerService> logger, IFileService fileService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -44,97 +40,83 @@ namespace C_TestForge.Parser.Projects
         /// <inheritdoc/>
         public async Task<List<string>> ScanDirectoryForCFilesAsync(string directoryPath, bool recursive = true)
         {
-            _logger.LogInformation($"Qu?t th? m?c {directoryPath} ?? t?m c?c t?p C/H (recursive: {recursive})");
+            _logger.LogInformation($"Quét thư mục {directoryPath} để tìm các tệp C/H (đệ quy: {recursive})");
 
             try
             {
                 if (!Directory.Exists(directoryPath))
                 {
-                    _logger.LogWarning($"Th? m?c kh?ng t?n t?i: {directoryPath}");
+                    _logger.LogWarning($"Thư mục không tồn tại: {directoryPath}");
                     return new List<string>();
                 }
 
-                // T?m t?p C (.c)
+                // Tìm tệp C (.c)
                 var cFiles = _fileService.GetFilesInDirectory(directoryPath, ".c", recursive);
                 
-                // T?m t?p header (.h)
+                // Tìm tệp header (.h)
                 var hFiles = _fileService.GetFilesInDirectory(directoryPath, ".h", recursive);
 
-                // T?m t?p C++ (.cpp)
+                // Tìm tệp C++ (.cpp)
                 var cppFiles = _fileService.GetFilesInDirectory(directoryPath, ".cpp", recursive);
                 
-                // T?m t?p header C++ (.hpp)
+                // Tìm tệp header C++ (.hpp)
                 var hppFiles = _fileService.GetFilesInDirectory(directoryPath, ".hpp", recursive);
 
-                // G?p k?t qu?
+                // Gộp kết quả
                 var result = new List<string>();
                 result.AddRange(cFiles);
                 result.AddRange(hFiles);
                 result.AddRange(cppFiles);
                 result.AddRange(hppFiles);
 
-                _logger.LogInformation($"?? t?m th?y {result.Count} t?p C/C++ trong th? m?c {directoryPath}");
-                _logger.LogDebug($"Chi ti?t: {cFiles.Count} .c, {hFiles.Count} .h, {cppFiles.Count} .cpp, {hppFiles.Count} .hpp");
+                _logger.LogInformation($"Đã tìm thấy {result.Count} tệp C/C++ trong thư mục {directoryPath}");
+                _logger.LogDebug($"Chi tiết: {cFiles.Count} .c, {hFiles.Count} .h, {cppFiles.Count} .cpp, {hppFiles.Count} .hpp");
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi qu?t th? m?c {directoryPath}: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi quét thư mục {directoryPath}: {ex.Message}");
                 return new List<string>();
             }
         }
 
         /// <inheritdoc/>
-        public async Task<List<string>> FindPotentialIncludeDirectoriesAsync(string rootDirectoryPath)
+        public async Task<List<string>> FindPotentialIncludeDirectoriesAsync(List<string> rootDirectoryPath)
         {
-            _logger.LogInformation($"T?m ki?m c?c th? m?c include ti?m n?ng trong {rootDirectoryPath}");
+            _logger.LogInformation($"Tìm kiếm các thư mục include tiềm năng trong {rootDirectoryPath}");
             
             var includeDirs = new List<string>();
             
             try
             {
-                if (!Directory.Exists(rootDirectoryPath))
-                {
-                    _logger.LogWarning($"Th? m?c kh?ng t?n t?i: {rootDirectoryPath}");
-                    return includeDirs;
-                }
-
-                // T?m t?t c? c?c th? m?c trong d? ?n
-                var allDirs = Directory.GetDirectories(rootDirectoryPath, "*", SearchOption.AllDirectories);
                 
-                foreach (var dir in allDirs)
+                foreach (var dir in rootDirectoryPath)
                 {
-                    // B? qua th? m?c .git, .vs, bin, obj, ...
+                    // Bỏ qua thư mục .git, .vs, bin, obj, ...
                     if (ShouldIgnoreDirectory(dir))
                         continue;
 
-                    // Ki?m tra xem th? m?c c? ch?a file .h kh?ng
+                    // Kiểm tra xem thư mục có chứa file .h không
                     if (_fileService.GetFilesInDirectory(dir, ".h", false).Any())
                     {
                         includeDirs.Add(dir);
                         continue;
                     }
 
-                    // Ki?m tra n?u t?n th? m?c g?i ? ??y l? th? m?c include
+                    // Kiểm tra nếu tên thư mục gợi ý đây là thư mục include
                     if (IsPotentialIncludeDir(dir))
                     {
                         includeDirs.Add(dir);
                     }
                 }
 
-                // Th?m th? m?c g?c
-                if (_fileService.GetFilesInDirectory(rootDirectoryPath, ".h", false).Any())
-                {
-                    includeDirs.Add(rootDirectoryPath);
-                }
-
-                _logger.LogInformation($"?? t?m th?y {includeDirs.Count} th? m?c include ti?m n?ng");
+                _logger.LogInformation($"Đã tìm thấy {includeDirs.Count} thư mục include tiềm năng");
                 return includeDirs;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi t?m ki?m th? m?c include: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi tìm kiếm thư mục include: {ex.Message}");
                 return includeDirs;
             }
         }
@@ -142,92 +124,53 @@ namespace C_TestForge.Parser.Projects
         /// <inheritdoc/>
         public async Task<string> FindIncludeFileAsync(string includePath, List<string> searchDirectories, string currentFilePath = null)
         {
-            _logger.LogDebug($"T?m ki?m t?p include: {includePath}");
+            _logger.LogDebug($"Tìm kiếm tệp include: {includePath}");
 
             try
             {
-                // N?u ???ng d?n include l? tuy?t ??i, ki?m tra tr?c ti?p
-                if (Path.IsPathRooted(includePath) && _fileService.FileExists(includePath))
-                {
-                    return includePath;
-                }
-
-                // N?u l? include d? ?n (c? ???ng d?n t??ng ??i)
-                if (includePath.Contains("/") || includePath.Contains("\\"))
-                {
-                    // Tr??ng h?p ??c bi?t: n?u include c? d?ng "../abc.h"
-                    if (includePath.StartsWith("../") || includePath.StartsWith("..\\"))
-                    {
-                        if (!string.IsNullOrEmpty(currentFilePath))
-                        {
-                            string currentDir = Path.GetDirectoryName(currentFilePath);
-                            string resolvedPath = Path.GetFullPath(Path.Combine(currentDir, includePath));
-                            
-                            if (_fileService.FileExists(resolvedPath))
-                            {
-                                return resolvedPath;
-                            }
-                        }
-                    }
-                }
-
-                // T?m ki?m trong th? m?c hi?n t?i (n?u c?)
-                if (!string.IsNullOrEmpty(currentFilePath))
-                {
-                    string currentDir = Path.GetDirectoryName(currentFilePath);
-                    string potentialPath = Path.Combine(currentDir, includePath);
-                    
-                    if (_fileService.FileExists(potentialPath))
-                    {
-                        return potentialPath;
-                    }
-                }
-
-                // T?m ki?m trong c?c th? m?c include
+                // Tìm kiếm trong các thư mục include
                 foreach (var dir in searchDirectories)
                 {
-                    string potentialPath = Path.Combine(dir, includePath);
-                    
-                    if (_fileService.FileExists(potentialPath))
+                    if (_fileService.FileExists(dir) && Path.GetFileName(dir).ToString() == includePath)
                     {
-                        return potentialPath;
+                        return dir;
                     }
                 }
 
-                _logger.LogWarning($"Kh?ng t?m th?y t?p include: {includePath}");
+                _logger.LogWarning($"Không tìm thấy tệp include: {includePath}");
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi t?m ki?m t?p include {includePath}: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi tìm kiếm tệp include {includePath}: {ex.Message}");
                 return null;
             }
         }
 
         /// <summary>
-        /// Ph?n t?ch c?c c?u l?nh include t? m?t t?p m? ngu?n
+        /// Phân tích các câu lệnh include từ một tệp mã nguồn
         /// </summary>
-        /// <param name="filePath">???ng d?n ??n t?p m? ngu?n</param>
-        /// <returns>Danh s?ch c?c ???ng d?n include t? t?p n?y</returns>
-        public async Task<List<InterfaceIncludeStatement>> ParseIncludeStatementsAsync(string filePath)
+        /// <param name="filePath">Đường dẫn đến tệp mã nguồn</param>
+        /// <returns>Danh sách các đường dẫn include từ tệp này</returns>
+        public async Task<List<IncludeStatement>> ParseIncludeStatementsAsync(string filePath)
         {
-            _logger.LogDebug($"Ph?n t?ch c?c c?u l?nh include trong t?p: {filePath}");
+            _logger.LogDebug($"Phân tích các câu lệnh include trong tệp: {filePath}");
 
-            var includes = new List<InterfaceIncludeStatement>();
+            var includes = new List<IncludeStatement>();
             
             try
             {
                 if (!_fileService.FileExists(filePath))
                 {
-                    _logger.LogWarning($"T?p kh?ng t?n t?i: {filePath}");
+                    _logger.LogWarning($"Tệp không tồn tại: {filePath}");
                     return includes;
                 }
 
                 string content = await _fileService.ReadFileAsync(filePath);
                 string[] lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                 
-                // Regex ?? ph?t hi?n c?u l?nh #include
-                var includeRegex = new Regex(@"^\s*#\s*include\s+([""<])([^"">]+)(["">\s])", RegexOptions.Compiled);
+                // Regex để phát hiện câu lệnh #include
+                var includeRegex = new Regex(@"^\s*#\s*include\s+([\""<])([^\"">]+)([\"">\s])", RegexOptions.Compiled);
                 
                 for (int i = 0; i < lines.Length; i++)
                 {
@@ -239,7 +182,7 @@ namespace C_TestForge.Parser.Projects
                         var delimiter = match.Groups[1].Value;
                         var path = match.Groups[2].Value;
                         
-                        var include = new InterfaceIncludeStatement
+                        var include = new IncludeStatement
                         {
                             FileName = Path.GetFileName(path),
                             RawIncludePath = $"{delimiter}{path}{(delimiter == "<" ? ">" : "\"")}",
@@ -252,29 +195,29 @@ namespace C_TestForge.Parser.Projects
                     }
                 }
 
-                _logger.LogDebug($"?? t?m th?y {includes.Count} c?u l?nh include trong t?p {filePath}");
+                _logger.LogDebug($"Đã tìm thấy {includes.Count} câu lệnh include trong tệp {filePath}");
                 return includes;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi ph?n t?ch c?u l?nh include trong t?p {filePath}: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi phân tích câu lệnh include trong tệp {filePath}: {ex.Message}");
                 return includes;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<InterfaceIncludeDependencyGraph> BuildIncludeDependencyGraphAsync(List<string> filePaths, List<string> includePaths)
+        public async Task<IncludeDependencyGraph> BuildIncludeDependencyGraphAsync(List<string> filePaths, List<string> includePaths)
         {
-            _logger.LogInformation($"X?y d?ng ?? th? ph? thu?c include cho {filePaths.Count} t?p");
+            _logger.LogInformation($"Xây dựng đồ thị phụ thuộc include cho {filePaths.Count} tệp");
 
-            var graph = new InterfaceIncludeDependencyGraph
+            var graph = new IncludeDependencyGraph
             {
                 IncludePaths = includePaths ?? new List<string>()
             };
 
             try
             {
-                // T?o danh s?ch t?t c? c?c t?p ngu?n
+                // Tạo danh sách tất cả các tệp nguồn
                 foreach (var path in filePaths)
                 {
                     if (_fileService.FileExists(path))
@@ -283,13 +226,13 @@ namespace C_TestForge.Parser.Projects
                     }
                 }
 
-                // Ph?n t?ch c?c t?p ?? t?m dependencies
+                // Phân tích các tệp để tìm dependencies
                 foreach (var sourceFile in graph.SourceFiles)
                 {
                     await ParseFileIncludesAsync(sourceFile, graph);
                 }
 
-                // X?c ??nh quan h? ph? thu?c hai chi?u
+                // Xác định quan hệ phụ thuộc hai chiều
                 foreach (var sourceFile in graph.SourceFiles)
                 {
                     foreach (var dependency in sourceFile.DirectDependencies)
@@ -301,36 +244,36 @@ namespace C_TestForge.Parser.Projects
                     }
                 }
 
-                _logger.LogInformation($"?? th? ph? thu?c include ?? ???c x?y d?ng v?i {graph.SourceFiles.Count} t?p");
+                _logger.LogInformation($"Đồ thị phụ thuộc include đã được xây dựng với {graph.SourceFiles.Count} tệp");
                 return graph;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi x?y d?ng ?? th? ph? thu?c: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi xây dựng đồ thị phụ thuộc: {ex.Message}");
                 return graph;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<List<InterfaceConditionalBlock>> ParsePreprocessorConditionalsAsync(string filePath)
+        public async Task<List<ConditionalBlock>> ParsePreprocessorConditionalsAsync(string filePath)
         {
-            _logger.LogDebug($"Ph?n t?ch c?c directive ti?n x? l? ?i?u ki?n trong t?p: {filePath}");
+            _logger.LogDebug($"Phân tích các directive tiền xử lý điều kiện trong tệp: {filePath}");
 
-            var blocks = new List<InterfaceConditionalBlock>();
-            var stack = new Stack<InterfaceConditionalBlock>();
+            var blocks = new List<ConditionalBlock>();
+            var stack = new Stack<ConditionalBlock>();
             
             try
             {
                 if (!_fileService.FileExists(filePath))
                 {
-                    _logger.LogWarning($"T?p kh?ng t?n t?i: {filePath}");
+                    _logger.LogWarning($"Tệp không tồn tại: {filePath}");
                     return blocks;
                 }
 
                 string content = await _fileService.ReadFileAsync(filePath);
                 string[] lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                 
-                // Regex cho c?c directive ti?n x? l?
+                // Regex cho các directive tiền xử lý
                 var ifRegex = new Regex(@"^\s*#\s*(if|ifdef|ifndef)\s+(.+)$", RegexOptions.Compiled);
                 var elifRegex = new Regex(@"^\s*#\s*elif\s+(.+)$", RegexOptions.Compiled);
                 var elseRegex = new Regex(@"^\s*#\s*else", RegexOptions.Compiled);
@@ -340,11 +283,11 @@ namespace C_TestForge.Parser.Projects
                 {
                     string line = lines[i].Trim();
                     
-                    // Ki?m tra #if, #ifdef, #ifndef
+                    // Kiểm tra #if, #ifdef, #ifndef
                     var ifMatch = ifRegex.Match(line);
                     if (ifMatch.Success)
                     {
-                        var block = new InterfaceConditionalBlock
+                        var block = new ConditionalBlock
                         {
                             DirectiveType = ifMatch.Groups[1].Value,
                             Condition = ifMatch.Groups[2].Value.Trim(),
@@ -366,14 +309,14 @@ namespace C_TestForge.Parser.Projects
                         continue;
                     }
                     
-                    // Ki?m tra #elif
+                    // Kiểm tra #elif
                     var elifMatch = elifRegex.Match(line);
                     if (elifMatch.Success && stack.Count > 0)
                     {
                         var currentBlock = stack.Pop();
                         currentBlock.EndLine = i;
                         
-                        var newBlock = new InterfaceConditionalBlock
+                        var newBlock = new ConditionalBlock
                         {
                             DirectiveType = "elif",
                             Condition = elifMatch.Groups[1].Value.Trim(),
@@ -394,13 +337,13 @@ namespace C_TestForge.Parser.Projects
                         continue;
                     }
                     
-                    // Ki?m tra #else
+                    // Kiểm tra #else
                     if (elseRegex.IsMatch(line) && stack.Count > 0)
                     {
                         var currentBlock = stack.Pop();
                         currentBlock.EndLine = i;
                         
-                        var newBlock = new InterfaceConditionalBlock
+                        var newBlock = new ConditionalBlock
                         {
                             DirectiveType = "else",
                             Condition = "true",
@@ -421,7 +364,7 @@ namespace C_TestForge.Parser.Projects
                         continue;
                     }
                     
-                    // Ki?m tra #endif
+                    // Kiểm tra #endif
                     if (endifRegex.IsMatch(line) && stack.Count > 0)
                     {
                         var currentBlock = stack.Pop();
@@ -430,54 +373,54 @@ namespace C_TestForge.Parser.Projects
                     }
                 }
 
-                // X? l? nh?ng kh?i kh?ng ???c ??ng ??ng c?ch
+                // Xử lý những khối chưa được đóng đúng cách
                 while (stack.Count > 0)
                 {
                     var block = stack.Pop();
                     block.EndLine = lines.Length;
-                    _logger.LogWarning($"Ph?t hi?n kh?i ?i?u ki?n kh?ng ??ng trong t?p {filePath}: {block.DirectiveType} {block.Condition} (d?ng {block.StartLine})");
+                    _logger.LogWarning($"Phát hiện khối điều kiện chưa đóng trong tệp {filePath}: {block.DirectiveType} {block.Condition} (dòng {block.StartLine})");
                 }
 
-                _logger.LogDebug($"?? t?m th?y {blocks.Count} kh?i ?i?u ki?n ti?n x? l? (c?p cao nh?t) trong t?p {filePath}");
+                _logger.LogDebug($"Đã tìm thấy {blocks.Count} khối điều kiện tiền xử lý (cấp cao nhất) trong tệp {filePath}");
                 return blocks;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi ph?n t?ch c?c directive ti?n x? l? trong t?p {filePath}: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi phân tích các directive tiền xử lý trong tệp {filePath}: {ex.Message}");
                 return blocks;
             }
         }
 
-        #region Private Helper Methods
+        #region Các phương thức hỗ trợ riêng
 
         /// <summary>
-        /// X?c ??nh xem c? n?n b? qua th? m?c n?y kh?ng
+        /// Xác định xem có nên bỏ qua thư mục này không
         /// </summary>
         private bool ShouldIgnoreDirectory(string directoryPath)
         {
             string dirName = Path.GetFileName(directoryPath).ToLowerInvariant();
             
-            // B? qua c?c th? m?c th?ng d?ng kh?ng c?n thi?t
+            // Bỏ qua các thư mục thông dụng không cần thiết
             string[] ignoreList = { ".git", ".vs", "bin", "obj", "debug", "release", ".svn", ".idea", "packages", "node_modules" };
             
             return ignoreList.Contains(dirName);
         }
 
         /// <summary>
-        /// Ki?m tra xem t?n th? m?c c? ph?i l? th? m?c include ti?m n?ng kh?ng
+        /// Kiểm tra xem tên thư mục có phải là thư mục include tiềm năng không
         /// </summary>
         private bool IsPotentialIncludeDir(string directoryPath)
         {
             string dirName = Path.GetFileName(directoryPath).ToLowerInvariant();
             
-            // C?c t?n th? m?c th??ng ???c d?ng cho th? m?c include
+            // Các tên thư mục thường được dùng cho thư mục include
             string[] includeHints = { "include", "inc", "headers", "h", "interface", "api", "common" };
             
             return includeHints.Contains(dirName);
         }
 
         /// <summary>
-        /// X?c ??nh lo?i t?p d?a tr?n ph?n m? r?ng
+        /// Xác định loại tệp dựa trên phần mở rộng
         /// </summary>
         private SourceFileType DetermineFileType(string filePath)
         {
@@ -502,49 +445,49 @@ namespace C_TestForge.Parser.Projects
         }
 
         /// <summary>
-        /// Ph?n t?ch m?t t?p ?? t?m c?c c?u l?nh include v? c?p nh?t ?? th? ph? thu?c
+        /// Phân tích một tệp để tìm các câu lệnh include và cập nhật đồ thị phụ thuộc
         /// </summary>
-        private async Task ParseFileIncludesAsync(InterfaceSourceFileDependency sourceFile, InterfaceIncludeDependencyGraph graph)
+        private async Task ParseFileIncludesAsync(SourceFileDependency sourceFile, IncludeDependencyGraph graph)
         {
             if (sourceFile.Parsed)
                 return;
             
             try
             {
-                // Ph?n t?ch c?c c?u l?nh include
+                // Phân tích các câu lệnh include
                 sourceFile.Includes = await ParseIncludeStatementsAsync(sourceFile.FilePath);
                 
-                // Ph?n t?ch c?c kh?i ?i?u ki?n
+                // Phân tích các khối điều kiện
                 sourceFile.ConditionalBlocks = await ParsePreprocessorConditionalsAsync(sourceFile.FilePath);
                 
-                // X? l? m?i c?u l?nh include
+                // Xử lý mỗi câu lệnh include
                 foreach (var include in sourceFile.Includes)
                 {
-                    // T?m kh?i ?i?u ki?n ch?a c?u l?nh include n?y
+                    // Tìm khối điều kiện chứa câu lệnh include này
                     include.Conditional = FindContainingConditionalBlock(include.LineNumber, sourceFile.ConditionalBlocks);
                     
-                    // T?m t?p ???c include
+                    // Tìm tệp được include
                     include.ResolvedPath = await FindIncludeFileAsync(
                         include.NormalizedIncludePath,
                         graph.IncludePaths,
                         sourceFile.FilePath);
                     
-                    // N?u t?m th?y t?p include, th?m v?o ?? th? v? x?c l?p quan h? ph? thu?c
+                    // Nếu tìm thấy tệp include, thêm vào đồ thị và xác lập quan hệ phụ thuộc
                     if (!string.IsNullOrEmpty(include.ResolvedPath))
                     {
                         var dependencyFile = graph.FindFile(include.ResolvedPath);
                         
                         if (dependencyFile == null)
                         {
-                            // Th?m t?p m?i v?o ?? th?
+                            // Thêm tệp mới vào đồ thị
                             dependencyFile = graph.AddSourceFile(include.ResolvedPath);
                             dependencyFile.FileType = DetermineFileType(include.ResolvedPath);
                             
-                            // Ph?n t?ch ?? quy t?p n?y
+                            // Phân tích đệ quy tệp này
                             await ParseFileIncludesAsync(dependencyFile, graph);
                         }
                         
-                        // Th?m quan h? ph? thu?c
+                        // Thêm quan hệ phụ thuộc
                         if (!sourceFile.DirectDependencies.Contains(dependencyFile))
                         {
                             sourceFile.DirectDependencies.Add(dependencyFile);
@@ -556,20 +499,20 @@ namespace C_TestForge.Parser.Projects
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"L?i khi ph?n t?ch include trong t?p {sourceFile.FilePath}: {ex.Message}");
+                _logger.LogError(ex, $"Lỗi khi phân tích include trong tệp {sourceFile.FilePath}: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// T?m kh?i ?i?u ki?n ch?a m?t d?ng c? th?
+        /// Tìm khối điều kiện chứa một dòng cụ thể
         /// </summary>
-        private InterfaceConditionalBlock FindContainingConditionalBlock(int lineNumber, List<InterfaceConditionalBlock> blocks)
+        private ConditionalBlock FindContainingConditionalBlock(int lineNumber, List<ConditionalBlock> blocks)
         {
             foreach (var block in blocks)
             {
                 if (lineNumber >= block.StartLine && lineNumber <= block.EndLine)
                 {
-                    // Ki?m tra c?c kh?i con tr??c
+                    // Kiểm tra các khối con trước
                     var nestedBlock = FindContainingConditionalBlock(lineNumber, block.NestedBlocks);
                     return nestedBlock ?? block;
                 }

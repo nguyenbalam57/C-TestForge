@@ -178,8 +178,32 @@ namespace C_TestForge.Parser.Analysis
 
                     string content = await _fileService.ReadFileAsync(headerPath);
 
-                    // Extract typedefs
-                    var typedefPattern = new Regex(@"typedef\s+([^\s]+(?:\s+[^\s]+)*)\s+([^\s;]+)\s*;");
+                    // 1. Bắt typedef struct/union/enum {...} UserType;
+                    var structTypedefPattern = new Regex(
+                        @"typedef\s+(struct|union|enum)\s+([^\s{]+)?\s*\{[^}]*\}\s*([^\s;]+)\s*;",
+                        RegexOptions.Singleline);
+                    var structMatches = structTypedefPattern.Matches(content);
+
+                    foreach (Match match in structMatches)
+                    {
+                        string kind = match.Groups[1].Value.Trim(); // struct/union/enum
+                        string structName = match.Groups[2].Success ? match.Groups[2].Value.Trim() : "";
+                        string userType = match.Groups[3].Value.Trim();
+
+                        string baseType = $"{kind} {(!string.IsNullOrEmpty(structName) ? structName : "")}".Trim();
+
+                        if (_typedefConfig.TypedefMappings.Any(t =>
+                            string.Equals(t.UserType, userType, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+
+                        AddTypedef(userType, baseType, $"Header: {Path.GetFileName(headerPath)}");
+                        detectedCount++;
+                    }
+
+                    // 2. Bắt typedef thông thường (không phải struct/union/enum)
+                    var typedefPattern = new Regex(@"typedef\s+([^{;]+?)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*;", RegexOptions.Multiline);
                     var matches = typedefPattern.Matches(content);
 
                     foreach (Match match in matches)
@@ -194,6 +218,35 @@ namespace C_TestForge.Parser.Analysis
                             continue;
                         }
 
+                        AddTypedef(userType, baseType, $"Header: {Path.GetFileName(headerPath)}");
+                        detectedCount++;
+                    }
+
+                    // 3. Bắt typedef function pointer, hỗ trợ __near, __far, __huge, v.v.
+                    var funcPtrTypedefPattern = new Regex(
+                        @"typedef\s+([a-zA-Z_][\w\s\*]*?)\s*\(\s*(?:__\w+\s*)*\*\s*([a-zA-Z_][\w]*)\s*\)\s*\(([^)]*)\)\s*;",
+                        RegexOptions.Multiline);
+
+                    var funcMatches = funcPtrTypedefPattern.Matches(content);
+
+                    foreach (Match match in funcMatches)
+                    {
+                        string returnType = match.Groups[1].Value.Trim();
+                        string userType = match.Groups[2].Value.Trim();
+                        string args = match.Groups[3].Value.Trim();
+
+                        // Chuẩn hóa tên userType (loại bỏ __near, __far, * thừa, khoảng trắng thừa)
+                        userType = Regex.Replace(userType, @"(__near|__far)", "", RegexOptions.IgnoreCase).Replace("*", "").Trim();
+
+                        // Skip if already exists in predefined mappings
+                        if (_typedefConfig.TypedefMappings.Any(t =>
+                            string.Equals(t.UserType, userType, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+
+                        // Lưu baseType là dạng "returnType (args)"
+                        string baseType = $"{returnType} ({args})";
                         AddTypedef(userType, baseType, $"Header: {Path.GetFileName(headerPath)}");
                         detectedCount++;
                     }

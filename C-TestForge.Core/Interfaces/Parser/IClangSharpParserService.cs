@@ -35,7 +35,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="sourceCode">The source code to parse</param>
         /// <param name="fileName">Optional file name for the source</param>
         /// <returns>The parsed source file model</returns>
-        Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, string fileName = "inline.c" );
+        Task<SourceFile> ParseSourceCodeAsync(SourceFile sourceFile, ParseOptions options, string fileName = "inline.c" );
 
         /// <summary>
         /// Extracts all functions from a C source file
@@ -57,7 +57,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// </summary>
         /// <param name="projectRootPath">Đường dẫn thư mục gốc của dự án</param>
         /// <returns>Kết quả phân tích dự án hoàn chỉnh bao gồm biến, hàm, macro và phụ thuộc</returns>
-        Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(string projectRootPath);
+        Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(List<string> projectRootPath);
 
         /// <summary>
         /// Trích xuất tất cả các điều kiện tiền xử lý từ kết quả phân tích dự án

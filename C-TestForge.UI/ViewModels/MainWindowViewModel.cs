@@ -102,8 +102,6 @@ namespace C_TestForge.UI.ViewModels
             AboutCommand = new RelayCommand(ShowAboutDialog);
             ExitCommand = new RelayCommand(Exit);
             SignOutCommand = new RelayCommand(SignOut);
-            AnalyzeFolderCommand = new AsyncRelayCommand(AnalyzeFolderDirectlyAsync);
-            AnalyzeCompleteProjectCommand = new AsyncRelayCommand<string>(AnalyzeCompleteProjectAsync);
             ShowProjectAnalysisReportCommand = new RelayCommand(ShowProjectAnalysisReport);
             ExportSourceFileCommand = new AsyncRelayCommand<SourceFile>(ExportSourceFileAsync);
             ExportDefinitionsCommand = new AsyncRelayCommand(ExportDefinitionsAsync);
@@ -589,8 +587,6 @@ namespace C_TestForge.UI.ViewModels
         public ICommand ExitCommand { get; }
         public ICommand NavigateCommand { get; }
         public ICommand SignOutCommand { get; }
-        public ICommand AnalyzeFolderCommand { get; }
-        public ICommand AnalyzeCompleteProjectCommand { get; }
         public ICommand ShowProjectAnalysisReportCommand { get; }
         public ICommand ExportSourceFileCommand { get; }
         public ICommand ExportDefinitionsCommand { get; }
@@ -936,11 +932,15 @@ namespace C_TestForge.UI.ViewModels
                 // Get source files from project
                 var sourceFiles = await _projectService.GetSourceFilesAsync(CurrentProject);
 
+                List<string> sourceFilePaths = new List<string>();
                 // Add source files to collection
                 foreach (var file in sourceFiles)
                 {
                     SourceFiles.Add(file);
+                    sourceFilePaths.Add(file.FilePath);
                 }
+
+                await AnalyzeCompleteProjectAsync(sourceFilePaths);
 
                 IsAnalyzing = false;
                 StatusMessage = $"Đã phân tích {sourceFiles.Count} tệp nguồn";
@@ -1078,44 +1078,26 @@ namespace C_TestForge.UI.ViewModels
         /// </summary>
         /// <param name="projectPath">Đường dẫn đến thư mục dự án</param>
         /// <returns>Task</returns>
-        private async Task AnalyzeCompleteProjectAsync(string? projectPath)
+        private async Task AnalyzeCompleteProjectAsync(List<string> projectPath)
         {
-            if (string.IsNullOrEmpty(projectPath))
+            if (projectPath == null || projectPath.Count < 1)
             {
-                // Nếu không có path được truyền, sử dụng folder picker
-                var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
-                {
-                    Description = "Chọn thư mục gốc của dự án để phân tích toàn bộ",
-                    UseDescriptionForTitle = true,
-                    Multiselect = false
-                };
-
-                if (dialog.ShowDialog() != true)
-                {
-                    return;
-                }
-
-                projectPath = dialog.SelectedPath;
-            }
-
-            if (!Directory.Exists(projectPath))
-            {
-                MessageBox.Show(
-                    $"Thư mục không tồn tại: {projectPath}",
-                    "Thư mục không hợp lệ",
+                var confirmResult = MessageBox.Show(
+                    $"Không có file nào được phân tích!",
+                    "Cảnh báo",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                    MessageBoxImage.Warning);
                 return;
             }
 
             try
             {
-                StatusMessage = $"Bắt đầu phân tích toàn bộ dự án: {projectPath}...";
+                StatusMessage = $"Bắt đầu phân tích toàn bộ dự án: {projectPath.Count}...";
                 IsAnalyzing = true;
 
                 // Show confirmation dialog with analysis details
                 var confirmResult = MessageBox.Show(
-                    $"Điều này sẽ thực hiện phân tích toàn bộ dự án tại:\n{projectPath}\n\n" +
+                    $"Điều này sẽ thực hiện phân tích toàn bộ dự án tại:\n{projectPath.Count}\n\n" +
                     "Phân tích sẽ:\n" +
                     "• Quét tất cả các tệp C/C++ trong thư mục\n" +
                     "• Xây dựng đồ thị phụ thuộc\n" +
@@ -1415,14 +1397,11 @@ namespace C_TestForge.UI.ViewModels
                         $"Đã chọn thư mục: {selectedPath}\n\n" +
                         "Chọn chế độ phân tích:\n\n" +
                         "• Yes: Quét nhanh và thêm tệp vào dự án hiện tại\n" +
-                        "• No: Phân tích toàn bộ dự án với đồ thị phụ thuộc\n" +
-                        "• Cancel: Hủy thao tác",
+                        "• No: Hủy thao tác",
                         "Tùy chọn phân tích thư mục",
-                        MessageBoxButton.YesNoCancel,
+                        MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
 
-                    if (analysisChoice == MessageBoxResult.Cancel)
-                        return;
 
                     if (analysisChoice == MessageBoxResult.Yes)
                     {
@@ -1430,7 +1409,7 @@ namespace C_TestForge.UI.ViewModels
                     }
                     else if (analysisChoice == MessageBoxResult.No)
                     {
-                        await AnalyzeCompleteProjectAsync(selectedPath);
+                        return;
                     }
                 }
             }
@@ -1565,44 +1544,6 @@ namespace C_TestForge.UI.ViewModels
                 _logger.LogError(ex, $"Lỗi khi hiển thị báo cáo phân tích: {ex.Message}");
             }
         }
-
-        /// <summary>
-        /// Lệnh phân tích thư mục trực tiếp (từ menu/thanh công cụ)
-        /// </summary>
-        private async Task AnalyzeFolderDirectlyAsync()
-        {
-            try
-            {
-                await AnalyzeFolderAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi trong phân tích thư mục trực tiếp");
-                StatusMessage = $"Lỗi: {ex.Message}";
-                MessageBox.Show($"Lỗi khi phân tích thư mục: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        #region Legacy Support Methods (giữ lại cho tương thích cũ)
-
-        /// <summary>
-        /// Phân tích sâu toàn bộ thư mục với đồ thị phụ thuộc (Legacy)
-        /// </summary>
-        private async Task DeepFolderAnalysisAsync(string folderPath)
-        {
-            try
-            {
-                // Use the new complete project analysis instead
-                await AnalyzeCompleteProjectAsync(folderPath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Lỗi trong phân tích sâu thư mục: {ex.Message}");
-                MessageBox.Show($"Lỗi trong phân tích sâu: {ex.Message}", "Lỗi phân tích", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        #endregion
 
         #region Export and Report Methods
 
