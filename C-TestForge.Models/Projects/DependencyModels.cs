@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -99,7 +99,7 @@ namespace C_TestForge.Models.Projects
         public List<SourceFileDependency> SourceFiles { get; set; } = new List<SourceFileDependency>();
 
         /// <summary>
-        /// Danh s?ch c?c th? m?c include ???c d?ng ?? gi?i quy?t c?c ???ng d?n
+        /// Danh sách các thư mục chứa tệp header hoặc include
         /// </summary>
         public List<string> IncludePaths { get; set; } = new List<string>();
 

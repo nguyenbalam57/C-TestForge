@@ -351,8 +351,6 @@ namespace C_TestForge.Parser
                         // Convert filename and source code to byte arrays
                         byte[] fileNameBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.FileName + "\0");
                         byte[] sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.Content);
-                        if (sourceFile.ProcessedContent.Count() > 0)
-                            sourceCodeBytes = System.Text.Encoding.UTF8.GetBytes(sourceFile.ProcessedContent);
 
                         // Allocate memory for arguments
                         var argPtrs = new List<IntPtr>();
@@ -383,6 +381,9 @@ namespace C_TestForge.Parser
                             {
                                 argArray[i] = (sbyte*)argPtrs[i].ToPointer();
                             }
+
+                            _logger.LogInformation("Clang arguments: " + string.Join(" ", args));
+
 
                             translationUnit = clang.parseTranslationUnit(
                         index,
@@ -1329,53 +1330,24 @@ namespace C_TestForge.Parser
                 var includeDirs = await FindPotentialIncludeDirectoriesAsync(projectRootPath);
                 _logger.LogInformation($"Đã tìm thấy {includeDirs.Count} thư mục include tiềm năng");
 
-                // Thêm các đường dẫn include từ configuration nếu có
-                if (_configurationService != null)
-                {
-                    var config = _configurationService.GetActiveConfiguration();
-                    if (config != null && config.IncludePaths != null)
-                    {
-                        foreach (var path in config.IncludePaths)
-                        {
-                            if (!includeDirs.Contains(path) && Directory.Exists(path))
-                            {
-                                includeDirs.Add(path);
-                            }
-                        }
-                    }
-                }
+                // Bước 3: Lấy đường dẫn thư mục của file header (.h, .hpp, ...) duy nhất
+                _logger.LogInformation("Bước 3: Lấy các thư mục chứa file header duy nhất");
+                var headerDirectories = GetUniqueHeaderDirectoriesAsUnixPaths(includeDirs);
+                _logger.LogInformation($"Đã tìm thấy {headerDirectories.Count} thư mục chứa file header duy nhất");
+                analysisResult.DependencyGraph.IncludePaths = headerDirectories;
 
-                // Bước 3: Xây dựng đồ thị phụ thuộc include
-                _logger.LogInformation("Bước 3: Xây dựng đồ thị phụ thuộc include");
-                var dependencyGraph = await BuildIncludeDependencyGraphAsync(allFiles, includeDirs);
-                analysisResult.DependencyGraph = dependencyGraph;
-                _logger.LogInformation($"Đã xây dựng đồ thị phụ thuộc với {dependencyGraph.SourceFiles.Count} tệp");
-
-                // Bước 4: Phân tích typedef từ các tệp header trước
-                _logger.LogInformation("Bước 4: Phân tích và thu thập typedef từ các tệp header");
-                await AnalyzeTypedefsFromHeadersAsync(dependencyGraph);
-
-                // Bước 5: Sắp xếp tệp theo thứ tự phụ thuộc (các tệp không có include hoặc ít phụ thuộc trước)
-                _logger.LogInformation("Bước 5: Sắp xếp tệp theo thứ tự phụ thuộc");
-                var sortedFiles = SortFilesByDependencies(dependencyGraph);
-                _logger.LogInformation($"Đã sắp xếp {sortedFiles.Count} tệp theo thứ tự phụ thuộc");
-
-                // Bước 6: Phân tích từng tệp theo thứ tự đã sắp xếp
-                _logger.LogInformation("Bước 6: Phân tích từng tệp theo thứ tự phụ thuộc");
-
-                var processedMacros = new Dictionary<string, CDefinition>(StringComparer.OrdinalIgnoreCase);
-                var processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var file in sortedFiles)
+                _logger.LogInformation($"Bắt đầu phân tích chi tiết mã");
+                foreach (var file in projectRootPath)
                 {
                     try
                     {
-                        await AnalyzeSingleFileInContext(file.FilePath, analysisResult, processedMacros, processedFiles);
+                        _logger.LogInformation($"Bắt đầu phân tích {file}");
+                        await AnalyzeSingleFileInContext(file, analysisResult);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Lỗi khi phân tích tệp {file.FilePath}: {ex.Message}");
-                        analysisResult.Errors.Add($"Error analyzing file {file.FilePath}: {ex.Message}");
+                        _logger.LogError(ex, $"Lỗi khi phân tích tệp {file}: {ex.Message}");
+                        analysisResult.Errors.Add($"Error analyzing file {file}: {ex.Message}");
                     }
                 }
 
@@ -1465,19 +1437,9 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="filePath">Đường dẫn tệp cần phân tích</param>
         /// <param name="analysisResult">Kết quả phân tích dự án để cập nhật</param>
-        /// <param name="processedMacros">Danh sách các macro đã được xử lý</param>
-        /// <param name="processedFiles">Danh sách các tệp đã được xử lý</param>
         /// <returns>Task</returns>
-        private async Task AnalyzeSingleFileInContext(string filePath, ProjectAnalysisResult analysisResult,
-            Dictionary<string, CDefinition> processedMacros, HashSet<string> processedFiles)
+        private async Task AnalyzeSingleFileInContext(string filePath, ProjectAnalysisResult analysisResult)
         {
-            if (processedFiles.Contains(filePath))
-            {
-                return;
-            }
-
-            processedFiles.Add(filePath);
-
             try
             {
                 var sourceFile = await ParseSourceFileAsync(filePath);
@@ -1492,11 +1454,11 @@ namespace C_TestForge.Parser
                         options = _configurationService.CreateParseOptionsFromConfiguration(config);
                     }
                 }
-                var pathFiles = GetUniqueHeaderDirectoriesAsUnixPaths(analysisResult.DependencyGraph.IncludePaths);
+
                 // Thêm include paths từ dependency graph 
-                if (pathFiles.Count > 0)
+                if (analysisResult.DependencyGraph.IncludePaths.Count > 0)
                 {
-                    foreach (var includePath in pathFiles)
+                    foreach (var includePath in analysisResult.DependencyGraph.IncludePaths)
                     {
                         if (!options.IncludePaths.Contains(includePath))
                         {
@@ -1504,29 +1466,8 @@ namespace C_TestForge.Parser
                         }
                     }
                 }
-                // Thêm macro definitions từ dependency graph
-                if (processedMacros != null)
-                {
-                    foreach (var macro in processedMacros)
-                    {
-                        if (!options.MacroDefinitions.ContainsKey(macro.Key))
-                        {
-                            options.MacroDefinitions[macro.Key] = macro.Value.Value;
-                        }
-                    }
-                }
 
                 var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
-
-                // Thu thập macro definitions mới
-                foreach (var definition in parseResult.Definitions)
-                {
-                    if (!processedMacros.ContainsKey(definition.Name))
-                    {
-                        processedMacros[definition.Name] = definition;
-                        analysisResult.Macros.Add(definition);
-                    }
-                }
 
                 // Thu thập functions
                 foreach (var function in parseResult.Functions)

@@ -34,6 +34,7 @@
             <cov:BoolToRowHeightConverter x:Key="BoolToRowHeightConverter" />
             <cov:DepthToColorConverter x:Key="DepthToColorConverter" />
             <cov:InverseCountToVisibilityConverter x:Key="InverseCountToVisibilityConverter" />
+            <cov:FileNameFromPathConverter x:Key="FileNameFromPathConverter" />
 
             <!-- Font Definitions -->
             <FontFamily x:Key="MainFont">Segoe UI, Roboto, Arial</FontFamily>

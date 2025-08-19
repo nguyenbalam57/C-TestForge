@@ -286,8 +286,8 @@ namespace C_TestForge.Parser
                 },
                 IncludePaths = new List<string>
                 {
-                    "/usr/include",
-                    "/usr/local/include"
+                    //"/usr/include",
+                    //"/usr/local/include"
                 },
                 AdditionalArguments = new List<string>
                 {

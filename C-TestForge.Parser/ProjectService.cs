@@ -3,10 +3,13 @@ using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
+using C_TestForge.Parser.Helpers;
+using ClangSharp;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -39,7 +42,13 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<Project> CreateProjectAsync(string projectName, string projectPath)
+        public async Task<Project> CreateProjectAsync(
+            string projectName,
+            string projectDescription,
+            string projectPath,
+            List<string>? macros = null,
+            List<string>? includePaths = null,
+            List<string>? cFiles = null)
         {
             try
             {
@@ -75,18 +84,21 @@ namespace C_TestForge.Parser
                 // Create a default configuration
                 var defaultConfig = _configurationService.CreateDefaultConfiguration();
 
+                // Convert macros to dictionary if provided
+                var macrosList = MacroHelper.ToDictionary(macros);
+
                 // Create the project
                 var project = new Project
                 {
                     Name = projectName,
                     ProjectFilePath = projectFilePath,
-                    SourceFiles = new List<string>(),
-                    IncludePaths = new List<string>(),
-                    MacroDefinitions = new Dictionary<string, string>(),
+                    SourceFiles = cFiles != null ? cFiles : new List<string>(),
+                    IncludePaths = includePaths != null ? includePaths : new List<string>(),
+                    MacroDefinitions = (macrosList != null && macrosList.Count > 0) ? macrosList : new Dictionary<string, string>(),
                     Configurations = new List<Configuration> { defaultConfig },
                     ActiveConfigurationName = defaultConfig.Name,
                     LastModified = DateTime.Now,
-                    Description = $"C-TestForge project: {projectName}",
+                    Description = projectDescription,
                     Properties = new Dictionary<string, string>
                     {
                         { "CreatedBy", Environment.UserName },
@@ -104,6 +116,70 @@ namespace C_TestForge.Parser
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error creating project: {projectName}");
+                throw;
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<Project> EditProjectAsync(
+            string projectName,
+            string projectDescription,
+            string projectPath,
+            List<string>? macros = null,
+            List<string>? includePaths = null,
+            List<string>? cFiles = null)
+        {
+            try
+            {
+                _logger.LogInformation($"Editing project: {projectName} at {projectPath}");
+
+                if (string.IsNullOrEmpty(projectName))
+                    throw new ArgumentException("Project name cannot be null or empty", nameof(projectName));
+                if (string.IsNullOrEmpty(projectPath))
+                    throw new ArgumentException("Project path cannot be null or empty", nameof(projectPath));
+
+                // Xác định đường dẫn file project cũ và mới
+                string newProjectFilePath = Path.Combine(projectPath, $"{projectName}.ctproj");
+
+                Project? project = null;
+                if (_fileService.FileExists(newProjectFilePath))
+                {
+                    // Đọc project hiện tại
+                    string json = await _fileService.ReadFileAsync(newProjectFilePath);
+                    project = JsonConvert.DeserializeObject<Project>(json);
+                }
+
+                if (project == null)
+                {
+                    // Nếu không tồn tại, tạo mới
+                    project = new Project();
+                }
+
+                // Cập nhật thông tin
+                project.Name = projectName;
+                project.Description = projectDescription;
+                project.ProjectFilePath = newProjectFilePath;
+                project.IncludePaths = includePaths ?? new List<string>();
+                project.SourceFiles = cFiles ?? new List<string>();
+                project.MacroDefinitions = MacroHelper.ToDictionary(macros);
+                project.LastModified = DateTime.Now;
+
+                // Cập nhật thuộc tính
+                if (project.Properties == null)
+                    project.Properties = new Dictionary<string, string>();
+                project.Properties["LastModifiedBy"] = Environment.UserName;
+                project.Properties["LastModifiedDate"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                // Lưu lại project
+                await SaveProjectAsync(project);
+
+                _logger.LogInformation($"Successfully edited project: {projectName} at {newProjectFilePath}");
+
+                return project;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error editing project: {projectName}");
                 throw;
             }
         }

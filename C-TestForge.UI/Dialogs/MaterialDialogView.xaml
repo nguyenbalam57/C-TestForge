@@ -62,8 +62,8 @@
                     Content="{Binding OkText}"
                     Command="{Binding OkCommand}"
                     CommandParameter="{Binding}"
-                    Background="{StaticResource PrimaryColor}"
-                    BorderBrush="{StaticResource PrimaryColor}"
+                    Background="{StaticResource PrimaryHueMidBrush}"
+                    BorderBrush="{StaticResource PrimaryHueMidBrush}"
                     Foreground="White" />
         </StackPanel>
     </Grid>

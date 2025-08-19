@@ -87,6 +87,7 @@ namespace C_TestForge.UI.ViewModels
 
             // Initialize commands
             NewProjectCommand = new AsyncRelayCommand(NewProjectAsync);
+            EditProjectCommand = new AsyncRelayCommand(EditProjectAsync);
             OpenProjectCommand = new AsyncRelayCommand(OpenProjectAsync);
             SaveProjectCommand = new AsyncRelayCommand(SaveProjectAsync, CanSaveProject);
             CloseProjectCommand = new RelayCommand(CloseProject, CanCloseProject);
@@ -571,6 +572,7 @@ namespace C_TestForge.UI.ViewModels
 
         // Commands
         public ICommand NewProjectCommand { get; }
+        public ICommand EditProjectCommand { get; }
         public ICommand OpenProjectCommand { get; }
         public ICommand SaveProjectCommand { get; }
         public ICommand CloseProjectCommand { get; }
@@ -811,7 +813,11 @@ namespace C_TestForge.UI.ViewModels
 
                     var newProject = await _projectService.CreateProjectAsync(
                         dialog.ProjectName,
-                        dialog.SourceDirectory);
+                        dialog.ProjectDescription,
+                        dialog.ProjectDirectory,
+                        dialog.Macros.ToList(),
+                        dialog.IncludePaths.ToList(),
+                        dialog.CFiles.ToList());
 
                     SetCurrentProject(newProject);
                     StatusMessage = $"Đã tạo dự án mới: {newProject.Name}";
@@ -829,6 +835,95 @@ namespace C_TestForge.UI.ViewModels
                 _logger.LogError(ex, "Lỗi khi tạo dự án mới");
                 StatusMessage = $"Lỗi: {ex.Message}";
                 MessageBox.Show($"Lỗi khi tạo dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        /// <summary>
+        /// Chỉnh sửa dự án hiện tại
+        /// </summary>
+        /// <returns></returns>
+        private async Task EditProjectAsync()
+        {
+            if (CurrentProject == null) return;
+            try
+            {
+                var dialog = new Dialogs.NewProjectDialog(
+                    CurrentProject.Name,
+                    CurrentProject.Description,
+                    CurrentProject.ProjectFilePath,
+                    Parser.Helpers.MacroHelper.ToObservableCollection(CurrentProject.MacroDefinitions),
+                    new ObservableCollection<string>(CurrentProject.IncludePaths));
+
+                if (dialog.ShowDialog() == true)
+                {
+                    // So sánh các trường
+                    var changes = new List<string>();
+
+                    if (dialog.ProjectName != CurrentProject.Name)
+                        changes.Add($"- Tên dự án: \"{CurrentProject.Name}\" → \"{dialog.ProjectName}\"");
+                    if (dialog.ProjectDescription != CurrentProject.Description)
+                        changes.Add($"- Mô tả dự án: \"{CurrentProject.Description}\" → \"{dialog.ProjectDescription}\"");
+                    if (dialog.ProjectDirectory != System.IO.Path.GetDirectoryName(CurrentProject.ProjectFilePath))
+                        changes.Add($"- Thư mục dự án: \"{System.IO.Path.GetDirectoryName(CurrentProject.ProjectFilePath)}\" → \"{dialog.ProjectDirectory}\"");
+
+                    // So sánh macro
+                    var oldMacros = Parser.Helpers.MacroHelper.ToObservableCollection(CurrentProject.MacroDefinitions);
+                    var newMacros = dialog.Macros;
+                    if (!oldMacros.SequenceEqual(newMacros))
+                        changes.Add("- Macro định nghĩa");
+
+                    // So sánh include paths
+                    var oldPaths = new ObservableCollection<string>(CurrentProject.IncludePaths ?? new List<string>());
+                    var newPaths = dialog.IncludePaths;
+                    if (!oldPaths.SequenceEqual(newPaths))
+                        changes.Add("- Đường dẫn include");
+
+                    // So sánh cFiles
+                    var oldCFiles = new ObservableCollection<string>(CurrentProject.SourceFiles ?? new List<string>());
+                    var newCFiles = dialog.CFiles;
+                    if (!oldCFiles.SequenceEqual(newCFiles))
+                        changes.Add("- Danh sách file .c");
+
+                    if (changes.Count == 0)
+                    {
+                        MessageBox.Show("Không có thay đổi nào được thực hiện.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+
+                    var message = "Các thay đổi sau sẽ được áp dụng:\n\n" + string.Join("\n", changes) + "\n\nBạn có muốn lưu các thay đổi này không?";
+                    var result = MessageBox.Show(message, "Xác nhận chỉnh sửa dự án", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (result != MessageBoxResult.Yes)
+                    {
+                        StatusMessage = "Đã hủy chỉnh sửa dự án.";
+                        return;
+                    }
+
+                    StatusMessage = $"Đang chỉnh sửa dự án: {dialog.ProjectName}...";
+
+                    var newProject = await _projectService.EditProjectAsync(
+                        dialog.ProjectName,
+                        dialog.ProjectDescription,
+                        dialog.ProjectDirectory,
+                        dialog.Macros.ToList(),
+                        dialog.IncludePaths.ToList(),
+                        dialog.CFiles.ToList());
+
+                    SetCurrentProject(newProject);
+                    StatusMessage = $"Đã chỉnh sửa dự án: {newProject.Name}";
+
+                    // Refresh UI
+                    await RefreshSourceFilesAsync();
+                    await RefreshTestCasesAsync();
+
+                    // Navigate to Project Explorer
+                    Navigate("ProjectExplorer");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi chỉnh sửa dự án");
+                StatusMessage = $"Lỗi: {ex.Message}";
+                MessageBox.Show($"Lỗi khi chỉnh sửa dự án: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

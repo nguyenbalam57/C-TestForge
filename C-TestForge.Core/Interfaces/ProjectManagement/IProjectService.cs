@@ -3,6 +3,7 @@ using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,7 +21,27 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <param name="projectName">Name of the project</param>
         /// <param name="projectPath">Path to the project</param>
         /// <returns>The created project</returns>
-        Task<Project> CreateProjectAsync(string projectName, string projectPath);
+        Task<Project> CreateProjectAsync(
+            string projectName, 
+            string projectDescription, 
+            string projectPath,
+            List<string>? macros = null,
+            List<string>? includePaths = null,
+            List<string>? cFiles = null);
+
+        /// <summary>
+        /// Chỉnh sửa một project
+        /// </summary>
+        /// <param name="projectName">Name of the project</param>
+        /// <param name="projectPath">Path to the project</param>
+        /// <returns>The created project</returns>
+        Task<Project> EditProjectAsync(
+            string projectName,
+            string projectDescription,
+            string projectPath,
+            List<string>? macros = null,
+            List<string>? includePaths = null,
+            List<string>? cFiles = null);
 
         /// <summary>
         /// Loads a project from disk

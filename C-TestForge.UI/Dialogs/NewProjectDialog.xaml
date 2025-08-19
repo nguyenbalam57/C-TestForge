@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="New Project" Height="300" Width="500"
+        Title="New Project" Height="300" Width="600"
+        MinWidth="600" MinHeight="300"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13"
@@ -14,45 +15,170 @@
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{materialDesign:MaterialDesignFont}"
         WindowStartupLocation="CenterOwner">
-    <Grid Margin="20">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Create New Project" Style="{StaticResource MaterialDesignHeadline5TextBlock}" Margin="0,0,0,20"/>
+        <TabControl materialDesign:ColorZoneAssist.Mode="PrimaryMid" 
+                    Margin="0,0,0,10"
+                    TabStripPlacement="Right">
+            <!-- Tab 1: Tạo mới Project -->
+            <TabItem Header="Tạo mới Project">
+                <Grid Margin="5" VerticalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="1" Margin="0,0,0,10">
-            <TextBlock Text="Project Name" Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
-            <TextBox x:Name="txtProjectName" Margin="0,5,0,0"/>
-        </StackPanel>
+                    <TextBlock Text="Tên dự án" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="0,4" MinWidth="200"/>
 
-        <StackPanel Grid.Row="2" Margin="0,0,0,10">
-            <TextBlock Text="Description" Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
-            <TextBox x:Name="txtDescription" Margin="0,5,0,0" AcceptsReturn="True" TextWrapping="Wrap" Height="60"/>
-        </StackPanel>
+                    <TextBlock Text="Mô tả dự án" Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,8,8,0"/>
+                    <TextBox Text="{Binding ProjectDescription, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" AcceptsReturn="True" TextWrapping="Wrap" Height="60"/>
 
-        <StackPanel Grid.Row="3" Margin="0,0,0,10">
-            <TextBlock Text="Source Directory" Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
-            <Grid Margin="0,5,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtSourceDirectory" Grid.Column="0"/>
-                <Button Grid.Column="1" Margin="5,0,0,0" Click="BrowseButton_Click">
-                    <materialDesign:PackIcon Kind="FolderOpen"/>
-                </Button>
-            </Grid>
-        </StackPanel>
+                    <TextBlock Text="Đường dẫn dự án" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,8,8,0"/>
+                    <Grid Grid.Row="2" Grid.Column="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txtProjectDirectory" Text="{Binding ProjectDirectory, UpdateSourceTrigger=PropertyChanged}" MinWidth="150"/>
+                        <Button Grid.Column="1" Margin="5,0,0,0" Click="BrowseProjectDirectory_Click">
+                            <materialDesign:PackIcon Kind="FolderOpen"/>
+                        </Button>
+                    </Grid>
+                </Grid>
+            </TabItem>
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" Click="CancelButton_Click">Cancel</Button>
-            <Button Style="{StaticResource MaterialDesignRaisedButton}" Click="OkButton_Click">Create Project</Button>
+            <!-- Tab 2: Macro Definitions -->
+            <TabItem Header="Macro Definitions">
+                <Grid Margin="5" VerticalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="txtMacroName" Grid.Row="0" Grid.Column="0" Margin="0,0,8,0" MinWidth="120"/>
+                    <Button Grid.Row="0" Grid.Column="1" Margin="0,0,4,0" Command="{Binding AddMacroCommand}" MinWidth="32">
+                        <materialDesign:PackIcon Kind="Plus"/>
+                    </Button>
+                    <Button Grid.Row="0" Grid.Column="2" Command="{Binding RemoveMacroCommand}" MinWidth="32" >
+                        <materialDesign:PackIcon Kind="Minus"/>
+                    </Button>
+
+                    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                        BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,10,0,0">
+                        <Grid>
+                            <ListBox x:Name="lstMacros"
+                                 ItemsSource="{Binding Macros}"
+                                 SelectedItem="{Binding SelectedMacro, Mode=TwoWay}"
+                                 MinHeight="80" MaxHeight="160"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding ., UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,2"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Text="Chưa có macro"
+                                   Foreground="{DynamicResource MaterialDesignHint}"
+                                   FontStyle="Italic"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding Macros.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 3: Đường dẫn SourceCode -->
+            <TabItem Header="Đường dẫn SourceCode">
+                <Grid Margin="5" VerticalAlignment="Stretch">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="txtSourcePath" Grid.Row="0" Grid.Column="0" Margin="0,0,8,0" MinWidth="120"/>
+                    <Button Grid.Row="0" Grid.Column="1" Margin="0,0,4,0" Click="BrowseSourcePath_Click" MinWidth="32">
+                        <materialDesign:PackIcon Kind="FolderOpen"/>
+                    </Button>
+                    <Button Grid.Row="0" Grid.Column="2" Margin="0,0,4,0" Command="{Binding AddSourcePathCommand}" MinWidth="32" >
+                        <materialDesign:PackIcon Kind="Plus"/>
+                    </Button>
+                    <Button Grid.Row="0" Grid.Column="3" Command="{Binding RemoveSourcePathCommand}" MinWidth="32" >
+                        <materialDesign:PackIcon Kind="Minus"/>
+                    </Button>
+
+                    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                        BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,10,0,0">
+                        <Grid>
+                            <ListBox x:Name="lstSourcePaths"
+                                 ItemsSource="{Binding IncludePaths}"
+                                 SelectedItem="{Binding SelectedSourcePath, Mode=TwoWay}"
+                                 MinHeight="80" MaxHeight="160"
+                                 Background="Transparent"
+                                 BorderThickness="0"/>
+                            <TextBlock Text="Chưa có đường dẫn"
+                                   Foreground="{DynamicResource MaterialDesignHint}"
+                                   FontStyle="Italic"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IncludePaths.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            <!-- Tab 4: File .c -->
+            <TabItem Header="File .c">
+                <Border BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="16,16,16,16">
+                    <ListBox ItemsSource="{Binding CFiles}" MinHeight="80" MaxHeight="200"
+                 Background="Transparent" BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Path=., Converter={StaticResource FileNameFromPathConverter}}"
+                               ToolTip="{Binding .}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <!-- Nút dưới cùng -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" Click="CancelButton_Click" MinWidth="90">Cancel</Button>
+            <Button Style="{StaticResource MaterialDesignRaisedButton}" Click="OkButton_Click" MinWidth="90">Tạo mới</Button>
         </StackPanel>
     </Grid>
 </Window>
