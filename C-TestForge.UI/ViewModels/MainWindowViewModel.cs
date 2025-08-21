@@ -95,7 +95,6 @@ namespace C_TestForge.UI.ViewModels
             ImportTestCasesCommand = new AsyncRelayCommand(ImportTestCasesAsync, CanImportTestCases);
             ExportTestCasesCommand = new AsyncRelayCommand(ExportTestCasesAsync, CanExportTestCases);
             AnalyzeSourceFileCommand = new AsyncRelayCommand<SourceFile>(AnalyzeSourceFileAsync, CanAnalyzeSourceFile);
-            AddSourceFileCommand = new AsyncRelayCommand(AddSourceFileAsync, CanAddSourceFile);
             RemoveSourceFileCommand = new AsyncRelayCommand<SourceFile>(RemoveSourceFileAsync, CanRemoveSourceFile);
             GenerateTestCasesCommand = new AsyncRelayCommand(GenerateTestCasesAsync, CanGenerateTestCases);
             ProjectSettingsCommand = new RelayCommand(ShowProjectSettings, CanShowProjectSettings);
@@ -580,7 +579,6 @@ namespace C_TestForge.UI.ViewModels
         public ICommand ImportTestCasesCommand { get; }
         public ICommand ExportTestCasesCommand { get; }
         public ICommand AnalyzeSourceFileCommand { get; }
-        public ICommand AddSourceFileCommand { get; }
         public ICommand RemoveSourceFileCommand { get; }
         public ICommand GenerateTestCasesCommand { get; }
         public ICommand ProjectSettingsCommand { get; }
@@ -755,8 +753,6 @@ namespace C_TestForge.UI.ViewModels
             OnPropertyChanged(nameof(HasAnalysisData));
         }
 
-        private bool CanAddSourceFile() => CurrentProject != null;
-
         private bool CanAnalyzeSourceFile(SourceFile? sourceFile) => sourceFile != null;
 
         private bool CanRemoveSourceFile(SourceFile? sourceFile) => CurrentProject != null && sourceFile != null;
@@ -846,11 +842,12 @@ namespace C_TestForge.UI.ViewModels
             if (CurrentProject == null) return;
             try
             {
+
                 var dialog = new Dialogs.NewProjectDialog(
                     CurrentProject.Name,
                     CurrentProject.Description,
-                    CurrentProject.ProjectFilePath,
-                    Parser.Helpers.MacroHelper.ToObservableCollection(CurrentProject.MacroDefinitions),
+                    Path.GetDirectoryName(CurrentProject.ProjectFilePath),
+                    new ObservableCollection<string>(CurrentProject.MacroDefinitions),
                     new ObservableCollection<string>(CurrentProject.IncludePaths));
 
                 if (dialog.ShowDialog() == true)
@@ -862,11 +859,11 @@ namespace C_TestForge.UI.ViewModels
                         changes.Add($"- Tên dự án: \"{CurrentProject.Name}\" → \"{dialog.ProjectName}\"");
                     if (dialog.ProjectDescription != CurrentProject.Description)
                         changes.Add($"- Mô tả dự án: \"{CurrentProject.Description}\" → \"{dialog.ProjectDescription}\"");
-                    if (dialog.ProjectDirectory != System.IO.Path.GetDirectoryName(CurrentProject.ProjectFilePath))
+                    if (dialog.ProjectDirectory != Path.GetDirectoryName(CurrentProject.ProjectFilePath))
                         changes.Add($"- Thư mục dự án: \"{System.IO.Path.GetDirectoryName(CurrentProject.ProjectFilePath)}\" → \"{dialog.ProjectDirectory}\"");
 
                     // So sánh macro
-                    var oldMacros = Parser.Helpers.MacroHelper.ToObservableCollection(CurrentProject.MacroDefinitions);
+                    var oldMacros = new ObservableCollection<string>(CurrentProject.MacroDefinitions);
                     var newMacros = dialog.Macros;
                     if (!oldMacros.SequenceEqual(newMacros))
                         changes.Add("- Macro định nghĩa");
@@ -901,6 +898,7 @@ namespace C_TestForge.UI.ViewModels
                     StatusMessage = $"Đang chỉnh sửa dự án: {dialog.ProjectName}...";
 
                     var newProject = await _projectService.EditProjectAsync(
+                        CurrentProject,
                         dialog.ProjectName,
                         dialog.ProjectDescription,
                         dialog.ProjectDirectory,
@@ -1010,7 +1008,7 @@ namespace C_TestForge.UI.ViewModels
         }
 
         /// <summary>
-        /// Phân tích lại các tệp nguồn của dự án
+        /// Phân tích các tệp nguồn của dự án
         /// </summary>
         private async Task ParseSourceFilesAsync()
         {
@@ -1027,15 +1025,13 @@ namespace C_TestForge.UI.ViewModels
                 // Get source files from project
                 var sourceFiles = await _projectService.GetSourceFilesAsync(CurrentProject);
 
-                List<string> sourceFilePaths = new List<string>();
                 // Add source files to collection
                 foreach (var file in sourceFiles)
                 {
                     SourceFiles.Add(file);
-                    sourceFilePaths.Add(file.FilePath);
                 }
 
-                await AnalyzeCompleteProjectAsync(sourceFilePaths);
+                await AnalyzeCompleteProjectAsync(CurrentProject, sourceFiles);
 
                 IsAnalyzing = false;
                 StatusMessage = $"Đã phân tích {sourceFiles.Count} tệp nguồn";
@@ -1139,13 +1135,7 @@ namespace C_TestForge.UI.ViewModels
                 IsAnalyzing = true;
 
                 // Clear previous analysis results
-                ClearAnalysisResults();
-
-                // Check if sourceFile has been processed before
-                if(string.IsNullOrEmpty(sourceFile.ProcessedContent))
-                {
-                     _sourceFileService.ProcessTypeReplacements(sourceFile);
-                }    
+                ClearAnalysisResults();  
 
                 // Analyze source file
                 _analysisResult = await _analysisService.AnalyzeSourceFileAsync(sourceFile, _analysisOptions);
@@ -1173,9 +1163,9 @@ namespace C_TestForge.UI.ViewModels
         /// </summary>
         /// <param name="projectPath">Đường dẫn đến thư mục dự án</param>
         /// <returns>Task</returns>
-        private async Task AnalyzeCompleteProjectAsync(List<string> projectPath)
+        private async Task AnalyzeCompleteProjectAsync(Project project, List<SourceFile> sourceFiles)
         {
-            if (projectPath == null || projectPath.Count < 1)
+            if (sourceFiles == null || sourceFiles.Count < 1)
             {
                 var confirmResult = MessageBox.Show(
                     $"Không có file nào được phân tích!",
@@ -1187,17 +1177,15 @@ namespace C_TestForge.UI.ViewModels
 
             try
             {
-                StatusMessage = $"Bắt đầu phân tích toàn bộ dự án: {projectPath.Count}...";
+                StatusMessage = $"Bắt đầu phân tích toàn bộ dự án: {sourceFiles.Count} File...";
                 IsAnalyzing = true;
 
                 // Show confirmation dialog with analysis details
                 var confirmResult = MessageBox.Show(
-                    $"Điều này sẽ thực hiện phân tích toàn bộ dự án tại:\n{projectPath.Count}\n\n" +
+                    $"Điều này sẽ thực hiện phân tích toàn bộ dự án tại:\n{sourceFiles.Count} File\n\n" +
                     "Phân tích sẽ:\n" +
-                    "• Quét tất cả các tệp C/C++ trong thư mục\n" +
-                    "• Xây dựng đồ thị phụ thuộc\n" +
-                    "• Trích xuất hàm, biến và macro\n" +
-                    "• Phân tích mối quan hệ và ràng buộc\n\n" +
+                    "• Quét tất cả các tệp C/C++\n" +
+                    "• Trích xuất hàm, biến và macro v.v..\n" +
                     "Quá trình này có thể mất vài phút đối với các dự án lớn.\n\n" +
                     "Bạn có muốn tiếp tục không?",
                     "Phân tích toàn bộ dự án",
@@ -1211,9 +1199,9 @@ namespace C_TestForge.UI.ViewModels
                     return;
                 }
 
-                // Perform complete project analysis
-                var analysisResult = await _clangSharpParserService.AnalyzeCompleteProjectAsync(projectPath);
+                var analysisResult = await _clangSharpParserService.AnalyzeCompleteProjectAsync(project, sourceFiles);
 
+                
                 // Update UI with results
                 UpdateProjectAnalysisResults(analysisResult);
 
@@ -1229,7 +1217,7 @@ namespace C_TestForge.UI.ViewModels
                 // Show detailed report
                 ShowAnalysisReport(summaryReport);
 
-                _logger.LogInformation($"Complete project analysis completed successfully for {projectPath}");
+                _logger.LogInformation($"Complete project analysis completed successfully for ");
             }
             catch (Exception ex)
             {
@@ -1383,42 +1371,6 @@ namespace C_TestForge.UI.ViewModels
             Application.Current.MainWindow?.Close();
         }
 
-        /// <summary>
-        /// Thêm tệp nguồn vào dự án (có thể chọn nhiều chế độ)
-        /// </summary>
-        private async Task AddSourceFileAsync()
-        {
-            try
-            {
-                // Show a menu to choose between adding files, analyzing folder, or complete project analysis
-                var choice = MessageBox.Show(
-                    "Chọn một tuỳ chọn:\n\n" +
-                    "• Yes: Thêm từng tệp nguồn vào dự án\n" +
-                    "• No: Phân tích toàn bộ thư mục\n" +
-                    "• Cancel: Hủy thao tác",
-                    "Thêm tệp nguồn",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Question);
-
-                if (choice == MessageBoxResult.Cancel)
-                    return;
-
-                if (choice == MessageBoxResult.Yes)
-                {
-                    await AddIndividualFilesAsync();
-                }
-                else if (choice == MessageBoxResult.No)
-                {
-                    await AnalyzeFolderAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi thêm tệp nguồn");
-                StatusMessage = $"Lỗi: {ex.Message}";
-                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         /// <summary>
         /// Thêm từng tệp nguồn riêng lẻ vào dự án

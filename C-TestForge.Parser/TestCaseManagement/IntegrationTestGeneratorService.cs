@@ -70,8 +70,8 @@ namespace C_TestForge.Parser.TestCaseManagement
                 testCase.InputVariables.Add(new TestCaseVariableInput
                 {
                     Name = param.Name,
-                    Type = param.TypeName,
-                    Value = GenerateDefaultValueForType(param.TypeName)
+                    //Type = param.TypeName,
+                    //Value = GenerateDefaultValueForType(param.TypeName)
                 });
             }
 

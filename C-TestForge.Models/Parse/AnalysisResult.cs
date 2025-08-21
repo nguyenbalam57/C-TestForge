@@ -1,72 +1,238 @@
-﻿using System;
+﻿using C_TestForge.Models.Core;
+using C_TestForge.Models.Core.Enumerations;
+using C_TestForge.Models.Projects;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using C_TestForge.Models.Core;
-using C_TestForge.Models.Projects;
 
 namespace C_TestForge.Models.Parse
 {
     /// <summary>
-    /// Result of analyzing a C source file or project
+    /// Kết quả phân tích một tệp hoặc dự án mã nguồn C/C++
     /// </summary>
     public class AnalysisResult
     {
+        #region Danh sách phần tử phân tích cơ bản
+
         /// <summary>
-        /// List of variables found in the analysis
+        /// Danh sách biến được phát hiện trong quá trình phân tích
         /// </summary>
         public List<CVariable> Variables { get; set; } = new List<CVariable>();
 
         /// <summary>
-        /// List of functions found in the analysis
+        /// Danh sách hàm được phát hiện trong quá trình phân tích
         /// </summary>
         public List<CFunction> Functions { get; set; } = new List<CFunction>();
 
         /// <summary>
-        /// List of preprocessor definitions found in the analysis
+        /// Danh sách macro/định nghĩa tiền xử lý được phát hiện
         /// </summary>
         public List<CDefinition> Definitions { get; set; } = new List<CDefinition>();
 
         /// <summary>
-        /// List of conditional directives found in the analysis
+        /// Danh sách directive điều kiện (#ifdef, #ifndef, #if, ...)
         /// </summary>
         public List<ConditionalDirective> ConditionalDirectives { get; set; } = new List<ConditionalDirective>();
 
         /// <summary>
-        /// List of function relationships found in the analysis
+        /// Danh sách mối quan hệ gọi hàm (ai gọi ai)
         /// </summary>
         public List<FunctionRelationship> FunctionRelationships { get; set; } = new List<FunctionRelationship>();
 
         /// <summary>
-        /// List of variable constraints found in the analysis
+        /// Danh sách ràng buộc giá trị biến (ví dụ: biến chỉ nhận giá trị trong khoảng nào đó)
         /// </summary>
         public List<VariableConstraint> VariableConstraints { get; set; } = new List<VariableConstraint>();
 
+        #endregion
+
+        #region Phần tử mở rộng (theo ParseResult)
+
         /// <summary>
-        /// Get variable by name
+        /// Danh sách struct được phát hiện
         /// </summary>
-        public CVariable GetVariable(string name)
+        public List<CStruct> Structures { get; set; } = new List<CStruct>();
+
+        /// <summary>
+        /// Danh sách union được phát hiện
+        /// </summary>
+        public List<CUnion> Unions { get; set; } = new List<CUnion>();
+
+        /// <summary>
+        /// Danh sách enum được phát hiện
+        /// </summary>
+        public List<CEnum> Enumerations { get; set; } = new List<CEnum>();
+
+        /// <summary>
+        /// Danh sách typedef được phát hiện
+        /// </summary>
+        public List<CTypedef> Typedefs { get; set; } = new List<CTypedef>();
+
+        /// <summary>
+        /// Danh sách chỉ thị include (#include)
+        /// </summary>
+        public List<CInclude> Includes { get; set; } = new List<CInclude>();
+
+        /// <summary>
+        /// Danh sách hằng số toàn cục
+        /// </summary>
+        public List<CConstant> Constants { get; set; } = new List<CConstant>();
+
+        /// <summary>
+        /// Danh sách phụ thuộc kiểu dữ liệu (giữa struct, union, typedef, ...)
+        /// </summary>
+        public List<TypeDependency> TypeDependencies { get; set; } = new List<TypeDependency>();
+
+        /// <summary>
+        /// Danh sách tham chiếu ký hiệu (symbol reference)
+        /// </summary>
+        public List<SymbolReference> SymbolReferences { get; set; } = new List<SymbolReference>();
+
+        /// <summary>
+        /// Đồ thị gọi hàm (call graph)
+        /// </summary>
+        public CallGraph CallGraph { get; set; } = new CallGraph();
+
+        #endregion
+
+        #region Trạng thái và thống kê phân tích
+
+        /// <summary>
+        /// Danh sách lỗi phát hiện trong quá trình phân tích
+        /// </summary>
+        public List<ParseError> ParseErrors { get; set; } = new List<ParseError>();
+
+        /// <summary>
+        /// Danh sách cảnh báo phát hiện trong quá trình phân tích
+        /// </summary>
+        public List<ParseWarning> ParseWarnings { get; set; } = new List<ParseWarning>();
+
+        /// <summary>
+        /// Thời điểm bắt đầu phân tích
+        /// </summary>
+        public DateTime StartTime { get; set; }
+
+        /// <summary>
+        /// Thời điểm kết thúc phân tích
+        /// </summary>
+        public DateTime EndTime { get; set; }
+
+        /// <summary>
+        /// Tổng thời gian phân tích
+        /// </summary>
+        public TimeSpan Duration => EndTime - StartTime;
+
+        /// <summary>
+        /// Phân tích thành công hay không
+        /// </summary>
+        public bool IsSuccess { get; set; } = true;
+
+        /// <summary>
+        /// Kết quả phân tích đã đầy đủ chưa
+        /// </summary>
+        public bool IsComplete { get; set; } = true;
+
+        /// <summary>
+        /// Đường dẫn tệp nguồn được phân tích
+        /// </summary>
+        public string SourceFilePath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Hash nội dung tệp để kiểm tra tính nhất quán
+        /// </summary>
+        public string ContentHash { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Phiên bản parser sử dụng
+        /// </summary>
+        public string ParserVersion { get; set; } = "1.0";
+
+        /// <summary>
+        /// Phiên bản Clang sử dụng để phân tích
+        /// </summary>
+        public string ClangVersion { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Thống kê chi tiết quá trình phân tích
+        /// </summary>
+        public ParseStatistics Statistics { get; set; } = new ParseStatistics();
+
+        #endregion
+
+        #region Thuộc tính tính toán nhanh
+
+        /// <summary>
+        /// Có lỗi nghiêm trọng không?
+        /// </summary>
+        public bool HasCriticalErrors => ParseErrors.Any(e => e.Severity == ErrorSeverity.Critical);
+
+        /// <summary>
+        /// Có lỗi (mức error trở lên) không?
+        /// </summary>
+        public bool HasErrors => ParseErrors.Any(e => e.Severity >= ErrorSeverity.Error);
+
+        /// <summary>
+        /// Có cảnh báo không?
+        /// </summary>
+        public bool HasWarnings => ParseErrors.Any(e => e.Severity == ErrorSeverity.Warning) || ParseWarnings.Count > 0;
+
+        /// <summary>
+        /// Tổng số phần tử được phân tích
+        /// </summary>
+        public int TotalElementCount => Functions.Count + Variables.Count + Structures.Count +
+                                       Unions.Count + Enumerations.Count + Typedefs.Count +
+                                       Definitions.Count + Constants.Count;
+
+        /// <summary>
+        /// Danh sách symbol toàn cục (hàm, biến toàn cục, hằng số)
+        /// </summary>
+        public List<ISymbol> GlobalSymbols
         {
-            return Variables.FirstOrDefault(v => v.Name == name);
+            get
+            {
+                var symbols = new List<ISymbol>();
+                symbols.AddRange(Functions.Cast<ISymbol>());
+                symbols.AddRange(Variables.Where(v => v.Scope == VariableScope.Global).Cast<ISymbol>());
+                symbols.AddRange(Constants.Cast<ISymbol>());
+                return symbols.OrderBy(s => s.Name).ToList();
+            }
         }
 
         /// <summary>
-        /// Get function by name
+        /// Thống kê độ phức tạp mã nguồn
         /// </summary>
-        public CFunction GetFunction(string name)
+        public CodeComplexity ComplexityMetrics
         {
-            return Functions.FirstOrDefault(f => f.Name == name);
+            get
+            {
+                return new CodeComplexity
+                {
+                    CyclomaticComplexity = Functions.Sum(f => f.CyclomaticComplexity),
+                    TotalFunctions = Functions.Count,
+                    TotalVariables = Variables.Count,
+                    TotalStructures = Structures.Count,
+                    AverageFunctionLength = Functions.Count > 0 ? Functions.Average(f => f.LineCount) : 0,
+                    MaxFunctionComplexity = Functions.Count > 0 ? Functions.Max(f => f.CyclomaticComplexity) : 0
+                };
+            }
         }
 
-        /// <summary>
-        /// Get definition by name
-        /// </summary>
-        public CDefinition GetDefinition(string name)
-        {
-            return Definitions.FirstOrDefault(d => d.Name == name);
-        }
+        #endregion
+
+        #region Các phương thức truy vấn nhanh
+
+        public CVariable GetVariable(string name) => Variables.FirstOrDefault(v => v.Name == name);
+        public CFunction GetFunction(string name) => Functions.FirstOrDefault(f => f.Name == name);
+        public CDefinition GetDefinition(string name) => Definitions.FirstOrDefault(d => d.Name == name);
+        public CStruct GetStructure(string name) => Structures.FirstOrDefault(s => s.Name == name);
+        public CUnion GetUnion(string name) => Unions.FirstOrDefault(u => u.Name == name);
+        public CEnum GetEnumeration(string name) => Enumerations.FirstOrDefault(e => e.Name == name);
+        public CTypedef GetTypedef(string name) => Typedefs.FirstOrDefault(t => t.Name == name);
+        public CConstant GetConstant(string name) => Constants.FirstOrDefault(c => c.Name == name);
+        public CInclude GetInclude(string includePath) => Includes.FirstOrDefault(i => i.IncludePath == includePath);
 
         /// <summary>
-        /// Get functions that call the specified function
+        /// Lấy danh sách hàm gọi tới một hàm cụ thể
         /// </summary>
         public List<CFunction> GetCallers(string functionName)
         {
@@ -81,7 +247,7 @@ namespace C_TestForge.Models.Parse
         }
 
         /// <summary>
-        /// Get functions called by the specified function
+        /// Lấy danh sách hàm được gọi bởi một hàm cụ thể
         /// </summary>
         public List<CFunction> GetCallees(string functionName)
         {
@@ -96,7 +262,67 @@ namespace C_TestForge.Models.Parse
         }
 
         /// <summary>
-        /// Merges another analysis result into this one
+        /// Tìm kiếm symbol theo tên (có thể dùng regex)
+        /// </summary>
+        public List<ISymbol> FindSymbols(string pattern, bool useRegex = false)
+        {
+            var allSymbols = new List<ISymbol>();
+            allSymbols.AddRange(Functions.Cast<ISymbol>());
+            allSymbols.AddRange(Variables.Cast<ISymbol>());
+            allSymbols.AddRange(Constants.Cast<ISymbol>());
+            allSymbols.AddRange(Structures.Cast<ISymbol>());
+            allSymbols.AddRange(Unions.Cast<ISymbol>());
+            allSymbols.AddRange(Enumerations.Cast<ISymbol>());
+            allSymbols.AddRange(Typedefs.Cast<ISymbol>());
+
+            if (useRegex)
+            {
+                try
+                {
+                    var regex = new System.Text.RegularExpressions.Regex(pattern,
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    return allSymbols.Where(s => regex.IsMatch(s.Name)).ToList();
+                }
+                catch
+                {
+                    // Nếu regex lỗi, fallback về so khớp chuỗi thường
+                    return allSymbols.Where(s => s.Name.Contains(pattern, StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+            }
+
+            return allSymbols.Where(s => s.Name.Contains(pattern, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        /// <summary>
+        /// Lấy tất cả hàm sử dụng một biến cụ thể
+        /// </summary>
+        public List<CFunction> GetFunctionsUsingVariable(string variableName)
+        {
+            return Functions
+                .Where(f => f.UsedVariables != null && f.UsedVariables.Contains(variableName))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Lấy tất cả biến được sử dụng trong một hàm cụ thể
+        /// </summary>
+        public List<CVariable> GetVariablesUsedByFunction(string functionName)
+        {
+            var function = GetFunction(functionName);
+            if (function?.UsedVariables == null)
+                return new List<CVariable>();
+
+            return Variables
+                .Where(v => function.UsedVariables.Contains(v.Name))
+                .ToList();
+        }
+
+        #endregion
+
+        #region Gộp và kiểm tra hợp lệ
+
+        /// <summary>
+        /// Gộp kết quả phân tích khác vào đối tượng hiện tại
         /// </summary>
         public void Merge(AnalysisResult other)
         {
@@ -109,232 +335,65 @@ namespace C_TestForge.Models.Parse
             ConditionalDirectives.AddRange(other.ConditionalDirectives);
             FunctionRelationships.AddRange(other.FunctionRelationships);
             VariableConstraints.AddRange(other.VariableConstraints);
-        }
-    }
 
-    /// <summary>
-    /// Kết quả phân tích toàn bộ dự án C/C++
-    /// </summary>
-    public class ProjectAnalysisResult : AnalysisResult
-    {
-        /// <summary>
-        /// Đường dẫn thư mục gốc của dự án
-        /// </summary>
-        public List<string> ProjectPath { get; set; }
+            Structures.AddRange(other.Structures);
+            Unions.AddRange(other.Unions);
+            Enumerations.AddRange(other.Enumerations);
+            Typedefs.AddRange(other.Typedefs);
+            Includes.AddRange(other.Includes);
+            Constants.AddRange(other.Constants);
+            TypeDependencies.AddRange(other.TypeDependencies);
+            SymbolReferences.AddRange(other.SymbolReferences);
 
-        /// <summary>
-        /// Đồ thị phụ thuộc include của dự án
-        /// </summary>
-        public IncludeDependencyGraph DependencyGraph { get; set; } = new IncludeDependencyGraph();
+            ParseErrors.AddRange(other.ParseErrors);
+            ParseWarnings.AddRange(other.ParseWarnings);
 
-        /// <summary>
-        /// Danh sách macro từ tất cả các tệp
-        /// </summary>
-        public List<CDefinition> Macros { get; set; } = new List<CDefinition>();
+            Statistics.Merge(other.Statistics);
 
-        /// <summary>
-        /// Danh sách directive tiền xử lý từ tất cả các tệp
-        /// </summary>
-        public List<CPreprocessorDirective> PreprocessorDirectives { get; set; } = new List<CPreprocessorDirective>();
-
-        /// <summary>
-        /// Danh sách các tệp đã được xử lý
-        /// </summary>
-        public List<string> ProcessedFiles { get; set; } = new List<string>();
-
-        /// <summary>
-        /// Danh sách lỗi gặp phải trong quá trình phân tích
-        /// </summary>
-        public List<string> Errors { get; set; } = new List<string>();
-
-        /// <summary>
-        /// Thời gian bắt đầu phân tích
-        /// </summary>
-        public DateTime StartTime { get; set; }
-
-        /// <summary>
-        /// Thời gian kết thúc phân tích
-        /// </summary>
-        public DateTime EndTime { get; set; }
-
-        /// <summary>
-        /// Thời gian phân tích
-        /// </summary>
-        public TimeSpan Duration { get; set; }
-
-        /// <summary>
-        /// Tổng số tệp trong dự án
-        /// </summary>
-        public int TotalFiles => DependencyGraph?.SourceFiles?.Count ?? 0;
-
-        /// <summary>
-        /// Số tệp đã được xử lý thành công
-        /// </summary>
-        public int ProcessedFileCount => ProcessedFiles?.Count ?? 0;
-
-        /// <summary>
-        /// Tỷ lệ phần trăm hoàn thành
-        /// </summary>
-        public double CompletionPercentage => TotalFiles > 0 ? (double)ProcessedFileCount / TotalFiles * 100 : 0;
-
-        /// <summary>
-        /// Có lỗi trong quá trình phân tích không
-        /// </summary>
-        public bool HasErrors => Errors?.Count > 0;
-
-        /// <summary>
-        /// Thống kê kết quả phân tích
-        /// </summary>
-        public ProjectAnalysisStatistics Statistics => new ProjectAnalysisStatistics
-        {
-            TotalFiles = TotalFiles,
-            ProcessedFiles = ProcessedFileCount,
-            TotalFunctions = Functions?.Count ?? 0,
-            TotalVariables = Variables?.Count ?? 0,
-            TotalMacros = Macros?.Count ?? 0,
-            TotalErrors = Errors?.Count ?? 0,
-            Duration = Duration,
-            CompletionPercentage = CompletionPercentage
-        };
-
-        /// <summary>
-        /// Lấy tất cả các tệp header trong dự án
-        /// </summary>
-        public List<SourceFileDependency> GetHeaderFiles()
-        {
-            return DependencyGraph?.SourceFiles?
-                .Where(f => f.FileType == SourceFileType.CHeader || f.FileType == SourceFileType.CPPHeader)
-                .ToList() ?? new List<SourceFileDependency>();
+            IsSuccess = IsSuccess && other.IsSuccess;
+            IsComplete = IsComplete && other.IsComplete;
         }
 
         /// <summary>
-        /// Lấy tất cả các tệp source trong dự án
+        /// Kiểm tra hợp lệ dữ liệu phân tích (ví dụ: trùng tên, tham chiếu chưa giải quyết, ...)
         /// </summary>
-        public List<SourceFileDependency> GetSourceFiles()
+        public List<string> Validate()
         {
-            return DependencyGraph?.SourceFiles?
-                .Where(f => f.FileType == SourceFileType.CSource || f.FileType == SourceFileType.CPPSource)
-                .ToList() ?? new List<SourceFileDependency>();
-        }
+            var issues = new List<string>();
 
-        /// <summary>
-        /// Lấy macro theo tên
-        /// </summary>
-        public CDefinition GetMacro(string name)
-        {
-            return Macros?.FirstOrDefault(m => m.Name == name);
-        }
-
-        /// <summary>
-        /// Lấy tất cả các điều kiện tiền xử lý duy nhất
-        /// </summary>
-        public List<string> GetUniquePreprocessorConditions()
-        {
-            var conditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Từ conditional directives
-            if (ConditionalDirectives != null)
+            // Kiểm tra trùng tên hàm
+            var functionNames = Functions.Select(f => f.Name).ToList();
+            var duplicateFunctions = functionNames.GroupBy(n => n).Where(g => g.Count() > 1);
+            foreach (var dup in duplicateFunctions)
             {
-                foreach (var directive in ConditionalDirectives)
+                issues.Add($"Trùng tên hàm: {dup.Key}");
+            }
+
+            // Kiểm tra symbol chưa giải quyết
+            foreach (var reference in SymbolReferences)
+            {
+                if (!reference.IsResolved)
                 {
-                    if (!string.IsNullOrEmpty(directive.Condition))
-                    {
-                        conditions.Add(directive.Condition.Trim());
-                    }
+                    issues.Add($"Symbol chưa giải quyết: {reference.Name} tại dòng {reference.LineNumber}");
                 }
             }
 
-            // Từ dependency graph conditional blocks
-            if (DependencyGraph?.SourceFiles != null)
+            // Kiểm tra mối quan hệ gọi hàm hợp lệ
+            foreach (var relationship in FunctionRelationships)
             {
-                foreach (var file in DependencyGraph.SourceFiles)
+                if (GetFunction(relationship.CallerName) == null)
                 {
-                    foreach (var block in file.ConditionalBlocks)
-                    {
-                        ExtractConditionsRecursively(block, conditions);
-                    }
+                    issues.Add($"Quan hệ gọi hàm tham chiếu caller không tồn tại: {relationship.CallerName}");
+                }
+                if (GetFunction(relationship.CalleeName) == null)
+                {
+                    issues.Add($"Quan hệ gọi hàm tham chiếu callee không tồn tại: {relationship.CalleeName}");
                 }
             }
 
-            return conditions.ToList();
+            return issues;
         }
 
-        /// <summary>
-        /// Trích xuất điều kiện đệ quy từ conditional blocks
-        /// </summary>
-        private void ExtractConditionsRecursively(ConditionalBlock block, HashSet<string> conditions)
-        {
-            if (!string.IsNullOrEmpty(block.Condition))
-            {
-                conditions.Add(block.Condition.Trim());
-            }
-
-            foreach (var nestedBlock in block.NestedBlocks)
-            {
-                ExtractConditionsRecursively(nestedBlock, conditions);
-            }
-        }
-
-        /// <summary>
-        /// Tạo báo cáo tóm tắt phân tích
-        /// </summary>
-        public string GenerateSummaryReport()
-        {
-            var report = new System.Text.StringBuilder();
-            
-            report.AppendLine("=== BÁO CÁO PHÂN TÍCH DỰ ÁN C/C++ ===");
-            report.AppendLine($"Dự án file: {ProjectPath.Count}");
-            //foreach( var path in ProjectPath)
-            //{
-            //    report.AppendLine($"- {path}");
-            //}
-            report.AppendLine($"Thời gian phân tích: {Duration.TotalSeconds:F2} giây");
-            report.AppendLine($"Hoàn thành: {CompletionPercentage:F1}%");
-            report.AppendLine();
-            
-            report.AppendLine("=== THỐNG KÊ ===");
-            report.AppendLine($"Tổng số tệp: {TotalFiles}");
-            report.AppendLine($"Tệp đã xử lý: {ProcessedFileCount}");
-            report.AppendLine($"Tệp header: {GetHeaderFiles().Count}");
-            report.AppendLine($"Tệp source: {GetSourceFiles().Count}");
-            report.AppendLine();
-            
-            report.AppendLine("=== THÀNH PHẦN ===");
-            report.AppendLine($"Hàm: {Functions?.Count ?? 0}");
-            report.AppendLine($"Biến: {Variables?.Count ?? 0}");
-            report.AppendLine($"Macro: {Macros?.Count ?? 0}");
-            report.AppendLine($"Điều kiện tiền xử lý: {GetUniquePreprocessorConditions().Count}");
-            report.AppendLine();
-
-            if (HasErrors)
-            {
-                report.AppendLine("=== LỖI ===");
-                foreach (var error in Errors.Take(10)) // Chỉ hiển thị 10 lỗi đầu tiên
-                {
-                    report.AppendLine($"- {error}");
-                }
-                if (Errors.Count > 10)
-                {
-                    report.AppendLine($"... và {Errors.Count - 10} lỗi khác");
-                }
-            }
-
-            return report.ToString();
-        }
-    }
-
-    /// <summary>
-    /// Thống kê kết quả phân tích dự án
-    /// </summary>
-    public class ProjectAnalysisStatistics
-    {
-        public int TotalFiles { get; set; }
-        public int ProcessedFiles { get; set; }
-        public int TotalFunctions { get; set; }
-        public int TotalVariables { get; set; }
-        public int TotalMacros { get; set; }
-        public int TotalErrors { get; set; }
-        public TimeSpan Duration { get; set; }
-        public double CompletionPercentage { get; set; }
+        #endregion
     }
 }

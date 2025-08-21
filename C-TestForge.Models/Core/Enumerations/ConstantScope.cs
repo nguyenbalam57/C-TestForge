@@ -4,15 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace C_TestForge.Models.Core
+namespace C_TestForge.Models.Core.Enumerations
 {
     /// <summary>
-    /// Type of preprocessor definition
+    /// Constant scopes
     /// </summary>
-    public enum DefinitionType
+    public enum ConstantScope
     {
-        MacroConstant,
-        MacroFunction,
-        EnumValue
+        Global,
+        Local,
+        File,
+        Function
     }
 }

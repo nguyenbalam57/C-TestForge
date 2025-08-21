@@ -88,7 +88,6 @@ namespace C_TestForge.UI
 
             // Register project services
             containerRegistry.RegisterSingleton<IProjectService, ProjectService>();
-            containerRegistry.RegisterSingleton<ISourceFileService, SourceFileService>();
 
             // Register test case services
             containerRegistry.RegisterSingleton<ITestCaseService, TestCaseService>();

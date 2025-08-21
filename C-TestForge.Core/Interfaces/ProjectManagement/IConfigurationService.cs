@@ -89,7 +89,7 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// </summary>
         /// <param name="configName">Name of the configuration</param>
         /// <returns>Dictionary of macro name to value</returns>
-        Task<Dictionary<string, string>> GetConfigurationValuesAsync(string configName);
+        Task<List<string>> GetConfigurationValuesAsync(string configName);
 
         /// <summary>
         /// Gets all available configuration names

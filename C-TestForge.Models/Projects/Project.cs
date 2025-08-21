@@ -39,7 +39,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Dictionary of macro definitions
         /// </summary>
-        public Dictionary<string, string> MacroDefinitions { get; set; } = new Dictionary<string, string>();
+        public List<string> MacroDefinitions { get; set; } = new List<string>();
 
         /// <summary>
         /// List of configurations
@@ -95,7 +95,7 @@ namespace C_TestForge.Models.Projects
                 ProjectFilePath = ProjectFilePath,
                 SourceFiles = SourceFiles != null ? new List<string>(SourceFiles) : new List<string>(),
                 IncludePaths = IncludePaths != null ? new List<string>(IncludePaths) : new List<string>(),
-                MacroDefinitions = MacroDefinitions != null ? new Dictionary<string, string>(MacroDefinitions) : new Dictionary<string, string>(),
+                MacroDefinitions = MacroDefinitions != null ? new List<string>(MacroDefinitions) : new List<string>(),
                 Configurations = Configurations?.Select(c => c.Clone()).ToList() ?? new List<Configuration>(),
                 ActiveConfigurationName = ActiveConfigurationName,
                 LastModified = LastModified,

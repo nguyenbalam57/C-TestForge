@@ -1,7 +1,9 @@
 ﻿using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Core.Enumerations;
 using C_TestForge.Models.Parse;
+using C_TestForge.Models.Projects;
 using ClangSharp.Interop;
 using Microsoft.Extensions.Logging;
 using System;
@@ -34,11 +36,8 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<PreprocessorResult> ExtractPreprocessorDefinitionsAsync(CXTranslationUnit translationUnit, string sourceFileName)
+        public async Task<string> ExtractPreprocessorDefinitionsAsync(CXTranslationUnit translationUnit, List<SourceFile> sourceFiles, SourceFile sourceFile)
         {
-            _logger.LogInformation($"Extracting preprocessor definitions from {sourceFileName}");
-
-            var result = new PreprocessorResult();
 
             try
             {
@@ -46,7 +45,7 @@ namespace C_TestForge.Parser
                 if (translationUnit.Handle == IntPtr.Zero)
                 {
                     _logger.LogError("Invalid translation unit");
-                    return result;
+                    return "0";
                 }
 
                 // Extract preprocessor definitions from the translation unit
@@ -59,10 +58,10 @@ namespace C_TestForge.Parser
                     {
                         if (child.Kind == CXCursorKind.CXCursor_MacroDefinition)
                         {
-                            var definition = ExtractDefinition(child, sourceFileName);
+                            var definition = ExtractDefinition(child, sourceFile.FileName);
                             if (definition != null)
                             {
-                                result.Definitions.Add(definition);
+                                sourceFile.ParseResult.Definitions.Add(definition);
                             }
                         }
 
@@ -70,27 +69,21 @@ namespace C_TestForge.Parser
                     }, default(CXClientData));
                 }
 
-                // Get the source code to extract conditional directives
-                string sourceFilePath = translationUnit.GetFile(sourceFileName).Name.ToString();
-                string sourceCode = await _fileService.ReadFileAsync(sourceFilePath);
-
                 // Extract conditional directives from source code
-                result.ConditionalDirectives = await ExtractConditionalDirectivesAsync(sourceCode, sourceFileName);
-
-                // Extract include directives from source code
-                result.Includes = await ExtractIncludeDirectivesAsync(sourceCode, sourceFileName);
+                sourceFile.ParseResult.ConditionalDirectives = await ExtractConditionalDirectivesAsync(sourceFile.Content, sourceFile.FileName);
 
                 // Process relationships between definitions and conditionals
-                await AnalyzeMacroRelationshipsAsync(result.Definitions, result.ConditionalDirectives);
+                // Sau khi thực hiện xong các file thì sẽ tiến hành phân tích phụ thuộc giữa các macro và chỉ thị điều kiện
+                await AnalyzeMacroRelationshipsAsync(sourceFiles);
 
-                _logger.LogInformation($"Extracted {result.Definitions.Count} definitions, {result.ConditionalDirectives.Count} conditionals, and {result.Includes.Count} includes");
+                _logger.LogInformation($"Extracted {sourceFile.ParseResult.Definitions.Count} definitions, {sourceFile.ParseResult.ConditionalDirectives.Count} conditionals");
 
-                return result;
+                return "1";
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting preprocessor definitions: {ex.Message}");
-                return result;
+                return "0";
             }
         }
 
@@ -139,7 +132,7 @@ namespace C_TestForge.Parser
                     LineNumber = (int)line,
                     ColumnNumber = (int)column,
                     SourceFile = sourceFileName,
-                    DefinitionType = isFunctionLike ? DefinitionType.MacroFunction : DefinitionType.MacroConstant,
+                    DefinitionType = isFunctionLike ? DefinitionType.FunctionMacro : DefinitionType.Constant,
                     IsEnabled = true // Assume enabled by default
                 };
 
@@ -685,52 +678,62 @@ namespace C_TestForge.Parser
 
         /// <summary>
         /// Analyzes relationships between macros and conditional directives
+        /// Hàm này dùng để phân tích mối quan hệ phụ thuộc giữa các macro (định nghĩa tiền xử lý) 
+        /// và các chỉ thị điều kiện (#if, #ifdef, ...) trong mã nguồn C. 
+        /// Kết quả giúp xác định macro nào phụ thuộc vào macro nào
+        /// và các chỉ thị điều kiện phụ thuộc vào những macro nào.
         /// </summary>
         /// <param name="definitions">List of definitions</param>
         /// <param name="conditionalDirectives">List of conditional directives</param>
         /// <returns>Task</returns>
-        private async Task AnalyzeMacroRelationshipsAsync(List<CDefinition> definitions, List<ConditionalDirective> conditionalDirectives)
+        private async Task AnalyzeMacroRelationshipsAsync(List<SourceFile> sourceFiles)
         {
             try
             {
-                _logger.LogInformation($"Analyzing relationships between {definitions.Count} macros and {conditionalDirectives.Count} conditional directives");
+                var allDefinitions = sourceFiles
+    .Where(f => f.ParseResult != null)
+    .SelectMany(f => f.ParseResult.Definitions)
+    .ToList();
+
+                var allConditionals = sourceFiles
+    .Where(f => f.ParseResult != null)
+    .SelectMany(f => f.ParseResult.ConditionalDirectives)
+    .ToList();
+
+                _logger.LogInformation($"Analyzing relationships between {allDefinitions.Count} macros and {allConditionals.Count} conditional directives");
 
                 // Build a dictionary for quick lookup
-                var definitionDict = definitions.ToDictionary(d => d.Name, d => d);
+                var definitionDict = allDefinitions.ToDictionary(d => d.Name, d => d);
 
-                // Analyze each definition for dependencies
-                foreach (var definition in definitions)
+                foreach (var sourceFile in sourceFiles)
                 {
-                    _logger.LogDebug($"Analyzing dependencies for definition: {definition.Name}");
-
-                    // Clear existing dependencies
-                    definition.Dependencies.Clear();
-
-                    // Look for dependencies in the value
-                    if (!string.IsNullOrEmpty(definition.Value))
+                    // Đảm bảo ParseResult đã được khởi tạo và có dữ liệu
+                    if (sourceFile.ParseResult != null)
                     {
-                        // This is a simplified approach - a real implementation would use a proper parser
-                        string[] tokens = SplitIntoTokens(definition.Value);
-
-                        foreach (var token in tokens)
+                        // Analyze each definition for dependencies
+                        foreach (var definition in sourceFile.ParseResult.Definitions)
                         {
-                            if (definitionDict.TryGetValue(token, out var referencedDefinition))
+                            _logger.LogDebug($"Analyzing dependencies for definition: {definition.Name}");
+
+                            // Xóa danh sách phụ thuộc cũ
+                            definition.Dependencies.Clear();
+
+                            // Nếu macro có giá trị (Value), tách thành các token
+                            if (!string.IsNullOrEmpty(definition.Value))
                             {
-                                _logger.LogDebug($"Definition {definition.Name} depends on {token}");
-                                definition.Dependencies.Add(token);
+                                // This is a simplified approach - a real implementation would use a proper parser
+                                string[] tokens = SplitIntoTokens(definition.Value);
+                                // Kiểm tra từng token xem có phải là tên macro khác không
+                                foreach (var token in tokens)
+                                {
+                                    if (definitionDict.TryGetValue(token, out var referencedDefinition))
+                                    {
+                                        // Nếu đúng là macro khác, thêm vào danh sách phụ thuộc
+                                        _logger.LogDebug($"Definition {definition.Name} depends on {token}");
+                                        definition.Dependencies.Add(token);
+                                    }
+                                }
                             }
-                        }
-                    }
-                }
-
-                // Analyze conditional directives for definition usage
-                foreach (var directive in conditionalDirectives)
-                {
-                    foreach (var dependency in directive.Dependencies)
-                    {
-                        if (definitionDict.TryGetValue(dependency, out var definition))
-                        {
-                            _logger.LogDebug($"Conditional at line {directive.LineNumber} depends on definition {dependency}");
                         }
                     }
                 }

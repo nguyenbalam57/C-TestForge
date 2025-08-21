@@ -79,8 +79,6 @@ namespace C_TestForge.UI.Dialogs
         {
             Title = "Tạo mới Project";
 
-            // Add Macros And SourceDefaults
-            Macros.Add("DEBUG=1");
             if (macros != null)
                 foreach (var m in macros) Macros.Add(m);
             if (sourcePaths != null)

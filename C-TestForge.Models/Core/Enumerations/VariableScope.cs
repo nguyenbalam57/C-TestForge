@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace C_TestForge.Models.Core
+namespace C_TestForge.Models.Core.Enumerations
 {
     /// <summary>
     /// Scope of a variable in C code
@@ -27,6 +27,8 @@ namespace C_TestForge.Models.Core
         /// Function parameter
         /// </summary>
         Parameter,
-        Rom
+        Register,
+        Auto,
+        Extern
     }
 }

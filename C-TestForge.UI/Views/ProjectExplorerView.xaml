@@ -30,18 +30,10 @@
 
             <!-- Actions -->
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="Thêm tệp" Margin="5" Command="{Binding AddSourceFileCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                            <Setter Property="Background" Value="#1976D2"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </Style>
-                    </Button.Style>
-                </Button>
                 <Button Content="Phân tích" Margin="5" Command="{Binding ParseSourceFilesCommand}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                            <Setter Property="Background" Value="#388E3C"/>
+                            <Setter Property="Background" Value="#1976D2"/>
                             <Setter Property="Foreground" Value="White"/>
                         </Style>
                     </Button.Style>

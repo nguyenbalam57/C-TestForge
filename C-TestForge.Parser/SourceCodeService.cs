@@ -66,7 +66,8 @@ namespace C_TestForge.Parser
                 };
 
                 // Pre-process the source file to get some basic information
-                await PreProcessSourceFileAsync(sourceFile);
+                // Chưa thực hiện tiền xử lý file mã nguồn
+                //await PreProcessSourceFileAsync(sourceFile);
 
                 _logger.LogInformation($"Successfully loaded source file: {filePath}");
 
@@ -81,6 +82,7 @@ namespace C_TestForge.Parser
 
         /// <summary>
         /// Pre-processes a source file to extract basic information
+        /// Tiền xử lý file mã nguồn để trích xuất các thông tin cơ bản như: chỉ thị include, define, và các chỉ thị điều kiện (#if, #ifdef, ...).
         /// </summary>
         /// <param name="sourceFile">Source file to pre-process</param>
         /// <returns>Task</returns>

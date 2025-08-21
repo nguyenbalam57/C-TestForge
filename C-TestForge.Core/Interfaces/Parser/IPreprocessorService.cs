@@ -1,9 +1,11 @@
 ﻿using C_TestForge.Models;
 using C_TestForge.Models.Core;
 using C_TestForge.Models.Parse;
+using C_TestForge.Models.Projects;
 using ClangSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,7 +23,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="translationUnit">Clang translation unit</param>
         /// <param name="sourceFileName">Name of the source file</param>
         /// <returns>Preprocessor definitions and conditional directives</returns>
-        Task<PreprocessorResult> ExtractPreprocessorDefinitionsAsync(CXTranslationUnit translationUnit, string sourceFileName);
+        Task<string> ExtractPreprocessorDefinitionsAsync(CXTranslationUnit translationUnit, List<SourceFile> sourceFiles, SourceFile sourceFile);
 
         /// <summary>
         /// Checks if a definition is enabled based on the current configuration

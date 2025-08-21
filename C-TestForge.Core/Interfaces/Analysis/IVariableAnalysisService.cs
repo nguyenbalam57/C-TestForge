@@ -1,5 +1,6 @@
 ﻿using C_TestForge.Models;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using ClangSharp.Interop;
 using System;
@@ -20,7 +21,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// </summary>
         /// <param name="cursor">Clang cursor</param>
         /// <returns>Variable object</returns>
-        CVariable ExtractVariable(CXCursor cursor, string sourceCode);
+        void ExtractVariable(CXCursor cursor, ParseResult result);
 
         /// <summary>
         /// Analyzes variables for constraints and relationships

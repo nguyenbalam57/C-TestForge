@@ -36,6 +36,7 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <param name="projectPath">Path to the project</param>
         /// <returns>The created project</returns>
         Task<Project> EditProjectAsync(
+            Project currentProject,
             string projectName,
             string projectDescription,
             string projectPath,
@@ -111,12 +112,5 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <returns>The active configuration</returns>
         Configuration GetActiveConfiguration(Project project);
 
-        /// <summary>
-        /// Analyzes a project and returns an analysis result
-        /// </summary>
-        /// <param name="project">Project to analyze</param>
-        /// <param name="options">Analysis options</param>
-        /// <returns>Analysis result</returns>
-        Task<AnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options);
     }
 }

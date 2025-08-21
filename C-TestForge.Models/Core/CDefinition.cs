@@ -1,4 +1,6 @@
 ﻿using C_TestForge.Models.Base;
+using C_TestForge.Models.Core.Enumerations;
+using C_TestForge.Models.Parse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,9 +11,9 @@ using System.Xml.Linq;
 namespace C_TestForge.Models.Core
 {
     /// <summary>
-    /// Represents a preprocessor definition in C code
+    /// Enhanced CDefinition with additional properties
     /// </summary>
-    public class CDefinition : SourceCodeEntity
+    public class CDefinition : SourceCodeEntity, ISymbol
     {
         /// <summary>
         /// Value of the definition
@@ -44,8 +46,23 @@ namespace C_TestForge.Models.Core
         public bool IsEnabled { get; set; } = true;
 
         /// <summary>
-        /// Get a string representation of the definition
+        /// Whether this is a system/standard macro
         /// </summary>
+        public bool IsSystemMacro { get; set; }
+
+        /// <summary>
+        /// Documentation/comment for the macro
+        /// </summary>
+        public string Documentation { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Macro usage count
+        /// </summary>
+        public int UsageCount { get; set; }
+
+        // ISymbol implementation
+        string ISymbol.Type => "Macro";
+
         public override string ToString()
         {
             if (IsFunctionLike)
@@ -59,9 +76,6 @@ namespace C_TestForge.Models.Core
             }
         }
 
-        /// <summary>
-        /// Create a clone of the definition
-        /// </summary>
         public CDefinition Clone()
         {
             return new CDefinition
@@ -73,10 +87,13 @@ namespace C_TestForge.Models.Core
                 ColumnNumber = ColumnNumber,
                 SourceFile = SourceFile,
                 IsFunctionLike = IsFunctionLike,
-                Parameters = Parameters != null ? new List<string>(Parameters) : new List<string>(),
+                Parameters = new List<string>(Parameters ?? new List<string>()),
                 DefinitionType = DefinitionType,
-                Dependencies = Dependencies != null ? new List<string>(Dependencies) : new List<string>(),
-                IsEnabled = IsEnabled
+                Dependencies = new List<string>(Dependencies ?? new List<string>()),
+                IsEnabled = IsEnabled,
+                IsSystemMacro = IsSystemMacro,
+                Documentation = Documentation,
+                UsageCount = UsageCount
             };
         }
     }

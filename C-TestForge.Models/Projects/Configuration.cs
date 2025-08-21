@@ -22,7 +22,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Dictionary of macro definitions
         /// </summary>
-        public Dictionary<string, string> MacroDefinitions { get; set; } = new Dictionary<string, string>();
+        public List<string> MacroDefinitions { get; set; } = new List<string>();
 
         /// <summary>
         /// List of include paths
@@ -61,7 +61,7 @@ namespace C_TestForge.Models.Projects
             {
                 Id = Id,
                 Name = Name,
-                MacroDefinitions = MacroDefinitions != null ? new Dictionary<string, string>(MacroDefinitions) : new Dictionary<string, string>(),
+                MacroDefinitions = MacroDefinitions != null ? new List<string>(MacroDefinitions) : new List<string>(),
                 IncludePaths = IncludePaths != null ? new List<string>(IncludePaths) : new List<string>(),
                 AdditionalArguments = AdditionalArguments != null ? new List<string>(AdditionalArguments) : new List<string>(),
                 Description = Description,

@@ -61,8 +61,8 @@ namespace C_TestForge.Parser.TestCaseManagement
                 testCase.InputVariables.Add(new TestCaseVariableInput
                 {
                     Name = param.Name,
-                    Type = param.TypeName,
-                    Value = GenerateDefaultValueForType(param.TypeName)
+                    //Type = param.TypeName,
+                    //Value = GenerateDefaultValueForType(param.TypeName)
                 });
             }
 
@@ -120,13 +120,13 @@ namespace C_TestForge.Parser.TestCaseManagement
             // Add input variables based on function parameters
             foreach (var param in function.Parameters)
             {
-                var value = inputs.ContainsKey(param.Name) ? inputs[param.Name] : GenerateDefaultValueForType(param.TypeName);
+                //var value = inputs.ContainsKey(param.Name) ? inputs[param.Name] : GenerateDefaultValueForType(param.TypeName);
 
                 testCase.InputVariables.Add(new TestCaseVariableInput
                 {
                     Name = param.Name,
-                    Type = param.TypeName,
-                    Value = value
+                    //Type = param.TypeName,
+                    //Value = value
                 });
             }
 

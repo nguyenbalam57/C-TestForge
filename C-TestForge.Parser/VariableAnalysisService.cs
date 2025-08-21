@@ -1,12 +1,17 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
+using C_TestForge.Models.CodeAnalysis;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Core.Enumerations;
+using C_TestForge.Models.Core.SupportingClasses;
+using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using ClangSharp;
 using ClangSharp.Interop;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -38,13 +43,15 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public unsafe CVariable ExtractVariable(CXCursor cursor, string sourceCode)
+        public unsafe void ExtractVariable(CXCursor cursor, ParseResult result)
         {
             try
             {
-                if (cursor.Kind != CXCursorKind.CXCursor_VarDecl)
+                if (cursor.Kind != CXCursorKind.CXCursor_VarDecl &&
+                    cursor.Kind != CXCursorKind.CXCursor_ParmDecl &&
+                    cursor.Kind != CXCursorKind.CXCursor_FieldDecl)
                 {
-                    return null;
+                    return;
                 }
 
                 string variableName = cursor.Spelling.ToString();
@@ -54,74 +61,77 @@ namespace C_TestForge.Parser
                 CXFile file;
                 uint line, column, offset;
                 cursor.Location.GetFileLocation(out file, out line, out column, out offset);
-                string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : null;
-
-                // Get source code for original type detection
-                string filePath = null;
-                if (file != null)
-                {
-                    filePath = file.Name.ToString();
-
-                }
+                string sourceFile = file != null ? Path.GetFileName(file.Name.ToString()) : string.Empty;
 
                 // Get variable type
                 var type = cursor.Type;
                 string typeName = type.Spelling.ToString();
+                string originalTypeName = GetOriginalTypeName(type, cursor);
 
-                // Determine variable scope
+                // Determine variable scope and storage class
                 VariableScope scope = DetermineScope(cursor);
+                StorageClass storageClass = DetermineStorageClass(cursor);
 
-                // Determine variable type
+                // Determine variable type category
                 VariableType variableType = DetermineVariableType(type);
 
-                // Check attributes
-                bool isConst = typeName.Contains("const");
-                bool isVolatile = typeName.Contains("volatile");
-                bool isReadOnly = scope == VariableScope.Rom ? true : false ;
+                // Check type qualifiers
+                bool isConst = IsTypeConst(type);
+                bool isVolatile = IsTypeVolatile(type);
+                bool isRestrict = IsTypeRestrict(type);
+
+                // Analyze pointer information
+                var pointerInfo = AnalyzePointerType(type);
+                bool isPointer = pointerInfo.IsPointer;
+                int pointerDepth = pointerInfo.Depth;
+
+                // Analyze array information
+                var arrayInfo = AnalyzeArrayType(type);
+                bool isArray = arrayInfo.IsArray;
+                List<int> arrayDimensions = arrayInfo.Dimensions;
 
                 // Extract default value if available
-                string defaultValue = null;
-                cursor.VisitChildren((child, parent, clientData) =>
-                {
-                    if (child.Kind == CXCursorKind.CXCursor_IntegerLiteral ||
-                        child.Kind == CXCursorKind.CXCursor_FloatingLiteral ||
-                        child.Kind == CXCursorKind.CXCursor_StringLiteral ||
-                        child.Kind == CXCursorKind.CXCursor_CharacterLiteral ||
-                        child.Kind == CXCursorKind.CXCursor_InitListExpr)
-                    {
-                        defaultValue = GetLiteralValue(child);
-                    }
+                string defaultValue = ExtractDefaultValue(cursor);
 
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, default(CXClientData));
+                // Determine if it's a custom type
+                bool isCustomType = IsCustomUserDefinedType(type, result);
 
                 // Create variable object
                 var variable = new CVariable
                 {
                     Name = variableName,
-                    TypeName = typeName,
-                    //OriginalTypeName = originalTypeName,  // Lưu kiểu gốc
-                    //IsCustomType = originalTypeName != typeName,  // Đánh dấu là kiểu tùy chỉnh
+                    TypeName = CleanTypeName(typeName),
+                    OriginalTypeName = originalTypeName,
+                    IsCustomType = isCustomType,
                     VariableType = variableType,
                     Scope = scope,
+                    StorageClass = storageClass,
                     DefaultValue = defaultValue,
                     LineNumber = (int)line,
                     ColumnNumber = (int)column,
                     SourceFile = sourceFile,
                     IsConst = isConst,
                     IsVolatile = isVolatile,
-                    IsReadOnly = isReadOnly
+                    IsPointer = isPointer,
+                    PointerDepth = pointerDepth,
+                    IsArray = isArray,
+                    ArrayDimensions = arrayDimensions,
+                    Size = DetermineSize(type)
                 };
 
-                // Determine size if possible
-                variable.Size = DetermineSize(type);
+                // Extract variable attributes
+                variable.Attributes = ExtractVariableAttributes(cursor);
 
-                return variable;
+                // Extract constraints if any
+                variable.Constraints = ExtractVariableConstraints(cursor, variable);
+
+                // Add to result
+                result.Variables.Add(variable);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting variable: {ex.Message}");
-                return null;
+                return;
             }
         }
 
@@ -150,35 +160,44 @@ namespace C_TestForge.Parser
                     variable.UsedByFunctions.Clear();
                     foreach (var function in functions)
                     {
-                        if (function.UsedVariables.Contains(variable.Name))
+                        if (function.UsedVariables != null && function.UsedVariables.Contains(variable.Name))
                         {
                             variable.UsedByFunctions.Add(function.Name);
                         }
                     }
 
                     // Look for enum constraints
-                    if (variable.TypeName.Contains("enum"))
+                    if (variable.VariableType == VariableType.Enum || variable.TypeName.Contains("enum"))
                     {
                         var enumConstraints = ExtractEnumConstraints(variable, definitions);
                         constraints.AddRange(enumConstraints);
+                    }
+
+                    // Extract constraints from array types
+                    if (variable.IsArray)
+                    {
+                        var arrayConstraints = ExtractArrayConstraints(variable);
+                        constraints.AddRange(arrayConstraints);
                     }
                 }
 
                 // Analyze function bodies for additional constraints
                 foreach (var function in functions)
                 {
-                    foreach (var variable in variables)
+                    if (function.UsedVariables != null)
                     {
-                        if (function.UsedVariables.Contains(variable.Name))
+                        foreach (var variable in variables)
                         {
-                            var usageConstraints = await ExtractUsageConstraintsAsync(variable, function);
-                            constraints.AddRange(usageConstraints);
+                            if (function.UsedVariables.Contains(variable.Name))
+                            {
+                                var usageConstraints = await ExtractUsageConstraintsAsync(variable, function);
+                                constraints.AddRange(usageConstraints);
+                            }
                         }
                     }
                 }
 
                 _logger.LogInformation($"Extracted {constraints.Count} variable constraints");
-
                 return constraints;
             }
             catch (Exception ex)
@@ -226,49 +245,46 @@ namespace C_TestForge.Parser
         /// <returns>Variable scope</returns>
         private unsafe VariableScope DetermineScope(CXCursor cursor)
         {
-            // Check if the variable is a parameter
-            if (cursor.Kind == CXCursorKind.CXCursor_ParmDecl)
+            try
             {
-                return VariableScope.Parameter;
-            }
+                var storageClass = cursor.StorageClass;
+                var semanticParent = cursor.SemanticParent;
 
-            // Check if the variable is local
-            var parent = clang.getCursorLexicalParent(cursor);
-            if (parent.Kind == CXCursorKind.CXCursor_FunctionDecl ||
-                parent.Kind == CXCursorKind.CXCursor_CXXMethod)
-            {
-                return VariableScope.Local;
-            }
-
-            // Check if the variable is static
-            bool isStatic = false;
-            cursor.VisitChildren((child, parent, clientData) =>
-            {
-
-                // Check spelling for static keyword
-                string childText = child.Spelling.ToString();
-                if (childText == "static")
+                // Check storage class first
+                switch (storageClass)
                 {
-                    isStatic = true;
+                    case CX_StorageClass.CX_SC_Static:
+                        return VariableScope.Static;
+                    case CX_StorageClass.CX_SC_Extern:
+                        return VariableScope.Extern;
+                    case CX_StorageClass.CX_SC_Register:
+                        return VariableScope.Register;
+                    case CX_StorageClass.CX_SC_Auto:
+                        return VariableScope.Auto;
                 }
 
-                return CXChildVisitResult.CXChildVisit_Continue;
-            }, default(CXClientData));
+                // Check semantic context
+                if (semanticParent.Kind == CXCursorKind.CXCursor_TranslationUnit)
+                {
+                    return VariableScope.Global;
+                }
+                else if (semanticParent.Kind == CXCursorKind.CXCursor_FunctionDecl)
+                {
+                    return cursor.Kind == CXCursorKind.CXCursor_ParmDecl ?
+                           VariableScope.Parameter : VariableScope.Local;
+                }
+                else if (semanticParent.Kind == CXCursorKind.CXCursor_CompoundStmt)
+                {
+                    return VariableScope.Local;
+                }
 
-            if (isStatic)
-            {
-                return VariableScope.Static;
+                return VariableScope.Local; // Default fallback
             }
-
-            // Check if the variable is in read-only memory
-            string typeName = cursor.Type.Spelling.ToString();
-            if (typeName.Contains("const") && typeName.Contains("*") == false)
+            catch (Exception ex)
             {
-                return VariableScope.Rom;
+                _logger.LogWarning($"Could not determine scope for variable, defaulting to Local: {ex.Message}");
+                return VariableScope.Local;
             }
-
-            // Default to global
-            return VariableScope.Global;
         }
 
         /// <summary>
@@ -278,80 +294,39 @@ namespace C_TestForge.Parser
         /// <returns>Variable type</returns>
         private VariableType DetermineVariableType(CXType type)
         {
-            switch (type.kind)
+            try
             {
-                case CXTypeKind.CXType_ConstantArray:
-                case CXTypeKind.CXType_VariableArray:
-                case CXTypeKind.CXType_IncompleteArray:
-                case CXTypeKind.CXType_DependentSizedArray:
-                    return VariableType.Array;
-
-                case CXTypeKind.CXType_Pointer:
-                    return VariableType.Pointer;
-
-                case CXTypeKind.CXType_Record:
-                    return type.Spelling.ToString().Contains("struct") ?
-                        VariableType.Struct : VariableType.Union;
-
-                case CXTypeKind.CXType_Enum:
-                    return VariableType.Enum;
-
-                case CXTypeKind.CXType_Float:
-                    return VariableType.Float;
-
-                case CXTypeKind.CXType_Double:
-                    return VariableType.Double;
-
-                case CXTypeKind.CXType_LongDouble:
-                    return VariableType.LongDouble;
-
-                case CXTypeKind.CXType_Bool:
-                    return VariableType.Bool;
-
-                case CXTypeKind.CXType_Char_S:
-                case CXTypeKind.CXType_SChar:
-                    return VariableType.Char;
-
-                case CXTypeKind.CXType_Char_U:
-                case CXTypeKind.CXType_UChar:
-                    return VariableType.UChar;
-
-                case CXTypeKind.CXType_UShort:
-                    return VariableType.UShort;
-
-                case CXTypeKind.CXType_ULong:
-                    return VariableType.ULong;
-
-                case CXTypeKind.CXType_ULongLong:
-                    return VariableType.ULongLong;
-
-                case CXTypeKind.CXType_UInt:
-                    return VariableType.UInt;
-
-                case CXTypeKind.CXType_Short:
-                    return VariableType.Short;
-
-                case CXTypeKind.CXType_Int:
-                    return VariableType.Int;
-
-                case CXTypeKind.CXType_Long:
-                    return VariableType.Long;
-
-                case CXTypeKind.CXType_LongLong:
-                    return VariableType.LongLong;
-
-                case CXTypeKind.CXType_Auto:
-                    return VariableType.Auto;
-
-
-                default:
-                    // Handle integer types
-                    if (type.kind >= CXTypeKind.CXType_Short && type.kind <= CXTypeKind.CXType_ULongLong)
-                    {
-                        return VariableType.Integer;
-                    }
-
-                    return VariableType.Unknown;
+                var kind = type.kind;
+                return kind switch
+                {
+                    CXTypeKind.CXType_Void => VariableType.Void,
+                    CXTypeKind.CXType_Bool => VariableType.Bool,
+                    CXTypeKind.CXType_Char_U or CXTypeKind.CXType_Char_S => VariableType.Char,
+                    CXTypeKind.CXType_UChar => VariableType.UnsignedChar,
+                    CXTypeKind.CXType_SChar => VariableType.SignedChar,
+                    CXTypeKind.CXType_UShort => VariableType.UnsignedShort,
+                    CXTypeKind.CXType_Short => VariableType.Short,
+                    CXTypeKind.CXType_UInt => VariableType.UnsignedInt,
+                    CXTypeKind.CXType_Int => VariableType.Int,
+                    CXTypeKind.CXType_ULong => VariableType.UnsignedLong,
+                    CXTypeKind.CXType_Long => VariableType.Long,
+                    CXTypeKind.CXType_ULongLong => VariableType.UnsignedLongLong,
+                    CXTypeKind.CXType_LongLong => VariableType.LongLong,
+                    CXTypeKind.CXType_Float => VariableType.Float,
+                    CXTypeKind.CXType_Double => VariableType.Double,
+                    CXTypeKind.CXType_LongDouble => VariableType.LongDouble,
+                    CXTypeKind.CXType_Pointer => VariableType.Pointer,
+                    CXTypeKind.CXType_Record => VariableType.Struct,
+                    CXTypeKind.CXType_Enum => VariableType.Enum,
+                    CXTypeKind.CXType_Typedef => DetermineVariableType(type.CanonicalType),
+                    CXTypeKind.CXType_ConstantArray or CXTypeKind.CXType_IncompleteArray => VariableType.Array,
+                    CXTypeKind.CXType_FunctionProto or CXTypeKind.CXType_FunctionNoProto => VariableType.Function,
+                    _ => VariableType.Unknown
+                };
+            }
+            catch
+            {
+                return VariableType.Unknown;
             }
         }
 
@@ -360,10 +335,45 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="cursor">Literal cursor</param>
         /// <returns>String representation of the literal value</returns>
-        private string GetLiteralValue(CXCursor cursor)
+        private unsafe string GetLiteralValue(CXCursor cursor)
         {
-            var extent = cursor.Extent;
-            return extent.ToString();
+            try
+            {
+                // Try to get the spelling directly from the cursor
+                var spelling = cursor.Spelling.ToString();
+                if (!string.IsNullOrEmpty(spelling))
+                {
+                    return spelling;
+                }
+
+                // Alternative: Try to get the display name
+                var displayName = cursor.DisplayName.ToString();
+                if (!string.IsNullOrEmpty(displayName))
+                {
+                    return displayName;
+                }
+
+                // As a fallback, try to extract from source location
+                var range = cursor.Extent;
+                var startLocation = range.Start;
+                var endLocation = range.End;
+
+                // Get file and positions
+                CXFile file;
+                uint startLine, startColumn, startOffset;
+                uint endLine, endColumn, endOffset;
+
+                startLocation.GetFileLocation(out file, out startLine, out startColumn, out startOffset);
+                endLocation.GetFileLocation(out file, out endLine, out endColumn, out endOffset);
+
+                // If we have a valid range, we could read from source if available
+                // For now, return null as we can't safely extract without the tokenization API
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -375,61 +385,14 @@ namespace C_TestForge.Parser
         {
             try
             {
-                switch (type.kind)
-                {
-                    case CXTypeKind.CXType_Bool:
-                        return 1;
-
-                    case CXTypeKind.CXType_Char_S:
-                    case CXTypeKind.CXType_Char_U:
-                    case CXTypeKind.CXType_SChar:
-                    case CXTypeKind.CXType_UChar:
-                        return 1;
-
-                    case CXTypeKind.CXType_Short:
-                    case CXTypeKind.CXType_UShort:
-                        return 2;
-
-                    case CXTypeKind.CXType_Int:
-                    case CXTypeKind.CXType_UInt:
-                        return 4;
-
-                    case CXTypeKind.CXType_Long:
-                    case CXTypeKind.CXType_ULong:
-                        return 4; // May be 8 on 64-bit platforms
-
-                    case CXTypeKind.CXType_LongLong:
-                    case CXTypeKind.CXType_ULongLong:
-                        return 8;
-
-                    case CXTypeKind.CXType_Float:
-                        return 4;
-
-                    case CXTypeKind.CXType_Double:
-                        return 8;
-
-                    case CXTypeKind.CXType_LongDouble:
-                        return 16; // May vary by platform
-
-                    case CXTypeKind.CXType_Pointer:
-                        return 4; // May be 8 on 64-bit platforms
-
-                    case CXTypeKind.CXType_ConstantArray:
-                        unsafe
-                        {
-                            long arraySize = clang.getArraySize(type);
-                            var elementType = clang.getArrayElementType(type);
-                            int elementSize = DetermineSize(elementType);
-                            return (int)(arraySize * elementSize);
-                        }
-
-                    default:
-                        return 0;
-                }
+                long sizeInBytes = type.SizeOf;
+                return sizeInBytes > 0 && sizeInBytes <= int.MaxValue ? (int)sizeInBytes : 0;
             }
             catch
             {
-                return 0;
+                // Fallback to typical sizes if Clang can't determine
+                var variableType = DetermineVariableType(type);
+                return variableType.GetTypicalSize();
             }
         }
 
@@ -438,53 +401,37 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="variable">Variable to analyze</param>
         /// <returns>List of type-based constraints</returns>
+        /// <summary>
+        /// Extracts type-based constraints for a variable
+        /// </summary>
         private List<VariableConstraint> ExtractTypeConstraints(CVariable variable)
         {
             var constraints = new List<VariableConstraint>();
 
-            // Ưu tiên sử dụng kiểu gốc nếu là kiểu tùy chỉnh
-            string typeToUse = variable.IsCustomType ? variable.OriginalTypeName : variable.TypeName;
-
-            // Thử lấy ràng buộc từ TypeManager
-            var typeConstraint = _typeManager.GetConstraintForType(variable.TypeName, variable.Name);
-            if (typeConstraint != null)
+            try
             {
-                constraints.Add(typeConstraint);
-            }
-            else
-            {
-                string typeName = variable.TypeName.ToLower();
-
-                // Add range constraints based on variable type
-                if (typeName.Contains("bool"))
+                // Try to get constraint from TypeManager first
+                var typeConstraint = _typeManager?.GetConstraintForType(variable.TypeName, variable.Name);
+                if (typeConstraint != null)
                 {
-                    // Boolean constraints
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Enumeration,
-                        AllowedValues = new List<string> { "0", "1", "false", "true" },
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
+                    constraints.Add(typeConstraint);
+                    return constraints;
                 }
-                else if (typeName.Contains("char") && !typeName.Contains("*"))
+
+                // Generate constraints based on variable type
+                switch (variable.VariableType)
                 {
-                    // Character constraints
-                    if (typeName.Contains("unsigned") || typeName.Contains("uchar"))
-                    {
-                        // Unsigned char constraints
+                    case VariableType.Bool:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
-                            Type = ConstraintType.Range,
-                            MinValue = "0",
-                            MaxValue = "255",
+                            Type = ConstraintType.Enumeration,
+                            AllowedValues = new List<string> { "0", "1", "false", "true" },
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                    else
-                    {
-                        // Signed char constraints
+                        break;
+
+                    case VariableType.SignedChar:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
@@ -493,25 +440,20 @@ namespace C_TestForge.Parser
                             MaxValue = "127",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                }
-                else if (typeName.Contains("short") || typeName.Contains("int16"))
-                {
-                    if (typeName.Contains("unsigned") || typeName.Contains("ushort"))
-                    {
-                        // Unsigned short constraints
+                        break;
+
+                    case VariableType.UnsignedChar:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
                             Type = ConstraintType.Range,
                             MinValue = "0",
-                            MaxValue = "65535",
+                            MaxValue = "255",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                    else
-                    {
-                        // Signed short constraints
+                        break;
+
+                    case VariableType.Short:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
@@ -520,25 +462,20 @@ namespace C_TestForge.Parser
                             MaxValue = "32767",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                }
-                else if (typeName.Contains("int") || typeName.Contains("int32"))
-                {
-                    if (typeName.Contains("unsigned") || typeName.Contains("uint"))
-                    {
-                        // Unsigned int constraints
+                        break;
+
+                    case VariableType.UnsignedShort:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
                             Type = ConstraintType.Range,
                             MinValue = "0",
-                            MaxValue = "4294967295",
+                            MaxValue = "65535",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                    else
-                    {
-                        // Signed int constraints
+                        break;
+
+                    case VariableType.Int:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
@@ -547,25 +484,43 @@ namespace C_TestForge.Parser
                             MaxValue = "2147483647",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                }
-                else if (typeName.Contains("long long") || typeName.Contains("int64"))
-                {
-                    if (typeName.Contains("unsigned") || typeName.Contains("uint64"))
-                    {
-                        // Unsigned long long constraints
+                        break;
+
+                    case VariableType.UnsignedInt:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
                             Type = ConstraintType.Range,
                             MinValue = "0",
-                            MaxValue = "18446744073709551615",
+                            MaxValue = "4294967295",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                    else
-                    {
-                        // Signed long long constraints
+                        break;
+
+                    case VariableType.Long:
+                        // Platform dependent, but typically same as int on 32-bit, long long on 64-bit
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = IntPtr.Size == 8 ? "-9223372036854775808" : "-2147483648",
+                            MaxValue = IntPtr.Size == 8 ? "9223372036854775807" : "2147483647",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                        break;
+
+                    case VariableType.UnsignedLong:
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = IntPtr.Size == 8 ? "18446744073709551615" : "4294967295",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                        break;
+
+                    case VariableType.LongLong:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
@@ -574,52 +529,58 @@ namespace C_TestForge.Parser
                             MaxValue = "9223372036854775807",
                             Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
-                }
-                else if (typeName.Contains("float"))
-                {
-                    // Float constraints (approximate)
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "-3.4e38",
-                        MaxValue = "3.4e38",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
-                else if (typeName.Contains("double"))
-                {
-                    // Double constraints (approximate)
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Range,
-                        MinValue = "-1.7e308",
-                        MaxValue = "1.7e308",
-                        Source = $"Type constraint: {variable.TypeName}"
-                    });
-                }
+                        break;
 
-                // Check for array size constraints
-                if (variable.VariableType == VariableType.Array)
-                {
-                    // Extract array size from type name
-                    var match = Regex.Match(variable.TypeName, @"\[(\d+)\]");
-                    if (match.Success && int.TryParse(match.Groups[1].Value, out int arraySize))
-                    {
+                    case VariableType.UnsignedLongLong:
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
-                            Type = ConstraintType.ArraySize,
-                            Value = arraySize.ToString(),
-                            Source = $"Array size: {arraySize}"
+                            Type = ConstraintType.Range,
+                            MinValue = "0",
+                            MaxValue = "18446744073709551615",
+                            Source = $"Type constraint: {variable.TypeName}"
                         });
-                    }
+                        break;
+
+                    case VariableType.Float:
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-3.4028235e38",
+                            MaxValue = "3.4028235e38",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                        break;
+
+                    case VariableType.Double:
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Range,
+                            MinValue = "-1.7976931348623157e308",
+                            MaxValue = "1.7976931348623157e308",
+                            Source = $"Type constraint: {variable.TypeName}"
+                        });
+                        break;
+                }
+
+                // Add pointer constraints
+                if (variable.IsPointer)
+                {
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Custom,
+                        Expression = "ptr != NULL",
+                        Source = "Pointer constraint"
+                    });
                 }
             }
-
-            
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting type constraints for variable {variable.Name}: {ex.Message}");
+            }
 
             return constraints;
         }
@@ -638,32 +599,54 @@ namespace C_TestForge.Parser
             {
                 // Look for enum definitions that match the variable type
                 var enumValues = new List<string>();
-                foreach (var definition in definitions)
+
+                string enumTypeName = ExtractEnumTypeName(variable.TypeName);
+                if (!string.IsNullOrEmpty(enumTypeName))
                 {
-                    if (definition.DefinitionType == DefinitionType.EnumValue)
+                    foreach (var definition in definitions)
                     {
-                        enumValues.Add(definition.Name);
+                        if (definition.DefinitionType == DefinitionType.EnumValue)
+                        {
+                            // Check if this definition has a Context property, otherwise assume it's related
+                            var hasContext = definition.GetType().GetProperty("Context") != null;
+                            if (!hasContext ||
+                                (hasContext && definition.GetType().GetProperty("Context")?.GetValue(definition)?.ToString()?.Contains(enumTypeName) == true))
+                            {
+                                enumValues.Add(definition.Name);
+                            }
+                        }
+                    }
+
+                    if (enumValues.Count > 0)
+                    {
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Enumeration,
+                            AllowedValues = enumValues,
+                            Source = $"Enum values for {variable.TypeName}"
+                        });
                     }
                 }
-
-                if (enumValues.Count > 0)
-                {
-                    constraints.Add(new VariableConstraint
-                    {
-                        VariableName = variable.Name,
-                        Type = ConstraintType.Enumeration,
-                        AllowedValues = enumValues,
-                        Source = $"Enum values for {variable.TypeName}"
-                    });
-                }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting enum constraints for variable {variable.Name}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
+        }
+
+        /// <summary>
+        /// Extracts enum type name from complex type string
+        /// </summary>
+        private string ExtractEnumTypeName(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
+
+            var match = Regex.Match(typeName, @"enum\s+(\w+)");
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         /// <summary>
@@ -695,13 +678,25 @@ namespace C_TestForge.Parser
                 var assignmentConstraints = ExtractAssignmentConstraints(function.Body, variable.Name);
                 constraints.AddRange(assignmentConstraints);
 
-                return constraints;
+                // Look for switch statements
+                var switchCases = ExtractSwitchCases(function.Body, variable.Name);
+                if (switchCases.Count > 0)
+                {
+                    constraints.Add(new VariableConstraint
+                    {
+                        VariableName = variable.Name,
+                        Type = ConstraintType.Enumeration,
+                        AllowedValues = switchCases,
+                        Source = "Switch statement cases"
+                    });
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting usage constraints for variable {variable.Name} in function {function.Name}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
         }
 
         /// <summary>
@@ -716,7 +711,7 @@ namespace C_TestForge.Parser
 
             try
             {
-                if (sourceFile == null || sourceFile.Lines == null || sourceFile.Lines.Count == 0)
+                if (sourceFile?.Lines == null || sourceFile.Lines.Count == 0)
                 {
                     return constraints;
                 }
@@ -729,32 +724,29 @@ namespace C_TestForge.Parser
                 {
                     string line = sourceFile.Lines[i];
 
-                    // Look for range comments: e.g., "// Range: 0-100" or "/* Valid values: 1, 2, 3 */"
+                    // Look for range comments
                     var rangeMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Range|Valid range|Value range):\s*(-?\d+(?:\.\d+)?)\s*(?:to|-)\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
                     if (rangeMatch.Success)
                     {
-                        string minValue = rangeMatch.Groups[1].Value;
-                        string maxValue = rangeMatch.Groups[2].Value;
-
                         constraints.Add(new VariableConstraint
                         {
                             VariableName = variable.Name,
                             Type = ConstraintType.Range,
-                            MinValue = minValue,
-                            MaxValue = maxValue,
+                            MinValue = rangeMatch.Groups[1].Value,
+                            MaxValue = rangeMatch.Groups[2].Value,
                             Source = $"Comment at line {i + 1}"
                         });
                     }
 
-                    // Look for enumeration comments: e.g., "// Valid values: 1, 2, 3" or "/* Allowed: A, B, C */"
-                    var enumMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Valid values|Allowed|Allowed values|Valid|Values):\s*([\w\d\s,]+)", RegexOptions.IgnoreCase);
+                    // Look for enumeration comments
+                    var enumMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Valid values|Allowed|Values):\s*([\w\d\s,]+)", RegexOptions.IgnoreCase);
                     if (enumMatch.Success)
                     {
-                        string valuesStr = enumMatch.Groups[1].Value;
-                        var values = valuesStr.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                              .Select(v => v.Trim())
-                                              .Where(v => !string.IsNullOrWhiteSpace(v))
-                                              .ToList();
+                        var values = enumMatch.Groups[1].Value
+                            .Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(v => v.Trim())
+                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                            .ToList();
 
                         if (values.Count > 0)
                         {
@@ -767,34 +759,14 @@ namespace C_TestForge.Parser
                             });
                         }
                     }
-
-                    // Look for min/max comments: e.g., "// Min: 0" or "/* Maximum: 100 */"
-                    var minMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Min|Minimum|Lower bound):\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-                    var maxMatch = Regex.Match(line, @"(?://|/\*)\s*(?:Max|Maximum|Upper bound):\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
-
-                    if (minMatch.Success || maxMatch.Success)
-                    {
-                        string minValue = minMatch.Success ? minMatch.Groups[1].Value : null;
-                        string maxValue = maxMatch.Success ? maxMatch.Groups[1].Value : null;
-
-                        constraints.Add(new VariableConstraint
-                        {
-                            VariableName = variable.Name,
-                            Type = ConstraintType.Range,
-                            MinValue = minValue,
-                            MaxValue = maxValue,
-                            Source = $"Comment at line {i + 1}"
-                        });
-                    }
                 }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting constraints from comments for variable {variable.Name}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
         }
 
         /// <summary>
@@ -809,22 +781,20 @@ namespace C_TestForge.Parser
 
             try
             {
-                if (sourceFile == null || string.IsNullOrEmpty(sourceFile.Content))
+                if (sourceFile?.Content == null)
                 {
                     return constraints;
                 }
 
                 string content = sourceFile.Content;
 
-                // Look for range checks: e.g., "if (variable > min && variable < max)"
-                var rangeChecks = ExtractRangeChecks(content, variable.Name);
-                constraints.AddRange(rangeChecks);
+                // Extract various constraint patterns
+                constraints.AddRange(ExtractRangeChecks(content, variable.Name));
+                constraints.AddRange(ExtractEqualityChecks(content, variable.Name));
+                constraints.AddRange(ExtractAssignmentConstraints(content, variable.Name));
+                constraints.AddRange(ExtractArrayAccessConstraints(content, variable.Name));
 
-                // Look for equality checks: e.g., "if (variable == value1 || variable == value2)"
-                var equalityChecks = ExtractEqualityChecks(content, variable.Name);
-                constraints.AddRange(equalityChecks);
-
-                // Look for switch statements: e.g., "switch (variable) { case value1: ... }"
+                // Extract switch case constraints
                 var switchCases = ExtractSwitchCases(content, variable.Name);
                 if (switchCases.Count > 0)
                 {
@@ -837,17 +807,12 @@ namespace C_TestForge.Parser
                     });
                 }
 
-                // Look for array accesses: e.g., "array[variable]"
-                var arrayAccesses = ExtractArrayAccessConstraints(content, variable.Name);
-                constraints.AddRange(arrayAccesses);
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting constraints from patterns for variable {variable.Name}: {ex.Message}");
-                return constraints;
             }
+            return constraints;
         }
 
         /// <summary>
@@ -862,8 +827,10 @@ namespace C_TestForge.Parser
 
             try
             {
-                // Look for range checks of the form: if (variable >= min && variable <= max)
-                var rangePattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(>=|>)\s*([^&|]+)\s*&&\s*{Regex.Escape(variableName)}\s*(<|<=)\s*([^&|]+)\s*\)");
+                var escapedVarName = Regex.Escape(variableName);
+
+                // Range checks: if (var >= min && var <= max)
+                var rangePattern = new Regex($@"if\s*\(\s*{escapedVarName}\s*(>=|>)\s*([^&|]+)\s*&&\s*{escapedVarName}\s*(<|<=)\s*([^&|)]+)\s*\)");
                 var matches = rangePattern.Matches(code);
 
                 foreach (Match match in matches)
@@ -873,23 +840,14 @@ namespace C_TestForge.Parser
                     string maxOp = match.Groups[3].Value;
                     string maxValue = match.Groups[4].Value.Trim();
 
-                    // Adjust bounds based on operators
-                    if (minOp == ">")
+                    // Adjust for exclusive bounds
+                    if (minOp == ">" && double.TryParse(minValue, out double minDouble))
                     {
-                        // Exclusive lower bound, add 1 to minimum
-                        if (double.TryParse(minValue, out double minDouble))
-                        {
-                            minValue = (minDouble + 1).ToString();
-                        }
+                        minValue = (minDouble + 1).ToString();
                     }
-
-                    if (maxOp == "<")
+                    if (maxOp == "<" && double.TryParse(maxValue, out double maxDouble))
                     {
-                        // Exclusive upper bound, subtract 1 from maximum
-                        if (double.TryParse(maxValue, out double maxDouble))
-                        {
-                            maxValue = (maxDouble - 1).ToString();
-                        }
+                        maxValue = (maxDouble - 1).ToString();
                     }
 
                     constraints.Add(new VariableConstraint
@@ -902,70 +860,54 @@ namespace C_TestForge.Parser
                     });
                 }
 
-                // Look for individual bounds checks: if (variable >= min) or if (variable <= max)
-                var lowerBoundPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(>=|>)\s*([^&|]+)\s*\)");
-                var upperBoundPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*(<|<=)\s*([^&|]+)\s*\)");
+                // Individual bounds
+                var lowerBoundPattern = new Regex($@"if\s*\(\s*{escapedVarName}\s*(>=|>)\s*([^&|)]+)\s*\)");
+                var upperBoundPattern = new Regex($@"if\s*\(\s*{escapedVarName}\s*(<|<=)\s*([^&|)]+)\s*\)");
 
-                var lowerMatches = lowerBoundPattern.Matches(code);
-                var upperMatches = upperBoundPattern.Matches(code);
-
-                foreach (Match match in lowerMatches)
+                foreach (Match match in lowerBoundPattern.Matches(code))
                 {
                     string op = match.Groups[1].Value;
                     string value = match.Groups[2].Value.Trim();
 
-                    // Adjust bound based on operator
-                    if (op == ">")
+                    if (op == ">" && double.TryParse(value, out double valueDouble))
                     {
-                        // Exclusive lower bound
-                        if (double.TryParse(value, out double valueDouble))
-                        {
-                            value = (valueDouble + 1).ToString();
-                        }
+                        value = (valueDouble + 1).ToString();
                     }
 
                     constraints.Add(new VariableConstraint
                     {
                         VariableName = variableName,
-                        Type = ConstraintType.Range,
+                        Type = ConstraintType.MinValue,
                         MinValue = value,
-                        MaxValue = null,
                         Source = "Code lower bound check"
                     });
                 }
 
-                foreach (Match match in upperMatches)
+                foreach (Match match in upperBoundPattern.Matches(code))
                 {
                     string op = match.Groups[1].Value;
                     string value = match.Groups[2].Value.Trim();
 
-                    // Adjust bound based on operator
-                    if (op == "<")
+                    if (op == "<" && double.TryParse(value, out double valueDouble))
                     {
-                        // Exclusive upper bound
-                        if (double.TryParse(value, out double valueDouble))
-                        {
-                            value = (valueDouble - 1).ToString();
-                        }
+                        value = (valueDouble - 1).ToString();
                     }
 
                     constraints.Add(new VariableConstraint
                     {
                         VariableName = variableName,
-                        Type = ConstraintType.Range,
-                        MinValue = null,
+                        Type = ConstraintType.MaxValue,
                         MaxValue = value,
                         Source = "Code upper bound check"
                     });
                 }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting range checks for variable {variableName}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
         }
 
         /// <summary>
@@ -980,22 +922,17 @@ namespace C_TestForge.Parser
 
             try
             {
-                // Look for equality checks of the form: if (variable == value)
-                var equalityPattern = new Regex($@"if\s*\(\s*{Regex.Escape(variableName)}\s*==\s*([^&|]+)\s*\)");
+                var escapedVarName = Regex.Escape(variableName);
+                var equalityPattern = new Regex($@"if\s*\(\s*{escapedVarName}\s*==\s*([^&|)]+)\s*\)");
                 var matches = equalityPattern.Matches(code);
 
                 if (matches.Count > 0)
                 {
-                    var allowedValues = new List<string>();
-
-                    foreach (Match match in matches)
-                    {
-                        string value = match.Groups[1].Value.Trim();
-                        if (!allowedValues.Contains(value))
-                        {
-                            allowedValues.Add(value);
-                        }
-                    }
+                    var allowedValues = matches
+                        .Cast<Match>()
+                        .Select(m => m.Groups[1].Value.Trim())
+                        .Distinct()
+                        .ToList();
 
                     constraints.Add(new VariableConstraint
                     {
@@ -1005,14 +942,13 @@ namespace C_TestForge.Parser
                         Source = "Code equality checks"
                     });
                 }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting equality checks for variable {variableName}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
         }
 
         /// <summary>
@@ -1027,8 +963,8 @@ namespace C_TestForge.Parser
 
             try
             {
-                // Look for switch statements of the form: switch (variable) { case value1: ... case value2: ... }
-                var switchPattern = new Regex($@"switch\s*\(\s*{Regex.Escape(variableName)}\s*\)\s*{{([^}}]+)}}");
+                var escapedVarName = Regex.Escape(variableName);
+                var switchPattern = new Regex($@"switch\s*\(\s*{escapedVarName}\s*\)\s*{{([^}}]+)}}", RegexOptions.Singleline);
                 var matches = switchPattern.Matches(code);
 
                 foreach (Match match in matches)
@@ -1046,14 +982,13 @@ namespace C_TestForge.Parser
                         }
                     }
                 }
-
-                return switchCases;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting switch cases for variable {variableName}: {ex.Message}");
-                return switchCases;
             }
+
+            return switchCases;
         }
 
         /// <summary>
@@ -1068,13 +1003,13 @@ namespace C_TestForge.Parser
 
             try
             {
-                // Look for array accesses of the form: array[variable]
-                var arrayAccessPattern = new Regex($@"[a-zA-Z_]\w*\[\s*{Regex.Escape(variableName)}\s*\]");
+                var escapedVarName = Regex.Escape(variableName);
+                var arrayAccessPattern = new Regex($@"[a-zA-Z_]\w*\[\s*{escapedVarName}\s*\]");
                 var matches = arrayAccessPattern.Matches(code);
 
                 if (matches.Count > 0)
                 {
-                    // Look for array sizes
+                    // Look for array size declarations
                     var arraySizePattern = new Regex(@"([a-zA-Z_]\w*)\[(\d+)\]");
                     var sizeMatches = arraySizePattern.Matches(code);
 
@@ -1088,17 +1023,15 @@ namespace C_TestForge.Parser
                         {
                             if (sizeMatch.Groups[1].Value == arrayName)
                             {
-                                string sizeStr = sizeMatch.Groups[2].Value;
-                                if (int.TryParse(sizeStr, out int size))
+                                if (int.TryParse(sizeMatch.Groups[2].Value, out int size))
                                 {
-                                    // Array indices are typically 0 to size-1
                                     constraints.Add(new VariableConstraint
                                     {
                                         VariableName = variableName,
                                         Type = ConstraintType.Range,
                                         MinValue = "0",
                                         MaxValue = (size - 1).ToString(),
-                                        Source = $"Array access for {arrayName}"
+                                        Source = $"Array access for {arrayName}[{size}]"
                                     });
                                     break;
                                 }
@@ -1106,14 +1039,13 @@ namespace C_TestForge.Parser
                         }
                     }
                 }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting array access constraints for variable {variableName}: {ex.Message}");
-                return constraints;
             }
+
+            return constraints;
         }
 
         /// <summary>
@@ -1128,29 +1060,18 @@ namespace C_TestForge.Parser
 
             try
             {
-                // Look for assignments of the form: variable = value;
-                var assignmentPattern = new Regex($@"{Regex.Escape(variableName)}\s*=\s*([^;]+);");
+                var escapedVarName = Regex.Escape(variableName);
+                var assignmentPattern = new Regex($@"{escapedVarName}\s*=\s*([^;]+);");
                 var matches = assignmentPattern.Matches(code);
 
                 if (matches.Count > 0)
                 {
-                    var assignedValues = new List<string>();
-
-                    foreach (Match match in matches)
-                    {
-                        string value = match.Groups[1].Value.Trim();
-
-                        // Only add simple literal values to the list
-                        if (Regex.IsMatch(value, @"^[0-9]+$") || // Integer
-                            Regex.IsMatch(value, @"^[0-9]*\.[0-9]+$") || // Float
-                            Regex.IsMatch(value, @"^'.'$")) // Character
-                        {
-                            if (!assignedValues.Contains(value))
-                            {
-                                assignedValues.Add(value);
-                            }
-                        }
-                    }
+                    var assignedValues = matches
+                        .Cast<Match>()
+                        .Select(m => m.Groups[1].Value.Trim())
+                        .Where(v => Regex.IsMatch(v, @"^[0-9]+$|^[0-9]*\.[0-9]+$|^'.'$")) // Simple literals only
+                        .Distinct()
+                        .ToList();
 
                     if (assignedValues.Count > 0)
                     {
@@ -1163,14 +1084,366 @@ namespace C_TestForge.Parser
                         });
                     }
                 }
-
-                return constraints;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error extracting assignment constraints for variable {variableName}: {ex.Message}");
-                return constraints;
+            }
+
+            return constraints;
+        }
+
+        private string GetOriginalTypeName(CXType type, CXCursor cursor)
+        {
+            try
+            {
+                // Get the canonical type to resolve typedefs
+                var canonicalType = type.CanonicalType;
+                if (canonicalType.Spelling.ToString() != type.Spelling.ToString())
+                {
+                    return type.Spelling.ToString(); // This is the typedef name
+                }
+                return canonicalType.Spelling.ToString();
+            }
+            catch
+            {
+                return type.Spelling.ToString();
             }
         }
+
+        private StorageClass DetermineStorageClass(CXCursor cursor)
+        {
+            try
+            {
+                var storageClass = cursor.StorageClass;
+                return storageClass switch
+                {
+                    CX_StorageClass.CX_SC_Auto => StorageClass.Auto,
+                    CX_StorageClass.CX_SC_Register => StorageClass.Register,
+                    CX_StorageClass.CX_SC_Static => StorageClass.Static,
+                    CX_StorageClass.CX_SC_Extern => StorageClass.Extern,
+                    _ => StorageClass.Auto
+                };
+            }
+            catch
+            {
+                return StorageClass.Auto;
+            }
+        }
+
+        private bool IsTypeConst(CXType type)
+        {
+            try
+            {
+                return type.IsConstQualified;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsTypeVolatile(CXType type)
+        {
+            try
+            {
+                return type.IsVolatileQualified;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsTypeRestrict(CXType type)
+        {
+            try
+            {
+                return type.IsRestrictQualified;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private (bool IsPointer, int Depth) AnalyzePointerType(CXType type)
+        {
+            int depth = 0;
+            var currentType = type;
+
+            try
+            {
+                while (currentType.kind == CXTypeKind.CXType_Pointer)
+                {
+                    depth++;
+                    currentType = currentType.PointeeType;
+                }
+
+                return (depth > 0, depth);
+            }
+            catch
+            {
+                return (false, 0);
+            }
+        }
+
+        private (bool IsArray, List<int> Dimensions) AnalyzeArrayType(CXType type)
+        {
+            var dimensions = new List<int>();
+            var currentType = type;
+
+            try
+            {
+                while (currentType.kind == CXTypeKind.CXType_ConstantArray ||
+                       currentType.kind == CXTypeKind.CXType_IncompleteArray)
+                {
+                    if (currentType.kind == CXTypeKind.CXType_ConstantArray)
+                    {
+                        dimensions.Add((int)currentType.NumElements);
+                    }
+                    else
+                    {
+                        dimensions.Add(-1); // Incomplete array
+                    }
+                    currentType = currentType.ArrayElementType;
+                }
+
+                return (dimensions.Count > 0, dimensions);
+            }
+            catch
+            {
+                return (false, new List<int>());
+            }
+        }
+
+        private unsafe string ExtractDefaultValue(CXCursor cursor)
+        {
+            string defaultValue = null;
+
+            try
+            {
+                cursor.VisitChildren((child, parent, clientData) =>
+                {
+                    switch (child.Kind)
+                    {
+                        case CXCursorKind.CXCursor_IntegerLiteral:
+                        case CXCursorKind.CXCursor_FloatingLiteral:
+                        case CXCursorKind.CXCursor_StringLiteral:
+                        case CXCursorKind.CXCursor_CharacterLiteral:
+                            defaultValue = GetLiteralValue(child);
+                            return CXChildVisitResult.CXChildVisit_Break;
+                        case CXCursorKind.CXCursor_InitListExpr:
+                            defaultValue = ExtractInitListValue(child);
+                            return CXChildVisitResult.CXChildVisit_Break;
+                        default:
+                            return CXChildVisitResult.CXChildVisit_Continue;
+                    }
+                }, default(CXClientData));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Could not extract default value: {ex.Message}");
+            }
+
+            return defaultValue;
+        }
+
+        private unsafe string ExtractInitListValue(CXCursor cursor)
+        {
+            var values = new List<string>();
+
+            try
+            {
+                cursor.VisitChildren((child, parent, clientData) =>
+                {
+                    var value = GetLiteralValue(child);
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        values.Add(value);
+                    }
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, default(CXClientData));
+
+                return values.Count > 0 ? $"{{{string.Join(", ", values)}}}" : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private bool IsCustomUserDefinedType(CXType type, ParseResult result)
+        {
+            try
+            {
+                var canonicalType = type.CanonicalType;
+                string typeName = canonicalType.Spelling.ToString();
+
+                // Check if it's a struct, union, or enum defined in this parse result
+                return result.Structures.Any(s => s.Name == typeName) ||
+                       result.Unions.Any(u => u.Name == typeName) ||
+                       result.Enumerations.Any(e => e.Name == typeName) ||
+                       result.Typedefs.Any(t => t.Name == typeName);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string CleanTypeName(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+                return string.Empty;
+
+            // Remove extra spaces and normalize
+            return System.Text.RegularExpressions.Regex.Replace(typeName.Trim(), @"\s+", " ");
+        }
+
+        private unsafe List<CVariableAttribute> ExtractVariableAttributes(CXCursor cursor)
+        {
+            var attributes = new List<CVariableAttribute>();
+
+            try
+            {
+                cursor.VisitChildren((child, parent, clientData) =>
+                {
+                    if (child.Kind == CXCursorKind.CXCursor_AnnotateAttr ||
+                        child.Kind == CXCursorKind.CXCursor_PackedAttr ||
+                        child.Kind == CXCursorKind.CXCursor_AlignedAttr)
+                    {
+                        var attr = new CVariableAttribute
+                        {
+                            Name = child.Spelling.ToString()
+                        };
+
+                        // Extract attribute parameters if any
+                        child.VisitChildren((attrChild, attrParent, attrClientData) =>
+                        {
+                            attr.Parameters.Add(attrChild.Spelling.ToString());
+                            return CXChildVisitResult.CXChildVisit_Continue;
+                        }, default(CXClientData));
+
+                        attributes.Add(attr);
+                    }
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, default(CXClientData));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Could not extract attributes: {ex.Message}");
+            }
+
+            return attributes;
+        }
+
+        private List<VariableConstraint> ExtractVariableConstraints(CXCursor cursor, CVariable variable)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                // Add basic type constraints
+                constraints.AddRange(ExtractTypeConstraints(variable));
+
+                // Extract constraints from attributes
+                foreach (var attr in variable.Attributes)
+                {
+                    var attrConstraints = ExtractConstraintsFromAttribute(attr, variable);
+                    constraints.AddRange(attrConstraints);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Could not extract constraints: {ex.Message}");
+            }
+
+            return constraints;
+        }
+
+        /// <summary>
+        /// Extracts constraints from variable attributes
+        /// </summary>
+        private List<VariableConstraint> ExtractConstraintsFromAttribute(CVariableAttribute attribute, CVariable variable)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                switch (attribute.Name.ToLower())
+                {
+                    case "packed":
+                        // Packed attribute doesn't add value constraints but affects memory layout
+                        break;
+
+                    case "aligned":
+                        if (attribute.Parameters.Count > 0 && int.TryParse(attribute.Parameters[0], out int alignment))
+                        {
+                            constraints.Add(new VariableConstraint
+                            {
+                                VariableName = variable.Name,
+                                Type = ConstraintType.Custom,
+                                Expression = $"alignment == {alignment}",
+                                Source = $"Aligned attribute: {alignment}"
+                            });
+                        }
+                        break;
+
+                    case "deprecated":
+                        constraints.Add(new VariableConstraint
+                        {
+                            VariableName = variable.Name,
+                            Type = ConstraintType.Custom,
+                            Expression = "deprecated",
+                            Source = "Deprecated attribute"
+                        });
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error extracting constraints from attribute {attribute.Name}: {ex.Message}");
+            }
+
+            return constraints;
+        }
+
+        /// <summary>
+        /// Extracts array-specific constraints
+        /// </summary>
+        private List<VariableConstraint> ExtractArrayConstraints(CVariable variable)
+        {
+            var constraints = new List<VariableConstraint>();
+
+            try
+            {
+                if (variable.ArrayDimensions != null && variable.ArrayDimensions.Count > 0)
+                {
+                    for (int i = 0; i < variable.ArrayDimensions.Count; i++)
+                    {
+                        int dimension = variable.ArrayDimensions[i];
+                        if (dimension > 0)
+                        {
+                            constraints.Add(new VariableConstraint
+                            {
+                                VariableName = $"{variable.Name}[{i}]",
+                                Type = ConstraintType.Range,
+                                MinValue = "0",
+                                MaxValue = (dimension - 1).ToString(),
+                                Source = $"Array dimension {i + 1}: size {dimension}"
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error extracting array constraints for variable {variable.Name}: {ex.Message}");
+            }
+
+            return constraints;
+        }
+
     }
 }

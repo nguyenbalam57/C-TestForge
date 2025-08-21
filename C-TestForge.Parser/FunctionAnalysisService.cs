@@ -2,6 +2,7 @@
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Core.Enumerations;
 using C_TestForge.Models.Projects;
 using ClangSharp;
 using ClangSharp.Interop;
@@ -83,7 +84,7 @@ namespace C_TestForge.Parser
                 {
                     Name = functionName,
                     ReturnType = returnTypeName,
-                    Parameters = parameters,
+                    //Parameters = parameters,
                     LineNumber = (int)line,
                     ColumnNumber = (int)column,
                     SourceFile = sourceFile,
@@ -588,11 +589,11 @@ namespace C_TestForge.Parser
 
                 // Get all variables that might be used in this function
                 var potentialVariables = allVariables
-                    .Where(v => v.Scope == VariableScope.Global || v.Scope == VariableScope.Rom || v.Scope == VariableScope.Static)
+                    .Where(v => v.Scope == VariableScope.Global || v.Scope == VariableScope.Static)
                     .ToList();
 
                 // Add function parameters
-                potentialVariables.AddRange(function.Parameters);
+                //potentialVariables.AddRange(function.Parameters);
 
                 // Create a dictionary for quick lookup
                 var variableDict = potentialVariables.ToDictionary(v => v.Name, v => v);

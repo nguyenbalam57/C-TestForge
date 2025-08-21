@@ -25,20 +25,17 @@ namespace C_TestForge.Parser
         private readonly IFileService _fileService;
         private readonly ISourceCodeService _sourceCodeService;
         private readonly IConfigurationService _configurationService;
-        private readonly IAnalysisService _analysisService;
 
         public ProjectService(
             ILogger<ProjectService> logger,
             IFileService fileService,
             ISourceCodeService sourceCodeService,
-            IConfigurationService configurationService,
-            IAnalysisService analysisService)
+            IConfigurationService configurationService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
             _sourceCodeService = sourceCodeService ?? throw new ArgumentNullException(nameof(sourceCodeService));
             _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
-            _analysisService = analysisService ?? throw new ArgumentNullException(nameof(analysisService));
         }
 
         /// <inheritdoc/>
@@ -84,9 +81,6 @@ namespace C_TestForge.Parser
                 // Create a default configuration
                 var defaultConfig = _configurationService.CreateDefaultConfiguration();
 
-                // Convert macros to dictionary if provided
-                var macrosList = MacroHelper.ToDictionary(macros);
-
                 // Create the project
                 var project = new Project
                 {
@@ -94,7 +88,7 @@ namespace C_TestForge.Parser
                     ProjectFilePath = projectFilePath,
                     SourceFiles = cFiles != null ? cFiles : new List<string>(),
                     IncludePaths = includePaths != null ? includePaths : new List<string>(),
-                    MacroDefinitions = (macrosList != null && macrosList.Count > 0) ? macrosList : new Dictionary<string, string>(),
+                    MacroDefinitions = (macros != null && macros.Count > 0) ? macros : new List<string>(),
                     Configurations = new List<Configuration> { defaultConfig },
                     ActiveConfigurationName = defaultConfig.Name,
                     LastModified = DateTime.Now,
@@ -122,6 +116,7 @@ namespace C_TestForge.Parser
 
         /// <inheritdoc/>
         public async Task<Project> EditProjectAsync(
+            Project currentProject,
             string projectName,
             string projectDescription,
             string projectPath,
@@ -138,22 +133,29 @@ namespace C_TestForge.Parser
                 if (string.IsNullOrEmpty(projectPath))
                     throw new ArgumentException("Project path cannot be null or empty", nameof(projectPath));
 
-                // Xác định đường dẫn file project cũ và mới
+                // Đường dẫn file project cũ và mới
+                string oldProjectFilePath = currentProject.ProjectFilePath;
                 string newProjectFilePath = Path.Combine(projectPath, $"{projectName}.ctproj");
 
+                // Đọc project cũ từ file (nếu tồn tại)
                 Project? project = null;
-                if (_fileService.FileExists(newProjectFilePath))
+                if (_fileService.FileExists(oldProjectFilePath))
                 {
-                    // Đọc project hiện tại
-                    string json = await _fileService.ReadFileAsync(newProjectFilePath);
+                    string json = await _fileService.ReadFileAsync(oldProjectFilePath);
                     project = JsonConvert.DeserializeObject<Project>(json);
                 }
-
+                // Nếu không đọc được thì dùng currentProject (trong bộ nhớ)
                 if (project == null)
                 {
-                    // Nếu không tồn tại, tạo mới
-                    project = new Project();
+                    project = currentProject.Clone();
                 }
+
+                // So sánh tên dự án và tên file
+                bool isNameChanged = !string.Equals(project.Name, projectName, StringComparison.Ordinal);
+                bool isFilePathChanged = !string.Equals(project.ProjectFilePath, newProjectFilePath, StringComparison.Ordinal);
+
+                // Nếu đổi tên file, xóa file cũ sau khi lưu file mới
+                bool needDeleteOldFile = isFilePathChanged && _fileService.FileExists(oldProjectFilePath);
 
                 // Cập nhật thông tin
                 project.Name = projectName;
@@ -161,7 +163,7 @@ namespace C_TestForge.Parser
                 project.ProjectFilePath = newProjectFilePath;
                 project.IncludePaths = includePaths ?? new List<string>();
                 project.SourceFiles = cFiles ?? new List<string>();
-                project.MacroDefinitions = MacroHelper.ToDictionary(macros);
+                project.MacroDefinitions = macros;
                 project.LastModified = DateTime.Now;
 
                 // Cập nhật thuộc tính
@@ -170,8 +172,15 @@ namespace C_TestForge.Parser
                 project.Properties["LastModifiedBy"] = Environment.UserName;
                 project.Properties["LastModifiedDate"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
-                // Lưu lại project
+                // Lưu lại project vào file mới
                 await SaveProjectAsync(project);
+
+                // Nếu đổi tên file, xóa file cũ
+                if (needDeleteOldFile)
+                {
+                    await _fileService.DeleteFileAsync(oldProjectFilePath);
+                    _logger.LogInformation($"Deleted old project file: {oldProjectFilePath}");
+                }
 
                 _logger.LogInformation($"Successfully edited project: {projectName} at {newProjectFilePath}");
 
@@ -615,35 +624,5 @@ namespace C_TestForge.Parser
             return configuration;
         }
 
-        /// <inheritdoc/>
-        public async Task<AnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options)
-        {
-            try
-            {
-                _logger.LogInformation($"Analyzing project: {project.Name}");
-
-                if (project == null)
-                {
-                    throw new ArgumentNullException(nameof(project));
-                }
-
-                if (options == null)
-                {
-                    throw new ArgumentNullException(nameof(options));
-                }
-
-                // Use the analysis service to analyze the project
-                var result = await _analysisService.AnalyzeProjectAsync(project, options);
-
-                _logger.LogInformation($"Successfully analyzed project: {project.Name}");
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error analyzing project: {project.Name}");
-                throw;
-            }
-        }
     }
 }

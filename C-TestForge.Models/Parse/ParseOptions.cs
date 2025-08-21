@@ -16,7 +16,7 @@ namespace C_TestForge.Models.Parse
         /// <summary>
         /// Dictionary of macro definitions to add to the compilation
         /// </summary>
-        public Dictionary<string, string> MacroDefinitions { get; set; } = new Dictionary<string, string>();
+        public List<string> MacroDefinitions { get; set; } = new List<string>();
 
         /// <summary>
         /// Additional command-line arguments to pass to clang
@@ -24,35 +24,17 @@ namespace C_TestForge.Models.Parse
         public List<string> AdditionalClangArguments { get; set; } = new List<string>();
 
         /// <summary>
-        /// Whether to parse preprocessor definitions
-        /// </summary>
-        public bool ParsePreprocessorDefinitions { get; set; } = true;
-
-        /// <summary>
-        /// Whether to analyze variables
-        /// </summary>
-        public bool AnalyzeVariables { get; set; } = true;
-
-        /// <summary>
-        /// Whether to analyze functions
-        /// </summary>
-        public bool AnalyzeFunctions { get; set; } = true;
-
-        /// <summary>
         /// Gets a default parse options object
         /// </summary>
         /// <returns>Default parse options</returns>
         public static ParseOptions Default => new ParseOptions
         {
-            AnalyzeFunctions = true,
-            AnalyzeVariables = true,
-            ParsePreprocessorDefinitions = true,
             IncludePaths = new List<string>
             {
                 "/usr/include",
                 "/usr/local/include"
             },
-            MacroDefinitions = new Dictionary<string, string>(),
+            MacroDefinitions = new List<string>(),
             AdditionalClangArguments = new List<string>
             {
                 "-std=c99"
@@ -67,11 +49,8 @@ namespace C_TestForge.Models.Parse
             return new ParseOptions
             {
                 IncludePaths = new List<string>(IncludePaths),
-                MacroDefinitions = new Dictionary<string, string>(MacroDefinitions),
+                MacroDefinitions = new List<string>(MacroDefinitions),
                 AdditionalClangArguments = new List<string>(AdditionalClangArguments),
-                ParsePreprocessorDefinitions = ParsePreprocessorDefinitions,
-                AnalyzeVariables = AnalyzeVariables,
-                AnalyzeFunctions = AnalyzeFunctions
             };
         }
     }

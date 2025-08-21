@@ -31,6 +31,8 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// C++ header file (.hpp)
         /// </summary>
-        CPPHeader
+        CPPHeader,
+        Assembly,
+        Include
     }
 }

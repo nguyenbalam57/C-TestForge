@@ -10,27 +10,12 @@ namespace C_TestForge.Models.Core
     /// <summary>
     /// Represents an error that occurred during parsing
     /// </summary>
-    public class ParseError : IModelObject
+    public class ParseError : SourceCodeEntity, IModelObject
     {
-        /// <summary>
-        /// Unique identifier
-        /// </summary>
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-
         /// <summary>
         /// Error message
         /// </summary>
         public string Message { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Line number in the source file
-        /// </summary>
-        public int LineNumber { get; set; }
-
-        /// <summary>
-        /// Column number in the source file
-        /// </summary>
-        public int ColumnNumber { get; set; }
 
         /// <summary>
         /// Source file where the error occurred
@@ -61,6 +46,7 @@ namespace C_TestForge.Models.Core
                 Message = Message,
                 LineNumber = LineNumber,
                 ColumnNumber = ColumnNumber,
+                SourceFile = SourceFile,
                 FileName = FileName,
                 Severity = Severity
             };

@@ -7,32 +7,43 @@ using System.Threading.Tasks;
 namespace C_TestForge.Models.Core
 {
     /// <summary>
-    /// Type of constraint on a variable
+    /// Types of constraints that can be applied to variables
     /// </summary>
     public enum ConstraintType
     {
-        MinValue,
-        MaxValue,
         /// <summary>
-        /// Enumeration constraint (set of allowed values)
+        /// Minimum value constraint
         /// </summary>
-        Enumeration,
+        MinValue,
+
         /// <summary>
-        /// Range constraint (min-max)
+        /// Maximum value constraint
+        /// </summary>
+        MaxValue,
+
+        /// <summary>
+        /// Range constraint (min and max)
         /// </summary>
         Range,
-        Custom,
+
+        /// <summary>
+        /// Enumeration of allowed values
+        /// </summary>
+        Enumeration,
+
         /// <summary>
         /// Array size constraint
         /// </summary>
         ArraySize,
+
+        /// <summary>
+        /// Custom constraint expression
+        /// </summary>
+        Custom,
+
         /// <summary>
         /// Exact value constraint
         /// </summary>
-        Exact,
-        /// <summary>
-        /// Pattern constraint (e.g., regex)
-        /// </summary>
-        Pattern
+        ExactValue
     }
 }

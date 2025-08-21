@@ -154,38 +154,10 @@ namespace C_TestForge.Parser
 
             var parseOptions = new ParseOptions
             {
-                AnalyzeFunctions = true,
-                AnalyzeVariables = true,
-                ParsePreprocessorDefinitions = true,
                 IncludePaths = configuration.IncludePaths.ToList(),
-                MacroDefinitions = configuration.MacroDefinitions.ToDictionary(kv => kv.Key, kv => kv.Value),
+                MacroDefinitions = configuration.MacroDefinitions.ToList(),
                 AdditionalClangArguments = configuration.AdditionalArguments.ToList()
             };
-
-            // Check if any properties affect parsing options
-            if (configuration.Properties.TryGetValue("AnalyzeFunctions", out string analyzeFunctionsStr))
-            {
-                if (bool.TryParse(analyzeFunctionsStr, out bool analyzeFunctions))
-                {
-                    parseOptions.AnalyzeFunctions = analyzeFunctions;
-                }
-            }
-
-            if (configuration.Properties.TryGetValue("AnalyzeVariables", out string analyzeVariablesStr))
-            {
-                if (bool.TryParse(analyzeVariablesStr, out bool analyzeVariables))
-                {
-                    parseOptions.AnalyzeVariables = analyzeVariables;
-                }
-            }
-
-            if (configuration.Properties.TryGetValue("ParsePreprocessorDefinitions", out string parsePreprocessorStr))
-            {
-                if (bool.TryParse(parsePreprocessorStr, out bool parsePreprocessor))
-                {
-                    parseOptions.ParsePreprocessorDefinitions = parsePreprocessor;
-                }
-            }
 
             return parseOptions;
         }
@@ -280,14 +252,13 @@ namespace C_TestForge.Parser
             {
                 Name = "Default",
                 Description = "Default configuration for C parsing",
-                MacroDefinitions = new Dictionary<string, string>
+                MacroDefinitions = new List<string>
                 {
-                    { "DEBUG", "1" }
+                    { "DEBUG=1" }
                 },
                 IncludePaths = new List<string>
                 {
-                    //"/usr/include",
-                    //"/usr/local/include"
+
                 },
                 AdditionalArguments = new List<string>
                 {
@@ -295,9 +266,7 @@ namespace C_TestForge.Parser
                 },
                 Properties = new Dictionary<string, string>
                 {
-                    { "AnalyzeFunctions", "true" },
-                    { "AnalyzeVariables", "true" },
-                    { "ParsePreprocessorDefinitions", "true" }
+                    
                 }
             };
 
@@ -342,9 +311,9 @@ namespace C_TestForge.Parser
             // Merge macro definitions (add any missing definitions from source)
             foreach (var define in source.MacroDefinitions)
             {
-                if (!target.MacroDefinitions.ContainsKey(define.Key))
+                if (!target.MacroDefinitions.Contains(define))
                 {
-                    target.MacroDefinitions[define.Key] = define.Value;
+                    target.MacroDefinitions.Add(define);
                 }
             }
 
@@ -383,7 +352,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<Dictionary<string, string>> GetConfigurationValuesAsync(string configName)
+        public async Task<List<string>> GetConfigurationValuesAsync(string configName)
         {
             try
             {
@@ -417,7 +386,7 @@ namespace C_TestForge.Parser
 
                 // Return empty dictionary if configuration not found
                 _logger.LogWarning($"Configuration not found: {configName}");
-                return new Dictionary<string, string>();
+                return new List<string>();
             }
             catch (Exception ex)
             {

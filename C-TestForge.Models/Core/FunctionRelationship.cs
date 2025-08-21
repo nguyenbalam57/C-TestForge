@@ -33,6 +33,8 @@ namespace C_TestForge.Models.Core
         /// </summary>
         public string SourceFile { get; set; } = string.Empty;
 
+        public FunctionRelationshipType Type { get; set; }
+
         /// <summary>
         /// Get a string representation of the function relationship
         /// </summary>
@@ -52,8 +54,20 @@ namespace C_TestForge.Models.Core
                 CallerName = CallerName,
                 CalleeName = CalleeName,
                 LineNumber = LineNumber,
-                SourceFile = SourceFile
+                SourceFile = SourceFile,
+                Type = Type
             };
         }
+    }
+
+    /// <summary>
+    /// Types of function relationships
+    /// </summary>
+    public enum FunctionRelationshipType
+    {
+        Calls,
+        Overrides,
+        Implements,
+        References
     }
 }
