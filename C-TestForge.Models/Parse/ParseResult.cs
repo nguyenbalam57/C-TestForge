@@ -58,11 +58,6 @@ namespace C_TestForge.Models.Parse
         /// </summary>
         public List<CInclude> Includes { get; set; } = new List<CInclude>();
 
-        /// <summary>
-        /// List of global constants found in the source file
-        /// </summary>
-        public List<CConstant> Constants { get; set; } = new List<CConstant>();
-
         #endregion
 
         #region Relationships and Dependencies
@@ -189,7 +184,7 @@ namespace C_TestForge.Models.Parse
         [JsonIgnore]
         public int TotalElementCount => Functions.Count + Variables.Count + Structures.Count +
                                        Unions.Count + Enumerations.Count + Typedefs.Count +
-                                       Definitions.Count + Constants.Count;
+                                       Definitions.Count;
 
         /// <summary>
         /// Gets all global symbols (functions, variables, constants)
@@ -202,7 +197,6 @@ namespace C_TestForge.Models.Parse
                 var symbols = new List<ISymbol>();
                 symbols.AddRange(Functions.Cast<ISymbol>());
                 symbols.AddRange(Variables.Where(v => v.IsGlobal).Cast<ISymbol>());
-                symbols.AddRange(Constants.Cast<ISymbol>());
                 return symbols.OrderBy(s => s.Name).ToList();
             }
         }
@@ -288,14 +282,6 @@ namespace C_TestForge.Models.Parse
         }
 
         /// <summary>
-        /// Get constant by name
-        /// </summary>
-        public CConstant GetConstant(string name)
-        {
-            return Constants.FirstOrDefault(c => c.Name == name);
-        }
-
-        /// <summary>
         /// Get functions that call the specified function
         /// </summary>
         public List<CFunction> GetCallers(string functionName)
@@ -333,7 +319,6 @@ namespace C_TestForge.Models.Parse
             var allSymbols = new List<ISymbol>();
             allSymbols.AddRange(Functions.Cast<ISymbol>());
             allSymbols.AddRange(Variables.Cast<ISymbol>());
-            allSymbols.AddRange(Constants.Cast<ISymbol>());
             allSymbols.AddRange(Structures.Cast<ISymbol>());
             allSymbols.AddRange(Unions.Cast<ISymbol>());
             allSymbols.AddRange(Enumerations.Cast<ISymbol>());
@@ -403,7 +388,6 @@ namespace C_TestForge.Models.Parse
             Typedefs.AddRange(other.Typedefs);
             ConditionalDirectives.AddRange(other.ConditionalDirectives);
             Includes.AddRange(other.Includes);
-            Constants.AddRange(other.Constants);
             FunctionRelationships.AddRange(other.FunctionRelationships);
             ParseErrors.AddRange(other.ParseErrors);
             ParseWarnings.AddRange(other.ParseWarnings);
@@ -443,7 +427,6 @@ namespace C_TestForge.Models.Parse
             if (filter.IncludeEnums) filtered.Enumerations.AddRange(Enumerations);
             if (filter.IncludeTypedefs) filtered.Typedefs.AddRange(Typedefs);
             if (filter.IncludeDefinitions) filtered.Definitions.AddRange(Definitions);
-            if (filter.IncludeConstants) filtered.Constants.AddRange(Constants);
             if (filter.IncludeErrors) filtered.ParseErrors.AddRange(ParseErrors);
             if (filter.IncludeWarnings) filtered.ParseWarnings.AddRange(ParseWarnings);
 

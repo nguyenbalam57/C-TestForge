@@ -24,7 +24,6 @@ namespace C_TestForge.Parser
     public class VariableAnalysisService : IVariableAnalysisService
     {
         private readonly ILogger<VariableAnalysisService> _logger;
-        private readonly ISourceCodeService _sourceCodeService;
         private readonly ITypeManager _typeManager;
 
         /// <summary>
@@ -34,11 +33,9 @@ namespace C_TestForge.Parser
         /// <param name="sourceCodeService">Source code service for reading source files</param>
         public VariableAnalysisService(
             ILogger<VariableAnalysisService> logger,
-            ISourceCodeService sourceCodeService,
             ITypeManager typeManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _sourceCodeService = sourceCodeService ?? throw new ArgumentNullException(nameof(sourceCodeService));
             _typeManager = typeManager ?? throw new ArgumentNullException(nameof(typeManager));
         }
 

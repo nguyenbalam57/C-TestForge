@@ -4,6 +4,7 @@ using C_TestForge.Core.Interfaces.ProjectManagement;
 using C_TestForge.Models.Core;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
+using ClangSharp;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -48,7 +49,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<AnalysisResult> AnalyzeSourceFileAsync(SourceFile sourceFile, AnalysisOptions options)
+        public async Task<AnalysisResult> AnalyzeSourceFileAsync( SourceFile sourceFile, AnalysisOptions options)
         {
             try
             {
@@ -70,13 +71,11 @@ namespace C_TestForge.Parser
                 // Create parsing options from analysis options
                 var parseOptions = new ParseOptions
                 {
-                    ParsePreprocessorDefinitions = options.AnalyzePreprocessorDefinitions,
-                    AnalyzeVariables = options.AnalyzeVariables,
-                    AnalyzeFunctions = options.AnalyzeFunctions
+
                 };
 
                 // Parse the source file
-                var parseResult = await _parserService.ParseSourceFileParserAsync(sourceFile, parseOptions);
+                var parseResult = await _parserService.ParseSourceFileParserAsync( sourceFile, parseOptions);
 
                 // Copy results from parse result
                 result.Definitions.AddRange(parseResult.Definitions);
@@ -122,7 +121,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<AnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options)
+        public async Task<ProjectAnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options)
         {
             try
             {
@@ -139,7 +138,7 @@ namespace C_TestForge.Parser
                 }
 
                 // Create a new analysis result
-                var result = new AnalysisResult();
+                var result = new ProjectAnalysisResult();
 
                 // Analyze each source file
                 foreach (var sourceFilePath in project.SourceFiles)
@@ -150,7 +149,7 @@ namespace C_TestForge.Parser
                         var sourceFile = await _sourceCodeService.LoadSourceFileAsync(sourceFilePath);
 
                         // Analyze the source file
-                        var fileResult = await AnalyzeSourceFileAsync(sourceFile, options);
+                        var fileResult = await AnalyzeSourceFileAsync( sourceFile, options);
 
                         // Merge results
                         result.Definitions.AddRange(fileResult.Definitions);

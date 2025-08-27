@@ -1,4 +1,5 @@
-﻿using System;
+﻿using C_TestForge.Models.Projects;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -49,6 +50,13 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         bool FileExists(string filePath);
 
         /// <summary>
+        /// Checks if a directory exists
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>True if the file exists, false otherwise</returns>
+        public bool DirectoryExists(string filePath);
+
+        /// <summary>
         /// Reads a file as bytes
         /// </summary>
         /// <param name="filePath">Path to the file</param>
@@ -92,6 +100,15 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         string GetDirectoryName(string filePath);
 
         /// <summary>
+        /// Tìm kiếm tất cả các file trong một thư mục với phần mở rộng cụ thể
+        /// </summary>
+        /// <param name="directoryPath">Đường đẫn thư mục</param>
+        /// <param name="extension">Phần mở rộng cần tìm kiếm</param>
+        /// <param name="recursive">Tìm kiếm tất cả file trong thư mục gốc hoặc tìm kiếm tất cả file trong những thư mục con</param>
+        /// <returns></returns>
+        public List<string> GetFiles(string directoryPath, string extension = "*", bool recursive = false);
+
+        /// <summary>
         /// Gets the last modified time of a file
         /// </summary>
         /// <param name="filePath">Path to the file</param>
@@ -113,5 +130,12 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <param name="recursive">Whether to search subdirectories</param>
         /// <returns>List of file paths</returns>
         List<string> GetFilesInDirectory(string directoryPath, string extension, bool recursive = false);
+
+        /// <summary>
+        /// Deletes a directory and all its contents.
+        /// </summary>
+        /// <param name="directoryPath">Path to the directory</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeleteDirectoryAsync(string directoryPath);
     }
 }

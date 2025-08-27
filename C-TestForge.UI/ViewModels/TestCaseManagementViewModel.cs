@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Models.Core;
+using C_TestForge.Models.Core.SupportingClasses;
 using C_TestForge.Models.TestCases;
 using Prism.Commands;
 using Prism.Mvvm;
@@ -387,49 +388,49 @@ namespace C_TestForge.UI.ViewModels
                 {
                     Name = "sum",
                     ReturnType = "int",
-                    Parameters = new List<CVariable>
+                    Parameters = new List<CParameter>
                     {
-                        new CVariable { Name = "a", TypeName = "int" },
-                        new CVariable { Name = "b", TypeName = "int" }
+                        new CParameter { Name = "a", ParameterType = "int" },
+                        new CParameter { Name = "b", ParameterType = "int" }
                     }
                 },
                 new CFunction
                 {
                     Name = "subtract",
                     ReturnType = "int",
-                    Parameters = new List<CVariable>
+                    Parameters = new List<CParameter>
                     {
-                        new CVariable { Name = "a", TypeName = "int" },
-                        new CVariable { Name = "b", TypeName = "int" }
+                        new CParameter { Name = "a", ParameterType = "int" },
+                        new CParameter { Name = "b", ParameterType = "int" }
                     }
                 },
                 new CFunction
                 {
                     Name = "multiply",
                     ReturnType = "int",
-                    Parameters = new List<CVariable>
+                    Parameters = new List<CParameter>
                     {
-                        new CVariable { Name = "a", TypeName = "int" },
-                        new CVariable { Name = "b", TypeName = "int" }
+                        new CParameter { Name = "a", ParameterType = "int" },
+                        new CParameter { Name = "b", ParameterType = "int" }
                     }
                 },
                 new CFunction
                 {
                     Name = "divide",
                     ReturnType = "double",
-                    Parameters = new List<CVariable>
+                    Parameters = new List<CParameter>
                     {
-                        new CVariable { Name = "a", TypeName = "int" },
-                        new CVariable { Name = "b", TypeName = "int" }
+                        new CParameter { Name = "a", ParameterType = "int" },
+                        new CParameter { Name = "b", ParameterType = "int" }
                     }
                 },
                 new CFunction
                 {
                     Name = "printMessage",
                     ReturnType = "void",
-                    Parameters = new List<CVariable>
+                    Parameters = new List<CParameter>
                     {
-                        new CVariable { Name = "message", TypeName = "const char*" }
+                        new CParameter { Name = "message", ParameterType = "const char*" }
                     }
                 }
             };

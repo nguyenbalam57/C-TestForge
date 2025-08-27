@@ -16,15 +16,12 @@ namespace C_TestForge.UI.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            bool inverse = parameter?.ToString() == "Inverse";
             bool isNull = value == null;
-
-            // Check if we need to invert the logic
-            if (parameter is string param && param.Equals("true", StringComparison.OrdinalIgnoreCase))
-            {
-                isNull = !isNull;
-            }
-
-            return isNull ? Visibility.Visible : Visibility.Collapsed;
+            if (inverse)
+                return isNull ? Visibility.Visible : Visibility.Collapsed;
+            else
+                return isNull ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

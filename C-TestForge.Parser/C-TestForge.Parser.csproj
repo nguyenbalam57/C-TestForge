@@ -15,6 +15,10 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Projects\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0-windows7.0</TargetFramework>
     <RootNamespace>C_TestForge.Parser</RootNamespace>

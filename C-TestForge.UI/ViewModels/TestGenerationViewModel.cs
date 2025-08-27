@@ -346,7 +346,7 @@ namespace C_TestForge.UI.ViewModels
         {
             get
             {
-                string parameters = string.Join(", ", _function.Parameters.Select(p => $"{p.TypeName} {p.Name}"));
+                string parameters = string.Join(", ", _function.Parameters.Select(p => $"{p.ParameterType} {p.Name}"));
                 return $"{ReturnType} {Name}({parameters})";
             }
         }

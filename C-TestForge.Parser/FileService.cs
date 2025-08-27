@@ -1,4 +1,5 @@
 ﻿using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Models.Projects;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -83,6 +84,7 @@ namespace C_TestForge.Parser
                 }
 
                 // Đọc file với encoding đã xác định
+
                 return await File.ReadAllTextAsync(filePath, encoding);
             }
             catch (Exception ex)
@@ -464,6 +466,24 @@ namespace C_TestForge.Parser
                 return false;
             }
         }
+        /// <inheritdoc/>
+        public bool DirectoryExists(string filePath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
+                }
+
+                return Directory.Exists(filePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error checking if directory exists: {filePath}");
+                return false;
+            }
+        }
 
         /// <inheritdoc/>
         public async Task<byte[]> ReadFileBytesAsync(string filePath)
@@ -568,6 +588,37 @@ namespace C_TestForge.Parser
 
             return Path.GetDirectoryName(filePath);
         }
+        /// <inheritdoc/>
+        public List<string> GetFiles(string directoryPath, string extension = "*", bool recursive = false)
+        {
+            try
+            {
+                _logger.LogDebug($"Getting files in directory: {directoryPath} with extension {extension}, recursive: {recursive}");
+                if (string.IsNullOrEmpty(directoryPath))
+                {
+                    throw new ArgumentException("Directory path cannot be null or empty", nameof(directoryPath));
+                }
+                if (!Directory.Exists(directoryPath))
+                {
+                    throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+                }
+                if (string.IsNullOrEmpty(extension) || extension == "*")
+                {
+                    extension = ".*";
+                }
+                else if (!extension.StartsWith("."))
+                {
+                    extension = "." + extension;
+                }
+                SearchOption searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                return Directory.GetFiles(directoryPath, $"*{extension}", searchOption).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting files in directory: {directoryPath}");
+                return new List<string>();
+            }
+        }
 
         /// <inheritdoc/>
         public DateTime GetLastModifiedTime(string filePath)
@@ -655,6 +706,47 @@ namespace C_TestForge.Parser
             {
                 _logger.LogError(ex, $"Error getting files in directory: {directoryPath}");
                 return new List<string>();
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> DeleteDirectoryAsync(string directoryPath)
+        {
+            try
+            {
+                _logger.LogDebug($"Deleting directory: {directoryPath}");
+
+                if (string.IsNullOrEmpty(directoryPath))
+                {
+                    throw new ArgumentException("Directory path cannot be null or empty", nameof(directoryPath));
+                }
+
+                if (!Directory.Exists(directoryPath))
+                {
+                    _logger.LogWarning($"Directory not found for deletion: {directoryPath}");
+                    return false;
+                }
+
+                // Directory.Delete is synchronous, so wrap in Task.Run for async signature
+                await Task.Run(() => Directory.Delete(directoryPath, true));
+
+                bool deleted = !Directory.Exists(directoryPath);
+
+                if (deleted)
+                {
+                    _logger.LogDebug($"Successfully deleted directory: {directoryPath}");
+                }
+                else
+                {
+                    _logger.LogWarning($"Failed to delete directory: {directoryPath}");
+                }
+
+                return deleted;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting directory: {directoryPath}");
+                return false;
             }
         }
     }

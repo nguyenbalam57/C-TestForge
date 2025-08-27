@@ -2,7 +2,6 @@
 using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Core.Interfaces.Solver;
 using C_TestForge.Core.Interfaces.TestCaseManagement;
 using C_TestForge.Core.Interfaces.UI;
@@ -11,7 +10,6 @@ using C_TestForge.Infrastructure;
 using C_TestForge.Infrastructure.Views;
 using C_TestForge.Parser;
 using C_TestForge.Parser.Analysis;
-using C_TestForge.Parser.Projects;
 using C_TestForge.Parser.TestCaseManagement;
 using C_TestForge.Parser.UI;
 using C_TestForge.SolverServices;
@@ -68,8 +66,8 @@ namespace C_TestForge.UI
             containerRegistry.RegisterSingleton<IConfigurationService, ConfigurationService>();
 
             // Đăng ký dịch vụ quét tệp và phân tích phụ thuộc
-            containerRegistry.RegisterSingleton<IFileScannerService, FileScannerService>();
             containerRegistry.RegisterSingleton<IDashboardView, DashboardView>();
+            containerRegistry.RegisterSingleton<IAboutView, AboutView>();
 
             // Register parser services
             containerRegistry.RegisterSingleton<ISourceCodeService, SourceCodeService>();
@@ -82,6 +80,11 @@ namespace C_TestForge.UI
             containerRegistry.RegisterSingleton<IVariableAnalysisService, VariableAnalysisService>();
             containerRegistry.RegisterSingleton<IMacroAnalysisService, MacroAnalysisService>();
             containerRegistry.RegisterSingleton<IAnalysisService, AnalysisService>();
+            containerRegistry.RegisterSingleton<IMacroDefineExtractor, MacroDefineExtractor>();
+            containerRegistry.RegisterSingleton<ITypeAnalysisService, TypeAnalysisService>();
+            containerRegistry.RegisterSingleton<IEnumAnalysisExtractor, EnumAnalysisExtractor>();
+            containerRegistry.RegisterSingleton<IStructAnalysisExtractor, StructAnalysisExtractor>();
+            containerRegistry.RegisterSingleton<IUnionAnalysisExtractor, UnionAnalysisExtractor>();
 
             // Register solver services
             containerRegistry.RegisterSingleton<IZ3SolverService, Z3SolverService>();
@@ -126,6 +129,7 @@ namespace C_TestForge.UI
             containerRegistry.RegisterForNavigation<TestGenerationView, TestGenerationViewModel>();
             containerRegistry.RegisterSingleton<SettingsViewModel>();
             containerRegistry.RegisterForNavigation<SettingsView, SettingsViewModel>();
+            
         }
 
         /// <summary>

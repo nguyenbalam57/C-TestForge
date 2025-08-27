@@ -1,7 +1,6 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
-using C_TestForge.Core.Interfaces.Projects;
 using C_TestForge.Models.Core;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
@@ -31,10 +30,15 @@ namespace C_TestForge.Parser
         private readonly IFunctionAnalysisService _functionAnalysisService;
         private readonly IVariableAnalysisService _variableAnalysisService;
         private readonly IMacroAnalysisService _macroAnalysisService;
+        private readonly IMacroDefineExtractor _macroDefineExtractor;
+        private readonly ITypeAnalysisService _typeAnalysisService;
+        private readonly IEnumAnalysisExtractor _enumAnalysisExtractor;
+        private readonly IStructAnalysisExtractor _structAnalysisExtractor;
+        private readonly IUnionAnalysisExtractor _unionAnalysisExtractor;
+
         private readonly IFileService _fileService;
         private readonly IConfigurationService _configurationService;
         private readonly ITypeManager _typeManager;
-        private readonly IFileScannerService _fileScannerService;
 
         /// <summary>
         /// Constructor for ClangSharpParserService
@@ -42,12 +46,18 @@ namespace C_TestForge.Parser
         public ClangSharpParserService(
             ILogger<ClangSharpParserService> logger,
             IPreprocessorService preprocessorService,
+
             IFunctionAnalysisService functionAnalysisService,
             IVariableAnalysisService variableAnalysisService,
             IMacroAnalysisService macroAnalysisService,
+            IMacroDefineExtractor macroDefineExtractor,
+            ITypeAnalysisService typeAnalysisService,
+            IEnumAnalysisExtractor enumAnalysisExtractor,
+            IStructAnalysisExtractor structAnalysisExtractor,
+            IUnionAnalysisExtractor unionAnalysisExtractor,
+
             IFileService fileService,
             ITypeManager typeManager,
-            IFileScannerService fileScannerService,
             IConfigurationService configurationService = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -55,9 +65,15 @@ namespace C_TestForge.Parser
             _functionAnalysisService = functionAnalysisService ?? throw new ArgumentNullException(nameof(functionAnalysisService));
             _variableAnalysisService = variableAnalysisService ?? throw new ArgumentNullException(nameof(variableAnalysisService));
             _macroAnalysisService = macroAnalysisService ?? throw new ArgumentNullException(nameof(macroAnalysisService));
+            _macroDefineExtractor = macroDefineExtractor ?? throw new ArgumentNullException(nameof(macroDefineExtractor));
+            _typeAnalysisService = typeAnalysisService ?? throw new ArgumentNullException(nameof(typeAnalysisService));
+            _enumAnalysisExtractor = enumAnalysisExtractor ?? throw new ArgumentNullException(nameof(enumAnalysisExtractor));
+            _structAnalysisExtractor = structAnalysisExtractor ?? throw new ArgumentNullException(nameof(structAnalysisExtractor));
+            _unionAnalysisExtractor = unionAnalysisExtractor ?? throw new ArgumentNullException(nameof(unionAnalysisExtractor));
+
+
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
             _typeManager = typeManager ?? throw new ArgumentNullException(nameof(typeManager));
-            _fileScannerService = fileScannerService ?? throw new ArgumentNullException(nameof(fileScannerService));
             _configurationService = configurationService;
 
             // Đảm bảo hỗ trợ các bảng mã cho xử lý file
@@ -83,7 +99,7 @@ namespace C_TestForge.Parser
             {
                 _logger.LogInformation($"Parsing source file: {filePath}");
 
-                // Đọc nội dung file
+                // Đọc nội dung fil
                 string sourceContent = await _fileService.ReadFileAsync(filePath);
 
                 // Convert ParseResult to SourceFile
@@ -146,7 +162,7 @@ namespace C_TestForge.Parser
         #region IParserService Implementation
 
         /// <inheritdoc/>
-        public async Task<ParseResult> ParseSourceFileParserAsync(List<SourceFile> sourceFiles, SourceFile sourceFile, ParseOptions options)
+        public async Task<ParseResult> ParseSourceFileParserAsync( SourceFile sourceFile, ParseOptions options)
         {
 
             try
@@ -154,7 +170,7 @@ namespace C_TestForge.Parser
                 _logger.LogInformation($"Starting parse of file: {sourceFile.FilePath}");
 
                 // Parse the source code
-                return await ParseSourceCodeParserAsync(sourceFiles, sourceFile, options);
+                return await ParseSourceCodeParserAsync( sourceFile, options);
 
             }
             catch (Exception ex)
@@ -165,7 +181,7 @@ namespace C_TestForge.Parser
         }
 
         /// <inheritdoc/>
-        public async Task<ParseResult> ParseSourceCodeParserAsync(List<SourceFile> sourceFiles, SourceFile sourceFile, ParseOptions options)
+        public async Task<ParseResult> ParseSourceCodeParserAsync( SourceFile sourceFile, ParseOptions options)
         {
             if (string.IsNullOrEmpty(sourceFile.Content))
             {
@@ -373,17 +389,6 @@ namespace C_TestForge.Parser
         }
 
         /// <summary>
-        /// Quét một thư mục để tìm tất cả các tệp C (.c) và header (.h)
-        /// </summary>
-        /// <param name="directoryPath">Đường dẫn thư mục cần quét</param>
-        /// <param name="recursive">Quét đệ quy các thư mục con</param>
-        /// <returns>Danh sách tất cả các tệp C và header được tìm thấy</returns>
-        public async Task<List<string>> ScanDirectoryForCFilesAsync(string directoryPath, bool recursive = true)
-        {
-            return await _fileScannerService.ScanDirectoryForCFilesAsync(directoryPath, recursive);
-        }
-
-        /// <summary>
         /// Tìm tất cả các thư mục include tiềm năng trong một dự án
         /// </summary>
         /// <param name="rootDirectoryPath">Đường dẫn tất cả các file</param>
@@ -414,14 +419,19 @@ namespace C_TestForge.Parser
                 var visitor = new ASTVisitor(
                     sourceFile.FileName,
                     _variableAnalysisService,
-                    _functionAnalysisService);
+                    _functionAnalysisService,
+                    _macroDefineExtractor,
+                    _typeAnalysisService,
+                    _enumAnalysisExtractor,
+                    _structAnalysisExtractor,
+                    _unionAnalysisExtractor);
 
                 // Visit all the children of the translation unit
                 unsafe
                 {
                     cursor.VisitChildren((child, parent, clientData) =>
                     {
-                        visitor.Visit(child, parent, sourceFile.ParseResult);
+                        visitor.Visit(child, parent, sourceFile);
                         return CXChildVisitResult.CXChildVisit_Continue;
                     }, default(CXClientData));
                 }
@@ -545,6 +555,11 @@ namespace C_TestForge.Parser
             private readonly string _sourceFileName;
             private readonly IVariableAnalysisService _variableAnalysisService;
             private readonly IFunctionAnalysisService _functionAnalysisService;
+            private readonly IMacroDefineExtractor _macroDefineExtractor;
+            private readonly ITypeAnalysisService _typeAnalysisService;
+            private readonly IEnumAnalysisExtractor _enumAnalysisExtractor;
+            private readonly IStructAnalysisExtractor _structAnalysisExtractor;
+            private readonly IUnionAnalysisExtractor _unionAnalysisExtractor;
 
             /// <summary>
             /// List of variables found during traversal
@@ -566,11 +581,21 @@ namespace C_TestForge.Parser
             public ASTVisitor(
                 string sourceFileName,
                 IVariableAnalysisService variableAnalysisService,
-                IFunctionAnalysisService functionAnalysisService)
+                IFunctionAnalysisService functionAnalysisService,
+                IMacroDefineExtractor macroDefineExtractor,
+                ITypeAnalysisService typeAnalysisService,
+                IEnumAnalysisExtractor enumAnalysisExtractor,
+                IStructAnalysisExtractor structAnalysisExtractor,
+                IUnionAnalysisExtractor unionAnalysisExtractor)
             {
                 _sourceFileName = sourceFileName;
                 _variableAnalysisService = variableAnalysisService;
                 _functionAnalysisService = functionAnalysisService;
+                _macroDefineExtractor = macroDefineExtractor;
+                _typeAnalysisService = typeAnalysisService;
+                _enumAnalysisExtractor = enumAnalysisExtractor;
+                _structAnalysisExtractor = structAnalysisExtractor;
+                _unionAnalysisExtractor = unionAnalysisExtractor;
             }
 
             /// <summary>
@@ -578,7 +603,7 @@ namespace C_TestForge.Parser
             /// </summary>
             /// <param name="cursor">Current cursor</param>
             /// <param name="parent">Parent cursor</param>
-            public void Visit(CXCursor cursor, CXCursor parent, ParseResult parseResult)
+            public void Visit(CXCursor cursor, CXCursor parent, SourceFile sourceFile)
             {
                 try
                 {
@@ -598,20 +623,49 @@ namespace C_TestForge.Parser
                     }
 
                     // Process variable declarations
-                    if ( cursor.Kind == CXCursorKind.CXCursor_VarDecl)
+                    if (cursor.Kind == CXCursorKind.CXCursor_VarDecl ||
+                    cursor.Kind == CXCursorKind.CXCursor_ParmDecl ||
+                    cursor.Kind == CXCursorKind.CXCursor_FieldDecl)
                     {
-                        _variableAnalysisService.ExtractVariable(cursor, parseResult);
+                        _variableAnalysisService.ExtractVariable(cursor, sourceFile.ParseResult);
                     }
 
-                    // Process function declarations
+                    // Đọc macro define
+                    if (cursor.Kind == CXCursorKind.CXCursor_MacroDefinition)
+                    {
+                        _macroDefineExtractor.ExtractMacroDefine(cursor, sourceFile.ParseResult);
+                    }
+
+                    // trích xuất function
                     if ( cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
                     {
-                        //var function = _functionAnalysisService.ExtractFunction(cursor, sourceCode);
-                        //if (function != null)
-                        //{
-                        //    Functions.Add(function);
-                        //}
+                        _functionAnalysisService.ExtractFunction(cursor, sourceFile);
                     }
+
+                    // trích xuất typedef
+                    if (cursor.Kind == CXCursorKind.CXCursor_TypedefDecl)
+                    {
+                        _typeAnalysisService.ExtractTypedef(cursor, sourceFile.ParseResult);
+                    }
+
+                    // trích xuất enum
+                    if (cursor.Kind == CXCursorKind.CXCursor_EnumDecl)
+                    {
+                        _enumAnalysisExtractor.ExtractEnum(cursor, sourceFile.ParseResult);
+                    }
+
+                    // trích xuất struct
+                    if (cursor.Kind == CXCursorKind.CXCursor_StructDecl)
+                    {
+                        _structAnalysisExtractor.ExtractStructDefinition(cursor, sourceFile.ParseResult);
+                    }
+
+                    // trích xuất Union
+                    if (cursor.Kind == CXCursorKind.CXCursor_UnionDecl)
+                    {
+                        _unionAnalysisExtractor.ExtractUnionDefinition(cursor, sourceFile.ParseResult);
+                    }
+
                 }
                 catch (Exception ex)
                 {
@@ -631,46 +685,55 @@ namespace C_TestForge.Parser
         /// </summary>
         /// <param name="sourceFiles"> file dự án</param>
         /// <returns>Kết quả phân tích dự án hoàn chỉnh bao gồm biến, hàm, macro và phụ thuộc</returns>
-        public async Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(Project project, List<SourceFile> sourceFiles)
+        public async Task<ProjectAnalysisResult> AnalyzeCompleteProjectAsync(
+                                                                        Project project,
+                                                                        List<SourceFile> sourceFiles,
+                                                                        IProgress<double>? progress = null,
+                                                                        CancellationToken cancellationToken = default)
         {
             if (sourceFiles == null)
-            {
                 throw new ArgumentException("Project root path cannot be null or empty", nameof(sourceFiles));
-            }
 
             _logger.LogInformation($"Bắt đầu phân tích toàn bộ file: {sourceFiles.Count}");
 
+            var analysisResult = new ProjectAnalysisResult
+            {
+                TotalFiles = sourceFiles.Count,
+                StartTime = DateTime.Now,
+                ProjectPath = new List<string> { project.ProjectFilePath }
+            };
+
             try
             {
+
                 foreach (var file in sourceFiles)
                 {
-                    _logger.LogInformation($"- {file.FileName}");
+                    cancellationToken.ThrowIfCancellationRequested();
 
+                    _logger.LogInformation($"- {file.FileName}");
                     file.ParseResult.StartTime = DateTime.Now;
 
                     try
                     {
                         _logger.LogInformation($"Phân tích {file.FileName}");
-                        await AnalyzeSingleFileInContext(project, sourceFiles, file);
+                        analysisResult.ProcessedFiles.Add(file.FilePath);
+                        await AnalyzeSingleFileInContext(project, file);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Lỗi khi phân tích tệp {file.FileName}: {ex.Message}");
+                        analysisResult.Errors.Add($"Lỗi khi phân tích tệp {file.FileName}: {ex.Message}");
                     }
 
-                    //_logger.LogInformation($"Hoàn thành phân tích dự án trong {analysisResult.Duration.TotalSeconds:F2} giây");
-                    //_logger.LogInformation($"Kết quả: {analysisResult.Functions.Count} hàm, {analysisResult.Variables.Count} biến, {analysisResult.Macros.Count} macro");
-
-                    return new ProjectAnalysisResult();
+                    progress?.Report(analysisResult.CompletionPercentage);
                 }
-                return new ProjectAnalysisResult();
+
+                analysisResult.EndTime = DateTime.Now;
+                return analysisResult;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Lỗi nghiêm trọng khi phân tích dự án: {ex.Message}");
-                //analysisResult.EndTime = DateTime.Now;
-                //analysisResult.Duration = analysisResult.EndTime - analysisResult.StartTime;
-                //analysisResult.Errors.Add($"Critical error: {ex.Message}");
                 throw;
             }
         }
@@ -723,7 +786,7 @@ namespace C_TestForge.Parser
         /// <param name="filePath">Đường dẫn tệp cần phân tích</param>
         /// <param name="analysisResult">Kết quả phân tích dự án để cập nhật</param>
         /// <returns>Task</returns>
-        private async Task AnalyzeSingleFileInContext(Project project, List<SourceFile> sourceFiles, SourceFile sourceFile)
+        private async Task AnalyzeSingleFileInContext(Project project, SourceFile sourceFile)
         {
             try
             {
@@ -739,9 +802,10 @@ namespace C_TestForge.Parser
                 }
 
                 // Thêm include paths từ Project 
-                if (project.IncludePaths.Count > 0)
+                var cof = project.Configurations.FirstOrDefault(c => c.Name == project.ActiveConfigurationName);
+                if (cof.IncludePaths.Count > 0)
                 {
-                    foreach (var includePath in project.IncludePaths)
+                    foreach (var includePath in cof.IncludePaths)
                     {
                         if (!options.IncludePaths.Contains(includePath))
                         {
@@ -751,9 +815,9 @@ namespace C_TestForge.Parser
                 }
 
                 // Thêm macro definitions từ Project
-                if (project.MacroDefinitions.Count > 0)
+                if (cof.MacroDefinitions.Count > 0)
                 {
-                    foreach (var macro in project.MacroDefinitions)
+                    foreach (var macro in cof.MacroDefinitions)
                     {
                         if (!options.MacroDefinitions.Contains(macro))
                         {
@@ -762,7 +826,7 @@ namespace C_TestForge.Parser
                     }
                 }
 
-                var parseResult = await ParseSourceFileParserAsync(sourceFiles, sourceFile, options);
+                var parseResult = await ParseSourceFileParserAsync(sourceFile, options);
 
             }
             catch (Exception ex)

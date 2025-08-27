@@ -36,24 +36,24 @@ namespace C_TestForge.Parser
             if (string.IsNullOrEmpty(rootFunctionName))
                 throw new ArgumentNullException(nameof(rootFunctionName));
 
-            // Extract all functions
-            var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
-            if (!functions.Any(f => f.Name == rootFunctionName))
-                throw new ArgumentException($"Function not found: {rootFunctionName}", nameof(rootFunctionName));
+            //// Extract all functions
+            //var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
+            //if (!functions.Any(f => f.Name == rootFunctionName))
+            //    throw new ArgumentException($"Function not found: {rootFunctionName}", nameof(rootFunctionName));
 
-            // Create call graph
-            var graph = new FunctionCallGraph
-            {
-                RootFunctionName = rootFunctionName,
-                Nodes = new List<FunctionCallNode>(),
-                Edges = new List<FunctionCallEdge>()
-            };
+            //// Create call graph
+            //var graph = new FunctionCallGraph
+            //{
+            //    RootFunctionName = rootFunctionName,
+            //    Nodes = new List<FunctionCallNode>(),
+            //    Edges = new List<FunctionCallEdge>()
+            //};
 
-            // Build the graph
-            var processedFunctions = new HashSet<string>();
-            await BuildCallGraphRecursiveAsync(rootFunctionName, sourceFile.FilePath, 0, maxDepth, graph, processedFunctions, functions);
+            //// Build the graph
+            //var processedFunctions = new HashSet<string>();
+            //await BuildCallGraphRecursiveAsync(rootFunctionName, sourceFile.FilePath, 0, maxDepth, graph, processedFunctions, functions);
 
-            return graph;
+            return new FunctionCallGraph();
         }
 
         /// <summary>
@@ -241,38 +241,38 @@ namespace C_TestForge.Parser
         /// </summary>
         public async Task<List<CyclicDependency>> AnalyzeCyclicDependenciesAsync(SourceFile sourceFile)
         {
-            string filePath = sourceFile.FilePath;
+            //string filePath = sourceFile.FilePath;
 
-            if (string.IsNullOrEmpty(filePath))
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found", filePath);
+            //if (string.IsNullOrEmpty(filePath))
+            //    throw new ArgumentNullException(nameof(filePath));
+            //if (!File.Exists(filePath))
+            //    throw new FileNotFoundException("File not found", filePath);
 
-            // Extract all functions
-            var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
+            //// Extract all functions
+            //var functions = await _parserService.ExtractFunctionsAsync(sourceFile);
 
-            // Create adjacency list
-            var adjacencyList = new Dictionary<string, List<string>>();
-            foreach (var function in functions)
-            {
-                adjacencyList[function.Name] = function.CalledFunctions;
-            }
+            //// Create adjacency list
+            //var adjacencyList = new Dictionary<string, List<string>>();
+            //foreach (var function in functions)
+            //{
+            //    adjacencyList[function.Name] = function.CalledFunctions;
+            //}
 
-            // Find cycles using DFS
-            var cycles = new List<CyclicDependency>();
-            var visited = new HashSet<string>();
-            var recursionStack = new HashSet<string>();
-            var currentPath = new List<string>();
+            //// Find cycles using DFS
+            //var cycles = new List<CyclicDependency>();
+            //var visited = new HashSet<string>();
+            //var recursionStack = new HashSet<string>();
+            //var currentPath = new List<string>();
 
-            foreach (var function in functions)
-            {
-                if (!visited.Contains(function.Name))
-                {
-                    FindCyclesUsingDFS(function.Name, adjacencyList, visited, recursionStack, currentPath, cycles);
-                }
-            }
+            //foreach (var function in functions)
+            //{
+            //    if (!visited.Contains(function.Name))
+            //    {
+            //        FindCyclesUsingDFS(function.Name, adjacencyList, visited, recursionStack, currentPath, cycles);
+            //    }
+            //}
 
-            return cycles;
+            return new List<CyclicDependency>();
         }
 
         /// <summary>

@@ -89,7 +89,7 @@ namespace C_TestForge.Models.Projects
         /// <summary>
         /// Encoding of the source file
         /// </summary>
-        public string Encoding { get; set; } = "UTF-8";
+        public string EncodingText { get; set; } 
 
         #endregion
 
@@ -251,7 +251,7 @@ namespace C_TestForge.Models.Projects
                 return;
             }
 
-            Content = File.ReadAllText(FilePath);
+            ReadFileAsync(FilePath);
             UpdateContent(Content);
         }
 
@@ -260,10 +260,23 @@ namespace C_TestForge.Models.Projects
         /// </summary>
         public void UpdateContent(string newContent)
         {
-            Content = newContent ?? string.Empty;
             Lines = Content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
             ContentHash = ComputeContentHash(Content);
-            FileSize = System.Text.Encoding.UTF8.GetByteCount(Content);
+            // Sử dụng EncodingText để lấy Encoding phù hợp khi tính FileSize
+            Encoding encoding;
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                encoding = !string.IsNullOrEmpty(EncodingText)
+                    ? Encoding.GetEncoding(EncodingText)
+                    : Encoding.UTF8;
+            }
+            catch
+            {
+                encoding = Encoding.UTF8;
+            }
+            FileSize = encoding.GetByteCount(Content);
+
             IsDirty = true;
 
             // Reset analysis flags
@@ -344,6 +357,318 @@ namespace C_TestForge.Models.Projects
             File.WriteAllText(FilePath, Content);
             IsDirty = false;
             LastModified = File.GetLastWriteTime(FilePath);
+        }
+
+        #endregion
+
+        #region ReadFile Methods
+
+        /// <inheritdoc/>
+        /// <summary>
+        /// Đọc nội dung file với phát hiện encoding tự động hoặc theo chỉ định
+        /// </summary>
+        /// <param name="filePath">Đường dẫn file</param>
+        /// <param name="encodingName">Tên encoding, null để tự động phát hiện</param>
+        /// <returns>Nội dung file dưới dạng chuỗi</returns>
+        private async void ReadFileAsync(string filePath, string encodingName = null)
+        {
+            try
+            {
+                // Đảm bảo các encoding bổ sung được đăng ký
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
+                }
+
+                if (!File.Exists(filePath))
+                {
+                    throw new FileNotFoundException($"File not found: {filePath}");
+                }
+
+                string encoding = string.Empty;
+
+                // Sử dụng encoding được chỉ định
+                if (!string.IsNullOrEmpty(encodingName))
+                {
+                    try
+                    {
+                        encoding = encoding;
+                    }
+                    catch (ArgumentException)
+                    {
+                        encoding = null;
+                    }
+                }
+
+                // Nếu không có encoding được chỉ định, tự động phát hiện
+                if (string.IsNullOrEmpty(encoding))
+                {
+                    // Đọc một phần file để phát hiện encoding
+                    int bufferSize = 4096; // 4KB là đủ cho hầu hết trường hợp
+                    byte[] buffer = new byte[bufferSize];
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                    {
+                        int bytesRead = await fileStream.ReadAsync(buffer, 0, bufferSize);
+                        if (bytesRead < bufferSize)
+                        {
+                            Array.Resize(ref buffer, bytesRead);
+                        }
+                    }
+
+                    encoding = DetectTextEncoding(buffer);
+                }
+
+                // Đọc file với encoding đã xác định
+
+                EncodingText = encoding;
+                Content = await File.ReadAllTextAsync(filePath, Encoding.GetEncoding(encoding));
+
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Kiểm tra xem buffer có chứa dữ liệu nhị phân không
+        /// </summary>
+        private bool ContainsBinaryData(byte[] buffer)
+        {
+            // Giới hạn số byte cần kiểm tra để tăng hiệu suất
+            int bytesToCheck = Math.Min(buffer.Length, 512);
+            int nullCount = 0;
+
+            for (int i = 0; i < bytesToCheck; i++)
+            {
+                byte b = buffer[i];
+
+                // Nếu là byte null
+                if (b == 0x00)
+                {
+                    nullCount++;
+                    // Nếu có hơn 5% là byte null, có thể là file nhị phân
+                    if (nullCount > bytesToCheck * 0.05)
+                        return true;
+                }
+
+                // Kiểm tra các ký tự điều khiển không phải whitespace
+                if (b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D)
+                {
+                    // Nếu gặp ký tự điều khiển không phải tab, LF, CR
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Kiểm tra xem buffer có chứa chuỗi UTF-8 hợp lệ không
+        /// </summary>
+        private bool IsValidUtf8(byte[] buffer)
+        {
+            int i = 0;
+            int length = buffer.Length;
+
+            while (i < length)
+            {
+                // Byte đầu tiên của chuỗi UTF-8
+                byte b = buffer[i++];
+
+                // ASCII (0xxx xxxx)
+                if ((b & 0x80) == 0)
+                    continue;
+
+                // Xác định số byte của ký tự UTF-8
+                int extraBytes;
+
+                if ((b & 0xE0) == 0xC0) // 2 byte (110x xxxx)
+                    extraBytes = 1;
+                else if ((b & 0xF0) == 0xE0) // 3 byte (1110 xxxx)
+                    extraBytes = 2;
+                else if ((b & 0xF8) == 0xF0) // 4 byte (1111 0xxx)
+                    extraBytes = 3;
+                else
+                    return false; // Không phải định dạng UTF-8 hợp lệ
+
+                // Kiểm tra các byte tiếp theo (10xx xxxx)
+                while (extraBytes > 0 && i < length)
+                {
+                    b = buffer[i++];
+                    if ((b & 0xC0) != 0x80)
+                        return false; // Không phải định dạng UTF-8 hợp lệ
+
+                    extraBytes--;
+                }
+
+                if (extraBytes > 0)
+                    return false; // Chuỗi UTF-8 không hoàn chỉnh
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Kiểm tra xem buffer có chứa ký tự tiếng Nhật không (theo Shift-JIS)
+        /// </summary>
+        private bool ContainsJapaneseCharacters(byte[] buffer)
+        {
+            int length = buffer.Length;
+
+            for (int i = 0; i < length - 1; i++)
+            {
+                byte b1 = buffer[i];
+                byte b2 = buffer[i + 1];
+
+                // Kiểm tra dải Shift-JIS cho Hiragana (0x82A0-0x8393)
+                if (b1 == 0x82 && b2 >= 0xA0)
+                    return true;
+
+                // Kiểm tra dải Shift-JIS cho Katakana (0x83A0-0x8393)
+                if (b1 == 0x83 && b2 <= 0x93)
+                    return true;
+
+                // Kiểm tra dải Shift-JIS cho Kanji (0x889F-0x9FFC)
+                if ((b1 >= 0x88 && b1 <= 0x9F) || (b1 >= 0xE0 && b1 <= 0xEA))
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Kiểm tra xem buffer có chứa ký tự tiếng Việt không
+        /// </summary>
+        private bool ContainsVietnameseCharacters(byte[] buffer)
+        {
+            // Kiểm tra Windows-1258 encoding
+            bool hasVietnameseDiacritics = false;
+
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                byte b = buffer[i];
+
+                // Các byte đặc trưng cho dấu tiếng Việt trong Windows-1258
+                if (b >= 0xC0 && b <= 0xCF) // Â, Ă, Đ, Ê, Ô, Ơ, Ư
+                    hasVietnameseDiacritics = true;
+                else if (b >= 0xD0 && b <= 0xDC) // à, á, â, ã...
+                    hasVietnameseDiacritics = true;
+                else if (b >= 0xE0 && b <= 0xEF) // è, é, ê...
+                    hasVietnameseDiacritics = true;
+            }
+
+            // Kiểm tra UTF-8 với các ký tự tiếng Việt
+            if (IsValidUtf8(buffer))
+            {
+                string content = Encoding.UTF8.GetString(buffer);
+
+                // Tìm các ký tự đặc trưng tiếng Việt
+                if (content.Contains('đ') || content.Contains('Đ') ||
+                    content.Contains('ă') || content.Contains('Ă') ||
+                    content.Contains('â') || content.Contains('Â') ||
+                    content.Contains('ê') || content.Contains('Ê') ||
+                    content.Contains('ô') || content.Contains('Ô') ||
+                    content.Contains('ơ') || content.Contains('Ơ') ||
+                    content.Contains('ư') || content.Contains('Ư'))
+                {
+                    return true;
+                }
+            }
+
+            return hasVietnameseDiacritics;
+        }
+
+        /// <summary>
+        /// Phương pháp toàn diện hơn để phát hiện encoding, trả về tên encoding (string)
+        /// </summary>
+        private string DetectTextEncoding(byte[] buffer)
+        {
+            try
+            {
+                // Đảm bảo các encoding bổ sung được đăng ký
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                // Kiểm tra BOM
+                if (buffer.Length >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+                    return "utf-8";
+                if (buffer.Length >= 2 && buffer[0] == 0xFE && buffer[1] == 0xFF)
+                    return "utf-16BE";
+                if (buffer.Length >= 2 && buffer[0] == 0xFF && buffer[1] == 0xFE)
+                    return "utf-16LE";
+                if (buffer.Length >= 4 && buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 0xFE && buffer[3] == 0xFF)
+                    return "utf-32BE";
+
+                // Nếu là file nhị phân
+                if (ContainsBinaryData(buffer))
+                    return Encoding.Default.WebName;
+
+                // Kiểm tra tiếng Nhật
+                if (ContainsJapaneseCharacters(buffer))
+                {
+                    try
+                    {
+                        return Encoding.GetEncoding("shift_jis").WebName;
+                    }
+                    catch (ArgumentException)
+                    {
+                        return "utf-8";
+                    }
+                }
+
+                // Kiểm tra UTF-8 không có BOM
+                if (IsValidUtf8(buffer))
+                    return "utf-8";
+
+                // Kiểm tra tiếng Việt
+                if (ContainsVietnameseCharacters(buffer))
+                {
+                    try
+                    {
+                        return Encoding.GetEncoding("windows-1258").WebName;
+                    }
+                    catch (ArgumentException)
+                    {
+                        return "utf-8";
+                    }
+                }
+
+                // Thử phân tích dựa trên tần suất xuất hiện của các byte
+                int[] byteCount = new int[256];
+                foreach (byte b in buffer)
+                {
+                    byteCount[b]++;
+                }
+
+                // Nếu có nhiều byte >127 có thể là một bảng mã mở rộng
+                int extendedAsciiCount = 0;
+                for (int i = 128; i < 256; i++)
+                {
+                    extendedAsciiCount += byteCount[i];
+                }
+
+                if (extendedAsciiCount > buffer.Length * 0.1) // Nếu >10% là byte mở rộng
+                {
+                    try
+                    {
+                        return Encoding.GetEncoding(1252).WebName; // Windows-1252
+                    }
+                    catch (ArgumentException)
+                    {
+                        return Encoding.Default.WebName;
+                    }
+                }
+
+                // Mặc định UTF-8
+                return "utf-8";
+            }
+            catch (Exception)
+            {
+                return "utf-8"; // Fallback to UTF-8
+            }
         }
 
         #endregion
@@ -495,7 +820,20 @@ namespace C_TestForge.Models.Projects
                 return string.Empty;
 
             using var sha256 = SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+            // Sử dụng EncodingText để lấy Encoding phù hợp khi tính FileSize
+            Encoding encoding;
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                encoding = !string.IsNullOrEmpty(EncodingText)
+                    ? Encoding.GetEncoding(EncodingText)
+                    : Encoding.UTF8;
+            }
+            catch
+            {
+                encoding = Encoding.UTF8;
+            }
+            var bytes = encoding.GetBytes(content);
             var hash = sha256.ComputeHash(bytes);
             return Convert.ToBase64String(hash);
         }
@@ -676,7 +1014,7 @@ namespace C_TestForge.Models.Projects
                 FileType = FileType,
                 LastModified = LastModified,
                 FileSize = FileSize,
-                Encoding = Encoding,
+                EncodingText = EncodingText,
                 Includes = new Dictionary<string, IncludeInfo>(Includes),
                 Dependencies = new List<string>(Dependencies),
                 ExternalDependencies = new List<string>(ExternalDependencies),

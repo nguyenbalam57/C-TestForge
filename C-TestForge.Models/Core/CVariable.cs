@@ -8,115 +8,113 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace C_TestForge.Models.Core
 {
     /// <summary>
-    /// Enhanced CVariable with additional properties
+    /// Đại diện cho biến C với các thuộc tính mở rộng
     /// </summary>
     public class CVariable : SourceCodeEntity, ISymbol
     {
         /// <summary>
-        /// Type of the variable as a string
+        /// Tên kiểu dữ liệu của biến (sau khi resolve typedef)
         /// </summary>
         public string TypeName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Original type name before typedef resolution
+        /// Tên kiểu gốc trước khi resolve typedef
         /// </summary>
         public string OriginalTypeName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Type of the variable
+        /// Loại biến (enum: int, float, struct, ...)
         /// </summary>
         public VariableType VariableType { get; set; }
 
         /// <summary>
-        /// Whether this is a custom/user-defined type
+        /// Có phải kiểu do người dùng định nghĩa không (struct, union, enum, ...)
         /// </summary>
         public bool IsCustomType { get; set; }
 
         /// <summary>
-        /// Scope of the variable
+        /// Phạm vi của biến (toàn cục, cục bộ, static, tham số, ...)
         /// </summary>
         public VariableScope Scope { get; set; }
 
         /// <summary>
-        /// Storage class (auto, register, static, extern)
+        /// Lớp lưu trữ (auto, register, static, extern)
         /// </summary>
         public StorageClass StorageClass { get; set; }
 
         /// <summary>
-        /// Default/initial value of the variable
+        /// Giá trị khởi tạo mặc định của biến (nếu có)
         /// </summary>
         public string DefaultValue { get; set; } = string.Empty;
 
         /// <summary>
-        /// Whether the variable is constant
+        /// Biến có phải là hằng số không (const)
         /// </summary>
         public bool IsConst { get; set; }
 
         /// <summary>
-        /// Whether the variable is volatile
+        /// Biến có phải volatile không
         /// </summary>
         public bool IsVolatile { get; set; }
 
         /// <summary>
-        /// Whether the variable is a pointer
+        /// Biến có phải là con trỏ không
         /// </summary>
         public bool IsPointer { get; set; }
 
         /// <summary>
-        /// Pointer depth (0 = not pointer, 1 = *, 2 = **, etc.)
+        /// Độ sâu con trỏ (0 = không phải con trỏ, 1 = *, 2 = **, ...)
         /// </summary>
         public int PointerDepth { get; set; }
 
         /// <summary>
-        /// Whether the variable is an array
+        /// Biến có phải là mảng không
         /// </summary>
         public bool IsArray { get; set; }
 
         /// <summary>
-        /// Array dimensions if it's an array
+        /// Kích thước các chiều mảng (nếu là mảng)
         /// </summary>
         public List<int> ArrayDimensions { get; set; } = new List<int>();
 
         /// <summary>
-        /// Size of the variable in bytes
+        /// Kích thước biến (byte)
         /// </summary>
         public int Size { get; set; }
 
         /// <summary>
-        /// Whether this is a global variable
+        /// Có phải biến toàn cục không
         /// </summary>
         [JsonIgnore]
         public bool IsGlobal => Scope == VariableScope.Global;
 
         /// <summary>
-        /// Whether this is a local variable
+        /// Có phải biến cục bộ không
         /// </summary>
         [JsonIgnore]
         public bool IsLocal => Scope == VariableScope.Local;
 
         /// <summary>
-        /// Constraints on the variable
+        /// Danh sách ràng buộc áp dụng lên biến
         /// </summary>
         public List<VariableConstraint> Constraints { get; set; } = new List<VariableConstraint>();
 
         /// <summary>
-        /// Functions that use this variable
+        /// Danh sách tên các hàm sử dụng biến này
         /// </summary>
         [JsonIgnore]
         public List<string> UsedByFunctions { get; set; } = new List<string>();
 
         /// <summary>
-        /// Variable attributes
+        /// Danh sách thuộc tính đặc biệt của biến (ví dụ: __attribute__((...)))
         /// </summary>
         public List<CVariableAttribute> Attributes { get; set; } = new List<CVariableAttribute>();
 
-        // ISymbol implementation
+        // Triển khai ISymbol
         string ISymbol.Type => "Variable";
 
         public override string ToString()
@@ -130,6 +128,9 @@ namespace C_TestForge.Models.Core
             return $"{constModifier}{volatileModifier}{TypeName} {pointerMarker}{Name}{arrayMarker}{defaultValueStr}";
         }
 
+        /// <summary>
+        /// Tạo bản sao sâu của biến
+        /// </summary>
         public CVariable Clone()
         {
             return new CVariable

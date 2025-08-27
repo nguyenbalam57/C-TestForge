@@ -20,7 +20,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="filePath">Path to the source file</param>
         /// <param name="options">Parse options</param>
         /// <returns>Parse result</returns>
-        Task<ParseResult> ParseSourceFileParserAsync(List<SourceFile> sourceFiles, SourceFile sourceFile, ParseOptions options);
+        Task<ParseResult> ParseSourceFileParserAsync(SourceFile sourceFile, ParseOptions options);
 
         /// <summary>
         /// Parses C source code content with options
@@ -29,7 +29,7 @@ namespace C_TestForge.Core.Interfaces.Parser
         /// <param name="fileName">Name of the source file</param>
         /// <param name="options">Parse options</param>
         /// <returns>Parse result</returns>
-        Task<ParseResult> ParseSourceCodeParserAsync(List<SourceFile> sourceFiles, SourceFile sourceFile, ParseOptions options);
+        Task<ParseResult> ParseSourceCodeParserAsync( SourceFile sourceFile, ParseOptions options);
 
     }
 }

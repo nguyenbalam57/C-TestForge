@@ -82,4 +82,9 @@ namespace C_TestForge.Infrastructure.Views
     public interface ITypeMappingManagerView : IView
     {
     }
+
+    public interface IAboutView : IView
+    {
+    }
+
 }

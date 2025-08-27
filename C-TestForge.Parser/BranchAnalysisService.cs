@@ -35,65 +35,65 @@ namespace C_TestForge.Parser
                 throw new ArgumentNullException(nameof(functionName));
 
             // Get function analysis
-            var functionAnalysis = await _parserService.AnalyzeFunctionParserAsync(functionName, sourceFile);
-            if (functionAnalysis == null)
-                throw new InvalidOperationException($"Function not found: {functionName}");
+            //var functionAnalysis = await _parserService.AnalyzeFunctionParserAsync(functionName, sourceFile);
+            //if (functionAnalysis == null)
+            //    throw new InvalidOperationException($"Function not found: {functionName}");
 
-            // Create branch analysis result
-            var result = new BranchAnalysisResult
-            {
-                FunctionName = functionName,
-                Branches = new List<CFunctionBranch>(),
-                Paths = new List<CFunctionPath>()
-            };
+            //// Create branch analysis result
+            //var result = new BranchAnalysisResult
+            //{
+            //    FunctionName = functionName,
+            //    Branches = new List<CFunctionBranch>(),
+            //    Paths = new List<CFunctionPath>()
+            //};
 
-            // Extract branches
-            foreach (var branch in functionAnalysis.Branches)
-            {
-                var functionBranch = new CFunctionBranch
-                {
-                    Id = branch.LineNumber, // Use line number as ID for simplicity
-                    LineNumber = branch.LineNumber,
-                    Condition = branch.Condition,
-                    TrueBranchTarget = branch.TrueBlockId,
-                    FalseBranchTarget = branch.FalseBlockId,
-                    IsFeasible = true // Assume all branches are feasible by default
-                };
+            //// Extract branches
+            //foreach (var branch in functionAnalysis.Branches)
+            //{
+            //    var functionBranch = new CFunctionBranch
+            //    {
+            //        Id = branch.LineNumber, // Use line number as ID for simplicity
+            //        LineNumber = branch.LineNumber,
+            //        Condition = branch.Condition,
+            //        TrueBranchTarget = branch.TrueBlockId,
+            //        FalseBranchTarget = branch.FalseBlockId,
+            //        IsFeasible = true // Assume all branches are feasible by default
+            //    };
 
-                result.Branches.Add(functionBranch);
-            }
+                //result.Branches.Add(functionBranch);
+            //}
 
-            // Extract paths
-            int pathId = 0;
-            foreach (var path in functionAnalysis.Paths)
-            {
-                var functionPath = new CFunctionPath
-                {
-                    Id = pathId++,
-                    PathCondition = path.PathCondition,
-                    IsFeasible = path.IsExecutable
-                };
+            //// Extract paths
+            //int pathId = 0;
+            //foreach (var path in functionAnalysis.Paths)
+            //{
+            //    var functionPath = new CFunctionPath
+            //    {
+            //        Id = pathId++,
+            //        PathCondition = path.PathCondition,
+            //        IsFeasible = path.IsExecutable
+            //    };
 
-                // Extract branch IDs from the path
-                foreach (var blockId in path.BlockSequence)
-                {
-                    // Find branches related to this block
-                    var branchesInBlock = functionAnalysis.Branches
-                        .Where(b => b.TrueBlockId == blockId || b.FalseBlockId == blockId)
-                        .Select(b => b.LineNumber);
+            //    // Extract branch IDs from the path
+            //    foreach (var blockId in path.BlockSequence)
+            //    {
+            //        // Find branches related to this block
+            //        var branchesInBlock = functionAnalysis.Branches
+            //            .Where(b => b.TrueBlockId == blockId || b.FalseBlockId == blockId)
+            //            .Select(b => b.LineNumber);
 
-                    functionPath.Branches.AddRange(branchesInBlock);
-                }
+            //        functionPath.Branches.AddRange(branchesInBlock);
+            //    }
 
-                result.Paths.Add(functionPath);
-            }
+            //    result.Paths.Add(functionPath);
+            //}
 
-            // Calculate statistics
-            result.TotalBranches = result.Branches.Count;
-            result.FeasibleBranches = result.Branches.Count(b => b.IsFeasible);
-            result.InfeasibleBranches = result.TotalBranches - result.FeasibleBranches;
+            //// Calculate statistics
+            //result.TotalBranches = result.Branches.Count;
+            //result.FeasibleBranches = result.Branches.Count(b => b.IsFeasible);
+            //result.InfeasibleBranches = result.TotalBranches - result.FeasibleBranches;
 
-            return result;
+            return new BranchAnalysisResult();
         }
 
         /// <summary>

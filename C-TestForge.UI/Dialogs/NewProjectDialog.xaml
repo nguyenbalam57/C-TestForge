@@ -4,9 +4,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:local="clr-namespace:C_TestForge.UI.Converters"
         mc:Ignorable="d"
-        Title="New Project" Height="350" Width="600"
-        MinWidth="600" MinHeight="350"
+        Title="New Project" Height="500" Width="750"
+        MinWidth="750" MinHeight="500"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13"
@@ -15,171 +16,480 @@
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{materialDesign:MaterialDesignFont}"
         WindowStartupLocation="CenterOwner">
-    <Grid Margin="16">
+
+    <Window.Resources>
+        <!-- Import Converters -->
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary>
+                    <local:FileNameFromPathConverter x:Key="FileNameFromPathConverter"/>
+                    <local:InverseCountToVisibilityConverter x:Key="InverseCountToVisibilityConverter"/>
+                    <local:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+                    <local:StringToBooleanConverter x:Key="StringToBooleanConverter"/>
+                    <local:DirectoryPathConverter x:Key="DirectoryPathConverter"/>
+                </ResourceDictionary>
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Custom TabItem Style -->
+            <Style x:Key="CustomTabItemStyle" TargetType="TabItem">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="Border" 
+                                Background="Transparent" 
+                                BorderThickness="0"
+                                Margin="0,2"
+                                CornerRadius="8,0,0,8">
+                                <ContentPresenter x:Name="ContentSite"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Left"
+                                            ContentSource="Header"
+                                            Margin="16,12,16,12"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="False">
+                                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyLight}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ListBox Item Style without border -->
+            <Style x:Key="BorderlessListBoxItem" TargetType="ListBoxItem">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Border" 
+                                Background="Transparent" 
+                                BorderThickness="0"
+                                Padding="8,4"
+                                Margin="0,1"
+                                CornerRadius="4">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource MaterialDesignSelection}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Selected File Item Style -->
+            <Style x:Key="SelectedFileItemStyle" TargetType="ListBoxItem" BasedOn="{StaticResource BorderlessListBoxItem}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Border" 
+                                Background="{DynamicResource MaterialDesignSelection}" 
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource MaterialDesignDivider}"
+                                Padding="8,4"
+                                Margin="0,1"
+                                CornerRadius="4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0"/>
+                                    <Button Grid.Column="1" 
+                                        Style="{StaticResource MaterialDesignIconButton}"
+                                        Width="24" Height="24"
+                                        Command="{Binding DataContext.RemoveSelectedFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding .}">
+                                        <materialDesign:PackIcon Kind="Close" Width="12" Height="12"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl materialDesign:ColorZoneAssist.Mode="PrimaryMid" 
-                    Margin="0,0,0,10"
-                    TabStripPlacement="Right">
-            
-            <!-- Tab 1: Tạo mới Project -->
-            <TabItem Header="Tạo mới Project">
-                <Grid Margin="5" VerticalAlignment="Stretch">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="140"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+        <TabControl x:Name="MainTabControl"
+                    materialDesign:ColorZoneAssist.Mode="PrimaryMid" 
+                    Margin="0,0,0,20"
+                    TabStripPlacement="Left"
+                    Background="Transparent">
 
-                    <TextBlock Text="Tên dự án" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="0,4" MinWidth="200"/>
+            <!-- Tab 1: Thông tin dự án -->
+            <TabItem Header="📋 Thông tin dự án" Style="{StaticResource CustomTabItemStyle}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="24, 19, 24, 24">
+                    <StackPanel>
+                        <!-- Project Name -->
+                        <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                                 materialDesign:HintAssist.Hint="Tên dự án"
+                                 materialDesign:HintAssist.IsFloating="True"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                 FontSize="14"
+                                 Margin="0,5,0,20"/>
 
-                    <TextBlock Text="Mô tả dự án" Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,8,8,0"/>
-                    <TextBox Text="{Binding ProjectDescription, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" AcceptsReturn="True" TextWrapping="Wrap" Height="60"/>
+                        <!-- Project Description -->
+                        <TextBox Text="{Binding ProjectDescription, UpdateSourceTrigger=PropertyChanged}"
+                                 materialDesign:HintAssist.Hint="Mô tả dự án"
+                                 materialDesign:HintAssist.IsFloating="True"
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                 AcceptsReturn="True" 
+                                 TextWrapping="Wrap" 
+                                 MinHeight="80"
+                                 FontSize="14"
+                                 Margin="0,0,0,20"/>
 
-                    <TextBlock Text="Đường dẫn dự án" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,8,8,0"/>
-                    <Grid Grid.Row="2" Grid.Column="1" Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="txtProjectDirectory" Text="{Binding ProjectDirectory, UpdateSourceTrigger=PropertyChanged}" MinWidth="150"/>
-                        <Button Grid.Column="1" Margin="5,0,0,0" Click="BrowseProjectDirectory_Click">
-                            <materialDesign:PackIcon Kind="FolderOpen"/>
-                        </Button>
-                    </Grid>
-                </Grid>
+                        <!-- Project Directory -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="txtProjectDirectory"
+                                     Text="{Binding ProjectDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                     materialDesign:HintAssist.Hint="Đường dẫn dự án"
+                                     materialDesign:HintAssist.IsFloating="True"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                     FontSize="14"/>
+                            <Button Grid.Column="1" 
+                                    Margin="12,0,0,0" 
+                                    Click="BrowseProjectDirectory_Click"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Height="56">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="FolderOpen" Width="18" Height="18"/>
+                                    <TextBlock Text="Chọn" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- Tab 2: Macro Definitions -->
-            <TabItem Header="Macro Definitions">
-                <Grid Margin="5" VerticalAlignment="Stretch">
+            <TabItem Header="🔧 Macro Definitions" Style="{StaticResource CustomTabItemStyle}">
+                <Grid Margin="24">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
 
-                    <TextBox x:Name="txtMacroName" Grid.Row="0" Grid.Column="0" Margin="0,0,8,0" MinWidth="120"/>
-                    <Button Grid.Row="0" Grid.Column="1" Margin="0,0,4,0" Command="{Binding AddMacroCommand}" MinWidth="32">
-                        <materialDesign:PackIcon Kind="Plus"/>
-                    </Button>
-                    <Button Grid.Row="0" Grid.Column="2" Command="{Binding RemoveMacroCommand}" MinWidth="32" >
-                        <materialDesign:PackIcon Kind="Minus"/>
-                    </Button>
-
-                    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                        BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,10,0,0">
+                    <!-- Add Macro Section -->
+                    <materialDesign:Card Grid.Row="0" Padding="16" Margin="0,0,0,16">
                         <Grid>
-                            <ListBox x:Name="lstMacros"
-                                 ItemsSource="{Binding Macros}"
-                                 SelectedItem="{Binding SelectedMacro, Mode=TwoWay}"
-                                 MinHeight="80" MaxHeight="160"
-                                 Background="Transparent"
-                                 BorderThickness="0">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="BorderThickness" Value="0"/>
-                                        <Setter Property="BorderBrush" Value="Transparent"/>
-                                        <Setter Property="Padding" Value="0"/>
-                                        <Setter Property="Margin" Value="0"/>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding ., UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,2"/>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <TextBlock Text="Chưa có macro"
-                                   Foreground="{DynamicResource MaterialDesignHint}"
-                                   FontStyle="Italic"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Visibility="{Binding Macros.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="txtMacroName" 
+                                     Text="{Binding MacroName, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Column="0"
+                                     materialDesign:HintAssist.Hint="Nhập tên macro"
+                                     materialDesign:HintAssist.IsFloating="True"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                     Margin="0,0,12,0"/>
+                            <Button Grid.Column="1" 
+                                    Command="{Binding AddMacroCommand}"
+                                    Style="{StaticResource MaterialDesignRaisedButton}"
+                                    Margin="0,0,8,0"
+                                    Height="40" Width="50">
+                                <materialDesign:PackIcon Kind="Plus" Width="20" Height="20"/>
+                            </Button>
+                            <Button Grid.Column="2" 
+                                    Command="{Binding RemoveMacroCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Height="40" Width="50">
+                                <materialDesign:PackIcon Kind="Delete" Width="20" Height="20"/>
+                            </Button>
                         </Grid>
-                    </Border>
+                    </materialDesign:Card>
+
+                    <!-- Macros List -->
+                    <materialDesign:Card Grid.Row="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="57*"/>
+                                <ColumnDefinition Width="454*"/>
+                            </Grid.ColumnDefinitions>
+                            <ListBox ItemsSource="{Binding Macros}"
+                                     SelectedItem="{Binding SelectedMacro, Mode=TwoWay}"
+                                     ItemContainerStyle="{StaticResource BorderlessListBoxItem}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="8" Grid.ColumnSpan="2"/>
+                            <TextBlock Text="Chưa có macro nào"
+                                       Foreground="{DynamicResource MaterialDesignBodyLight}"
+                                       FontStyle="Italic"
+                                       FontSize="16"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding Macros.Count, Converter={StaticResource InverseCountToVisibilityConverter}}" Grid.Column="1" Margin="131,0,0,0"/>
+                        </Grid>
+                    </materialDesign:Card>
                 </Grid>
             </TabItem>
 
             <!-- Tab 3: Đường dẫn SourceCode -->
-            <TabItem Header="Đường dẫn SourceCode">
-                <Grid Margin="5" VerticalAlignment="Stretch">
+            <TabItem Header="📁 Đường dẫn Source" Style="{StaticResource CustomTabItemStyle}">
+                <Grid Margin="24">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
 
-                    <TextBox x:Name="txtSourcePath" Grid.Row="0" Grid.Column="0" Margin="0,0,8,0" MinWidth="120"/>
-                    <Button Grid.Row="0" Grid.Column="1" Margin="0,0,4,0" Click="BrowseSourcePath_Click" MinWidth="32">
-                        <materialDesign:PackIcon Kind="FolderOpen"/>
-                    </Button>
-                    <Button Grid.Row="0" Grid.Column="2" Margin="0,0,4,0" Command="{Binding AddSourcePathCommand}" MinWidth="32" >
-                        <materialDesign:PackIcon Kind="Plus"/>
-                    </Button>
-                    <Button Grid.Row="0" Grid.Column="3" Command="{Binding RemoveSourcePathCommand}" MinWidth="32" >
-                        <materialDesign:PackIcon Kind="Minus"/>
-                    </Button>
-
-                    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
-                        BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="0,10,0,0">
+                    <!-- Add Source Path Section -->
+                    <materialDesign:Card Grid.Row="0" Padding="16" Margin="0,0,0,16">
                         <Grid>
-                            <ListBox x:Name="lstSourcePaths"
-                                 ItemsSource="{Binding IncludePaths}"
-                                 SelectedItem="{Binding SelectedSourcePath, Mode=TwoWay}"
-                                 MinHeight="80" MaxHeight="160"
-                                 Background="Transparent"
-                                 BorderThickness="0"/>
-                            <TextBlock Text="Chưa có đường dẫn"
-                                   Foreground="{DynamicResource MaterialDesignHint}"
-                                   FontStyle="Italic"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Visibility="{Binding IncludePaths.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="txtSourcePath" 
+                                     Text="{Binding SourcePath, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Column="0"
+                                     materialDesign:HintAssist.Hint="Đường dẫn thư mục source"
+                                     materialDesign:HintAssist.IsFloating="True"
+                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <Button Grid.Column="1" 
+                                    Click="BrowseSourcePath_Click"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Margin="0,0,8,0"
+                                    Height="40" Width="50">
+                                <materialDesign:PackIcon Kind="FolderOpen" Width="20" Height="20"/>
+                            </Button>
+                            <Button Grid.Column="2" 
+                                    Command="{Binding AddSourcePathCommand}"
+                                    Style="{StaticResource MaterialDesignRaisedButton}"
+                                    Margin="0,0,8,0"
+                                    Height="40" Width="50">
+                                <materialDesign:PackIcon Kind="Plus" Width="20" Height="20"/>
+                            </Button>
+                            <Button Grid.Column="3" 
+                                    Command="{Binding RemoveSourcePathCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Height="40" Width="50">
+                                <materialDesign:PackIcon Kind="Delete" Width="20" Height="20"/>
+                            </Button>
                         </Grid>
-                    </Border>
+                    </materialDesign:Card>
+
+                    <!-- Source Paths List -->
+                    <materialDesign:Card Grid.Row="1">
+                        <Grid>
+                            <ListBox ItemsSource="{Binding IncludePaths}"
+                                     SelectedItem="{Binding SelectedSourcePath, Mode=TwoWay}"
+                                     ItemContainerStyle="{StaticResource BorderlessListBoxItem}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="8"/>
+                            <TextBlock Text="Chưa có đường dẫn nào"
+                                       Foreground="{DynamicResource MaterialDesignBodyLight}"
+                                       FontStyle="Italic"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding IncludePaths.Count, Converter={StaticResource InverseCountToVisibilityConverter}}"/>
+                        </Grid>
+                    </materialDesign:Card>
                 </Grid>
             </TabItem>
+
             <!-- Tab 4: File .c -->
-            <TabItem Header="File .c">
-                <Border BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1" CornerRadius="4" Padding="4" Margin="16,16,16,16">
-                    <ListBox ItemsSource="{Binding CFiles}" MinHeight="80" MaxHeight="200"
-                 Background="Transparent" BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Path=., Converter={StaticResource FileNameFromPathConverter}}"
-                               ToolTip="{Binding .}"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Border>
+            <TabItem Header="📄 File .c" Style="{StaticResource CustomTabItemStyle}">
+                <Grid Margin="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Available Files -->
+                    <materialDesign:Card Grid.Column="0" Margin="0,0,12,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" 
+                                    Background="{DynamicResource MaterialDesignToolBarBackground}"
+                                    Padding="16,12"
+                                    CornerRadius="4,4,0,0">
+                                <TextBlock Text="Tất cả file có sẵn" 
+                                           FontWeight="Medium"
+                                           FontSize="14"/>
+                            </Border>
+
+                            <ListBox x:Name="lstAllCFiles"
+                                     Grid.Row="1"
+                                     ItemsSource="{Binding AllCFiles}" 
+                                     SelectedItem="{Binding SelectedAvailableFile, Mode=TwoWay}"
+                                     ItemContainerStyle="{StaticResource BorderlessListBoxItem}"
+                                     Background="Transparent" 
+                                     BorderThickness="0"
+                                     Padding="8"
+                                     MouseDoubleClick="AvailableFile_DoubleClick">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0"
+                                                                     Kind="FileCode" 
+                                                                     Width="16" Height="16"
+                                                                     Margin="0,0,8,0"
+                                                                     Foreground="{DynamicResource MaterialDesignBodyLight}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Path=., Converter={StaticResource FileNameFromPathConverter}}"
+                                                       ToolTip="{Binding .}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </materialDesign:Card>
+
+                    <!-- Control Buttons -->
+                    <StackPanel Grid.Column="1" 
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Button Command="{Binding AddFileCommand}"
+                                Style="{StaticResource MaterialDesignRaisedButton}"
+                                Width="50" Height="50"
+                                ToolTip="Thêm file đã chọn"
+                                Margin="0,0,0,12">
+                            <materialDesign:PackIcon Kind="ArrowRight" Width="24" Height="24"/>
+                        </Button>
+                        <Button Command="{Binding AddAllFilesCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Width="50" Height="50"
+                                ToolTip="Thêm tất cả file"
+                                Margin="0,0,0,12">
+                            <materialDesign:PackIcon Kind="ArrowRightBold" Width="24" Height="24"/>
+                        </Button>
+                        <Button Command="{Binding RemoveFileCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Width="50" Height="50"
+                                ToolTip="Xóa file đã chọn"
+                                Margin="0,0,0,12">
+                            <materialDesign:PackIcon Kind="ArrowLeft" Width="24" Height="24"/>
+                        </Button>
+                        <Button Command="{Binding RemoveAllFilesCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Width="50" Height="50"
+                                ToolTip="Xóa tất cả file">
+                            <materialDesign:PackIcon Kind="ArrowLeftBold" Width="24" Height="24"/>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Selected Files -->
+                    <materialDesign:Card Grid.Column="2" Margin="12,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" 
+                                    Background="{DynamicResource MaterialDesignSelection}"
+                                    Padding="16,12"
+                                    CornerRadius="4,4,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="File đã chọn" 
+                                               FontWeight="Medium"
+                                               FontSize="14"/>
+                                    <TextBlock Text="{Binding SelectedCFiles.Count, StringFormat=({0})}" 
+                                               Margin="8,0,0,0"
+                                               Foreground="{DynamicResource MaterialDesignBodyLight}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <ListBox x:Name="lstSelectedCFiles"
+                                     Grid.Row="1"
+                                     ItemsSource="{Binding SelectedCFiles}" 
+                                     SelectedItem="{Binding SelectedFile, Mode=TwoWay}"
+                                     ItemContainerStyle="{StaticResource SelectedFileItemStyle}"
+                                     Background="Transparent" 
+                                     BorderThickness="0"
+                                     Padding="8">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0"
+                                                                     Kind="CheckCircle" 
+                                                                     Width="16" Height="16"
+                                                                     Margin="0,0,8,0"
+                                                                     Foreground="{DynamicResource MaterialDesignValidationErrorBrush}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Path=., Converter={StaticResource FileNameFromPathConverter}}"
+                                                       ToolTip="{Binding .}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </materialDesign:Card>
+                </Grid>
             </TabItem>
         </TabControl>
 
-        <!-- Nút dưới cùng -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" Click="CancelButton_Click" MinWidth="90">Cancel</Button>
-            <Button Style="{StaticResource MaterialDesignRaisedButton}" Click="OkButton_Click" MinWidth="90">Lưu</Button>
-        </StackPanel>
+        <!-- Bottom Action Buttons -->
+        <materialDesign:Card Grid.Row="1" 
+                             Padding="20,16"
+                             materialDesign:ElevationAssist.Elevation="Dp2">
+            <StackPanel Orientation="Horizontal" Margin="418,0,0,0">
+                <Button Style="{StaticResource MaterialDesignOutlinedButton}" 
+                        Click="CancelButton_Click" 
+                        MinWidth="100"
+                        Height="40"
+                        Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Close" Width="16" Height="16"/>
+                        <TextBlock Text="Hủy" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource MaterialDesignRaisedButton}" 
+                        Click="OkButton_Click" 
+                        MinWidth="100"
+                        Height="40">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ContentSave" Width="16" Height="16"/>
+                        <TextBlock Text="Build" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </materialDesign:Card>
     </Grid>
 </Window>

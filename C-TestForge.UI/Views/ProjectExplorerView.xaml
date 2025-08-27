@@ -27,26 +27,47 @@
                 <TextBlock Text="{Binding ProjectName, StringFormat='Dự án: {0}'}" 
                          FontSize="14" Foreground="#606060" Margin="0,5,0,0"/>
             </StackPanel>
-
-            <!-- Actions -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="Phân tích" Margin="5" Command="{Binding ParseSourceFilesCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                            <Setter Property="Background" Value="#1976D2"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </StackPanel>
         </Grid>
 
         <!-- Content -->
         <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+
+            <GridSplitter Grid.Column="1"
+              Width="6"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Stretch"
+              Background="#FFEEEEEE"
+              ShowsPreview="True"
+              Margin="0"
+              ResizeBehavior="PreviousAndNext"
+              ResizeDirection="Columns"
+              Cursor="SizeWE">
+                <GridSplitter.Style>
+                    <Style TargetType="GridSplitter">
+                        <Setter Property="Background" Value="#FFEEEEEE"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="GridSplitter">
+                                    <Grid Background="{TemplateBinding Background}">
+                                        <Rectangle Fill="{TemplateBinding Background}" RadiusX="3" RadiusY="3"/>
+                                        <Rectangle Width="2" HorizontalAlignment="Center" Fill="#FFB0B0B0" RadiusX="1" RadiusY="1"/>
+                                    </Grid>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FF90CAF9"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </GridSplitter.Style>
+            </GridSplitter>
 
             <!-- Source Files Section -->
             <materialDesign:Card Grid.Column="0" Margin="5" UniformCornerRadius="8">
@@ -106,24 +127,6 @@
                                             <TextBlock Text="{Binding FilePath}" TextTrimming="CharacterEllipsis" 
                                                      Foreground="#606060" FontSize="12"/>
                                         </StackPanel>
-
-                                        <!-- Actions -->
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                            <Button Style="{StaticResource MaterialDesignIconButton}" 
-                                                  ToolTip="Phân tích tệp này"
-                                                  Command="{Binding DataContext.AnalyzeSourceFileCommand, 
-                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                  CommandParameter="{Binding}">
-                                                <materialDesign:PackIcon Kind="Microscope" Width="20" Height="20"/>
-                                            </Button>
-                                            <Button Style="{StaticResource MaterialDesignIconButton}" 
-                                                  ToolTip="Xóa tệp"
-                                                  Command="{Binding DataContext.RemoveSourceFileCommand, 
-                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                  CommandParameter="{Binding}">
-                                                <materialDesign:PackIcon Kind="Delete" Width="20" Height="20"/>
-                                            </Button>
-                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
@@ -133,7 +136,7 @@
             </materialDesign:Card>
 
             <!-- Source File Details -->
-            <materialDesign:Card Grid.Column="1" Margin="5" UniformCornerRadius="8">
+            <materialDesign:Card Grid.Column="2" Margin="5" UniformCornerRadius="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -142,7 +145,11 @@
 
                     <!-- Details Header -->
                     <Grid Grid.Row="0" Background="#F5F5F5">
-                        <TextBlock Text="Chi tiết tệp" FontSize="16" FontWeight="Medium" Margin="15,10"/>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48*"/>
+                            <ColumnDefinition Width="329*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Chi tiết tệp" FontSize="16" FontWeight="Medium" Margin="15,10,15,10" Grid.ColumnSpan="2"/>
                     </Grid>
 
                     <!-- No File Selected -->
@@ -164,6 +171,10 @@
                     <!-- File Details Content -->
                     <Grid Grid.Row="1" Margin="15"
                         Visibility="{Binding SelectedSourceFile, Converter={StaticResource NullToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="11*"/>
+                            <ColumnDefinition Width="74*"/>
+                        </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -174,14 +185,14 @@
 
                         <!-- File Name -->
                         <TextBlock Grid.Row="0" Text="{Binding SelectedSourceFile.FileName}" 
-                                 FontSize="20" FontWeight="SemiBold"/>
+                                 FontSize="20" FontWeight="SemiBold" Grid.ColumnSpan="2" Margin="0,0,0,21" Grid.RowSpan="2"/>
 
                         <!-- File Path -->
                         <TextBlock Grid.Row="1" Text="{Binding SelectedSourceFile.FilePath}" 
-                                 Foreground="#606060" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                 Foreground="#606060" TextWrapping="Wrap" Margin="0,5,0,67" Grid.ColumnSpan="2" Grid.RowSpan="2"/>
 
                         <!-- File Statistics -->
-                        <Grid Grid.Row="2" Margin="0,20,0,10">
+                        <Grid Grid.Row="2" Margin="0,20,0,10" Grid.ColumnSpan="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -207,22 +218,6 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- Actions -->
-                        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Xem mã nguồn" Margin="5"
-                                   Command="{Binding NavigateCommand}" CommandParameter="SourceAnalysis"
-                                   Style="{StaticResource MaterialDesignOutlinedButton}"/>
-                            <Button Content="Phân tích" Margin="5"
-                                   Command="{Binding AnalyzeSourceFileCommand}" 
-                                   CommandParameter="{Binding SelectedSourceFile}">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                                        <Setter Property="Background" Value="#1976D2"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                        </StackPanel>
                     </Grid>
                 </Grid>
             </materialDesign:Card>

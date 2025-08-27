@@ -112,5 +112,29 @@ namespace C_TestForge.Core.Interfaces.ProjectManagement
         /// <returns>The active configuration</returns>
         Configuration GetActiveConfiguration(Project project);
 
+        /// <summary>
+        /// Lưu file build của dự án vào thư mục build (cùng thư mục với file project gốc).
+        /// Tạo thư mục cùng tên với project, bên trong có thư mục build, lưu cả project và các source file.
+        /// </summary>
+        /// <param name="project">Project cần lưu</param>
+        /// <param name="sourceFiles">Danh sách source file</param>
+        /// <returns>True nếu lưu thành công, false nếu có lỗi</returns>
+        Task<bool> SaveBuildFilesAsync(Project project, List<SourceFile> sourceFiles);
+
+        /// <summary>
+        /// Đọc file build của dự án từ thư mục build.
+        /// </summary>
+        /// <param name="projectName">Tên project (dùng để xác định thư mục build)</param>
+        /// <param name="projectDirectory">Thư mục chứa project</param>
+        /// <returns>Tuple gồm Project và danh sách SourceFile, null nếu không tìm thấy hoặc lỗi</returns>
+        Task<(Project? project, List<SourceFile>? sourceFiles)> LoadBuildFilesAsync(string projectName, string projectDirectory);
+
+        /// <summary>
+        /// So sánh file Project ngoài thư mục và trong thư mục build để kiểm tra thay đổi.
+        /// </summary>
+        /// <param name="project">Project hiện tại (ngoài thư mục build)</param>
+        /// <param name="buildProject">Project trong thư mục build</param>
+        /// <returns>True nếu có thay đổi, false nếu giống nhau</returns>
+        bool IsBuildOutdated(Project project, Project buildProject);
     }
 }

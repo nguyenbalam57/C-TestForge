@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection.Metadata;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -19,6 +21,7 @@ namespace C_TestForge.Parser
         private readonly ILogger<SourceCodeService> _logger;
         private readonly IFileService _fileService;
         private readonly IPreprocessorService _preprocessorService;
+
 
         /// <summary>
         /// Constructor for SourceCodeService
@@ -53,21 +56,9 @@ namespace C_TestForge.Parser
                     throw new FileNotFoundException($"Source file not found: {filePath}");
                 }
 
-                string fileContent = await _fileService.ReadFileAsync(filePath);
-                string[] lines = fileContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                SourceFile sourceFile = new SourceFile(filePath);
 
-                var sourceFile = new SourceFile
-                {
-                    FilePath = filePath,
-                    FileName = _fileService.GetFileName(filePath),
-                    Content = fileContent,
-                    Lines = new List<string>(lines),
-                    LastModified = File.GetLastWriteTime(filePath)
-                };
-
-                // Pre-process the source file to get some basic information
-                // Chưa thực hiện tiền xử lý file mã nguồn
-                //await PreProcessSourceFileAsync(sourceFile);
+                sourceFile.LoadFromFile(); 
 
                 _logger.LogInformation($"Successfully loaded source file: {filePath}");
 
@@ -80,56 +71,6 @@ namespace C_TestForge.Parser
             }
         }
 
-        /// <summary>
-        /// Pre-processes a source file to extract basic information
-        /// Tiền xử lý file mã nguồn để trích xuất các thông tin cơ bản như: chỉ thị include, define, và các chỉ thị điều kiện (#if, #ifdef, ...).
-        /// </summary>
-        /// <param name="sourceFile">Source file to pre-process</param>
-        /// <returns>Task</returns>
-        private async Task PreProcessSourceFileAsync(SourceFile sourceFile)
-        {
-            try
-            {
-                if (sourceFile == null || string.IsNullOrEmpty(sourceFile.Content))
-                {
-                    return;
-                }
-
-                // Extract include directives
-                var includeRegex = new Regex(@"^\s*#\s*include\s+[<""]([^>""]*)[\>""]", RegexOptions.Multiline);
-                var includeMatches = includeRegex.Matches(sourceFile.Content);
-
-                foreach (Match match in includeMatches)
-                {
-                    string includePath = match.Groups[1].Value;
-                    // You might want to do something with the include paths here
-                }
-
-                // Extract define directives
-                var defineRegex = new Regex(@"^\s*#\s*define\s+(\w+)(?:\(([^)]*)\))?\s*(.*)?$", RegexOptions.Multiline);
-                var defineMatches = defineRegex.Matches(sourceFile.Content);
-
-                foreach (Match match in defineMatches)
-                {
-                    string macroName = match.Groups[1].Value;
-                    string parameters = match.Groups[2].Value;
-                    string value = match.Groups[3].Value;
-                    // You might want to do something with the defines here
-                }
-
-                // Extract conditional directives
-                var conditionalDirectives = await _preprocessorService.ExtractConditionalDirectivesAsync(
-                    sourceFile.Content, sourceFile.FileName);
-
-                // You might want to do something with the conditional directives here
-
-                await Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error pre-processing source file: {sourceFile.FileName}");
-                // Continue with partial information
-            }
-        }
+        
     }
 }

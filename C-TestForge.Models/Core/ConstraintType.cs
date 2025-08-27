@@ -46,4 +46,48 @@ namespace C_TestForge.Models.Core
         /// </summary>
         ExactValue
     }
+
+    /// <summary>
+    /// Types of typedef usage
+    /// </summary>
+    public enum TypedefUsageType
+    {
+        VariableDeclaration,
+        ParameterType,
+        ReturnType,
+        PointerTarget,
+        ArrayElement,
+        StructMember,
+        FunctionPointer,
+        TypeCast,
+        SizeofOperand
+    }
+
+    /// <summary>
+    /// Types of typedef validation issues
+    /// </summary>
+    public enum TypedefIssueType
+    {
+        CircularReference,
+        UnresolvedType,
+        DuplicateDefinition,
+        UnusedTypedef,
+        NamingConvention,
+        ComplexChain,
+        InvalidFunctionPointer,
+        MissingDocumentation,
+        InconsistentUsage,
+        PlatformSpecific
+    }
+
+    /// <summary>
+    /// Severity levels for issues
+    /// </summary>
+    public enum IssueSeverity
+    {
+        Info,
+        Warning,
+        Error,
+        Critical
+    }
 }

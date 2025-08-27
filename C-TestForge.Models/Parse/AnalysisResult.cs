@@ -74,11 +74,6 @@ namespace C_TestForge.Models.Parse
         public List<CInclude> Includes { get; set; } = new List<CInclude>();
 
         /// <summary>
-        /// Danh sách hằng số toàn cục
-        /// </summary>
-        public List<CConstant> Constants { get; set; } = new List<CConstant>();
-
-        /// <summary>
         /// Danh sách phụ thuộc kiểu dữ liệu (giữa struct, union, typedef, ...)
         /// </summary>
         public List<TypeDependency> TypeDependencies { get; set; } = new List<TypeDependency>();
@@ -181,7 +176,7 @@ namespace C_TestForge.Models.Parse
         /// </summary>
         public int TotalElementCount => Functions.Count + Variables.Count + Structures.Count +
                                        Unions.Count + Enumerations.Count + Typedefs.Count +
-                                       Definitions.Count + Constants.Count;
+                                       Definitions.Count;
 
         /// <summary>
         /// Danh sách symbol toàn cục (hàm, biến toàn cục, hằng số)
@@ -193,7 +188,6 @@ namespace C_TestForge.Models.Parse
                 var symbols = new List<ISymbol>();
                 symbols.AddRange(Functions.Cast<ISymbol>());
                 symbols.AddRange(Variables.Where(v => v.Scope == VariableScope.Global).Cast<ISymbol>());
-                symbols.AddRange(Constants.Cast<ISymbol>());
                 return symbols.OrderBy(s => s.Name).ToList();
             }
         }
@@ -228,7 +222,6 @@ namespace C_TestForge.Models.Parse
         public CUnion GetUnion(string name) => Unions.FirstOrDefault(u => u.Name == name);
         public CEnum GetEnumeration(string name) => Enumerations.FirstOrDefault(e => e.Name == name);
         public CTypedef GetTypedef(string name) => Typedefs.FirstOrDefault(t => t.Name == name);
-        public CConstant GetConstant(string name) => Constants.FirstOrDefault(c => c.Name == name);
         public CInclude GetInclude(string includePath) => Includes.FirstOrDefault(i => i.IncludePath == includePath);
 
         /// <summary>
@@ -269,7 +262,6 @@ namespace C_TestForge.Models.Parse
             var allSymbols = new List<ISymbol>();
             allSymbols.AddRange(Functions.Cast<ISymbol>());
             allSymbols.AddRange(Variables.Cast<ISymbol>());
-            allSymbols.AddRange(Constants.Cast<ISymbol>());
             allSymbols.AddRange(Structures.Cast<ISymbol>());
             allSymbols.AddRange(Unions.Cast<ISymbol>());
             allSymbols.AddRange(Enumerations.Cast<ISymbol>());
@@ -341,7 +333,6 @@ namespace C_TestForge.Models.Parse
             Enumerations.AddRange(other.Enumerations);
             Typedefs.AddRange(other.Typedefs);
             Includes.AddRange(other.Includes);
-            Constants.AddRange(other.Constants);
             TypeDependencies.AddRange(other.TypeDependencies);
             SymbolReferences.AddRange(other.SymbolReferences);
 

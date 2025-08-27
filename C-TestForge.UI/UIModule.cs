@@ -31,13 +31,15 @@ namespace C_TestForge.UI
             containerRegistry.RegisterForNavigation<ProjectExplorerView>("ProjectExplorerView");
             containerRegistry.RegisterForNavigation<SourceAnalysisView>("SourceAnalysisView");
             containerRegistry.RegisterForNavigation<TestCasesView>("TestCasesView");
-            
+            containerRegistry.RegisterForNavigation<AboutView>("AboutView");
+
             // Register old views
             containerRegistry.Register<ITestCaseManagementView, TestCaseManagementView>();
             containerRegistry.Register<IDashboardView, DashboardView>();
             containerRegistry.Register<IProjectExplorerView, ProjectExplorerView>();
             containerRegistry.Register<ISourceAnalysisView, SourceAnalysisView>();
             containerRegistry.Register<ITestCasesView, TestCasesView>();
+            containerRegistry.Register<IAboutView, AboutView>();
 
             // Register dialogs
             containerRegistry.RegisterDialog<TestCaseEditorDialog>();

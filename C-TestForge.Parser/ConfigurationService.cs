@@ -252,14 +252,8 @@ namespace C_TestForge.Parser
             {
                 Name = "Default",
                 Description = "Default configuration for C parsing",
-                MacroDefinitions = new List<string>
-                {
-                    { "DEBUG=1" }
-                },
-                IncludePaths = new List<string>
-                {
-
-                },
+                MacroDefinitions = new List<string>(),
+                IncludePaths = new List<string>(),
                 AdditionalArguments = new List<string>
                 {
                     "-std=c99"

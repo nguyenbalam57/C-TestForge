@@ -31,8 +31,8 @@ namespace C_TestForge.Models.Parse
         {
             IncludePaths = new List<string>
             {
-                "/usr/include",
-                "/usr/local/include"
+                //"/usr/include",
+                //"/usr/local/include"
             },
             MacroDefinitions = new List<string>(),
             AdditionalClangArguments = new List<string>

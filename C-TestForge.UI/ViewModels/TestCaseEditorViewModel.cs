@@ -141,8 +141,8 @@ namespace C_TestForge.UI.ViewModels
                     Inputs.Add(new TestCaseVariableInput
                     {
                         Name = param.Name,
-                        Type = param.TypeName,
-                        Value = GenerateDefaultValueForType(param.TypeName),
+                        //Type = param.TypeName,
+                        //Value = GenerateDefaultValueForType(param.TypeName),
                         IsStubParameter = false
                     });
                 }

@@ -28,7 +28,7 @@ namespace C_TestForge.Core.Interfaces.Analysis
         /// <param name="project">Project to analyze</param>
         /// <param name="options">Analysis options</param>
         /// <returns>Analysis result</returns>
-        Task<AnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options);
+        Task<ProjectAnalysisResult> AnalyzeProjectAsync(Project project, AnalysisOptions options);
 
         /// <summary>
         /// Checks if a source file has been modified since it was last analyzed

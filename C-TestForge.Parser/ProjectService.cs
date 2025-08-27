@@ -1,6 +1,7 @@
 ﻿using C_TestForge.Core.Interfaces.Analysis;
 using C_TestForge.Core.Interfaces.Parser;
 using C_TestForge.Core.Interfaces.ProjectManagement;
+using C_TestForge.Models.CodeAnalysis;
 using C_TestForge.Models.Parse;
 using C_TestForge.Models.Projects;
 using C_TestForge.Parser.Helpers;
@@ -13,6 +14,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace C_TestForge.Parser
 {
@@ -79,18 +81,28 @@ namespace C_TestForge.Parser
                 }
 
                 // Create a default configuration
-                var defaultConfig = _configurationService.CreateDefaultConfiguration();
+                //var defaultConfig = _configurationService.CreateDefaultConfiguration();
 
-                // Create the project
-                var project = new Project
+                Configuration configuration = new Configuration
+                {
+                    Name = $"{projectName}_config",
+                    MacroDefinitions = (macros != null && macros.Count > 0) ? macros : new List<string>(),
+                    IncludePaths = includePaths != null ? new List<string>(includePaths) : new List<string>(),
+                    Description = $"Config {projectName}",
+                    Properties = new Dictionary<string, string> { 
+                        { "CreatedBy", Environment.UserName },
+                        { "CreatedDate", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") } },
+
+                };
+
+                 // Create the project
+                 var project = new Project
                 {
                     Name = projectName,
                     ProjectFilePath = projectFilePath,
                     SourceFiles = cFiles != null ? cFiles : new List<string>(),
-                    IncludePaths = includePaths != null ? includePaths : new List<string>(),
-                    MacroDefinitions = (macros != null && macros.Count > 0) ? macros : new List<string>(),
-                    Configurations = new List<Configuration> { defaultConfig },
-                    ActiveConfigurationName = defaultConfig.Name,
+                    Configurations = new List<Configuration> { configuration },
+                    ActiveConfigurationName = configuration.Name,
                     LastModified = DateTime.Now,
                     Description = projectDescription,
                     Properties = new Dictionary<string, string>
@@ -116,13 +128,13 @@ namespace C_TestForge.Parser
 
         /// <inheritdoc/>
         public async Task<Project> EditProjectAsync(
-            Project currentProject,
-            string projectName,
-            string projectDescription,
-            string projectPath,
-            List<string>? macros = null,
-            List<string>? includePaths = null,
-            List<string>? cFiles = null)
+    Project currentProject,
+    string projectName,
+    string projectDescription,
+    string projectPath,
+    List<string>? macros = null,
+    List<string>? includePaths = null,
+    List<string>? cFiles = null)
         {
             try
             {
@@ -157,13 +169,42 @@ namespace C_TestForge.Parser
                 // Nếu đổi tên file, xóa file cũ sau khi lưu file mới
                 bool needDeleteOldFile = isFilePathChanged && _fileService.FileExists(oldProjectFilePath);
 
+                // Nếu đổi tên project, đổi tên cả thư mục chứa project và thư mục build/source liên quan
+                if (isNameChanged)
+                {
+                    string oldProjectDir = Path.GetDirectoryName(oldProjectFilePath)!;
+                    string newProjectDir = Path.GetDirectoryName(newProjectFilePath)!;
+
+                    string oldProjectFolder = Path.Combine(oldProjectDir, currentProject.Name);
+                    string newProjectFolder = Path.Combine(newProjectDir, projectName);
+
+                    if (_fileService.DirectoryExists(oldProjectFolder))
+                    {
+                        // Đảm bảo không trùng tên thư mục mới
+                        if (_fileService.DirectoryExists(newProjectFolder))
+                        {
+                            // Nếu thư mục mới đã tồn tại, xóa hoặc xử lý theo yêu cầu
+                            await _fileService.DeleteDirectoryAsync(newProjectFolder);
+                        }
+                        Directory.Move(oldProjectFolder, newProjectFolder);
+                        _logger.LogInformation($"Renamed project folder from {oldProjectFolder} to {newProjectFolder}");
+                    }
+                }
+
+                var cof = project.Configurations.FirstOrDefault(n => n.Name == project.ActiveConfigurationName);
+                if (cof != null)
+                {
+                    cof.MacroDefinitions = macros ?? new List<string>();
+                    cof.IncludePaths = includePaths ?? new List<string>();
+                    cof.Properties["LastModifiedBy"] = Environment.UserName;
+                    cof.Properties["LastModifiedDate"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                }
+
                 // Cập nhật thông tin
                 project.Name = projectName;
                 project.Description = projectDescription;
                 project.ProjectFilePath = newProjectFilePath;
-                project.IncludePaths = includePaths ?? new List<string>();
                 project.SourceFiles = cFiles ?? new List<string>();
-                project.MacroDefinitions = macros;
                 project.LastModified = DateTime.Now;
 
                 // Cập nhật thuộc tính
@@ -275,6 +316,23 @@ namespace C_TestForge.Parser
                     throw new ArgumentException("Project file path cannot be null or empty");
                 }
 
+                // Bổ sung thêm phần tạo luôn thư mục nếu chưa có,
+                // Khi đó sẽ xóa build
+                // Mục đích là khi thay đổi gì thì build lại từ đầu.
+                // Xác định thư mục build: <ProjectDir>\<ProjectName>\build\
+                string projectDir = Path.GetDirectoryName(project.ProjectFilePath)!;
+                string projectFolder = Path.Combine(projectDir, project.Name);
+                string buildFolder = Path.Combine(projectFolder, "build");
+
+                // Kiểm tra và tạo thư mục
+                // Nếu tồn tại thì xóa hết nội dung bên trong
+                if (_fileService.DirectoryExists(buildFolder))
+                {
+                    _fileService.DeleteDirectoryAsync(buildFolder);
+                }
+
+                _fileService.CreateDirectoryIfNotExists(projectFolder);
+
                 // Update last modified time
                 project.LastModified = DateTime.Now;
 
@@ -365,8 +423,43 @@ namespace C_TestForge.Parser
                 }
 
                 var sourceFiles = new List<SourceFile>();
+                var coffinal = project.Configurations.FirstOrDefault(c => c.Name == project.ActiveConfigurationName);
 
-                // Load each source file
+                // Đọc source file .h
+                foreach (var includePath in coffinal.IncludePaths)
+                {
+                    try
+                    {
+                        if (_fileService.DirectoryExists(includePath))
+                        {
+                            // Tìm kiếm file .h trong thư mục include chỉ truy câp thư mục gốc
+                            _logger.LogDebug($"Searching for header files in include path: {includePath}");
+                            var files = _fileService.GetFiles(includePath, "h", false);
+                            foreach (var file in files)
+                            {
+                                if (_fileService.FileExists(file))
+                                {
+                                    var sourceFile = await _sourceCodeService.LoadSourceFileAsync(file);
+                                    sourceFiles.Add(sourceFile);
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"Header file not found: {file}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"Include path not found: {includePath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error loading header files from: {includePath}");
+                    }
+                }
+
+                // Load each source file .c
                 foreach (var filePath in project.SourceFiles)
                 {
                     try
@@ -387,6 +480,8 @@ namespace C_TestForge.Parser
                         // Continue with other files
                     }
                 }
+
+                
 
                 _logger.LogInformation($"Successfully loaded {sourceFiles.Count} source files for project: {project.Name}");
 
@@ -623,6 +718,132 @@ namespace C_TestForge.Parser
 
             return configuration;
         }
+
+        #region Luu và đọc file build
+
+        /// <summary>
+        /// Lưu file build của dự án vào thư mục build (cùng thư mục với file project gốc).
+        /// Tạo thư mục cùng tên với project, bên trong có thư mục build, lưu cả project và các source file.
+        /// </summary>
+        public async Task<bool> SaveBuildFilesAsync(Project project, List<SourceFile> sourceFiles)
+        {
+            try
+            {
+                if (project == null)
+                    throw new ArgumentNullException(nameof(project));
+                if (string.IsNullOrEmpty(project.Name))
+                    throw new ArgumentException("Project name is required");
+                if (string.IsNullOrEmpty(project.ProjectFilePath))
+                    throw new ArgumentException("Project file path is required");
+
+                // Xác định thư mục build: <ProjectDir>\<ProjectName>\build\
+                string projectDir = Path.GetDirectoryName(project.ProjectFilePath)!;
+                string projectFolder = Path.Combine(projectDir, project.Name);
+                string buildFolder = Path.Combine(projectFolder, "build");
+
+                // Kiểm tra và tạo thư mục
+                // Nếu tồn tại thì xóa hết nội dung bên trong
+                if (_fileService.DirectoryExists(buildFolder))
+                {
+                    _fileService.DeleteDirectoryAsync(buildFolder);
+                }
+
+                // Tạo thư mục nếu chưa có
+                _fileService.CreateDirectoryIfNotExists(projectFolder);
+                _fileService.CreateDirectoryIfNotExists(buildFolder);
+
+                // Lưu Project vào buildFolder
+                string buildProjectPath = Path.Combine(buildFolder, $"{project.Name}.ctproj");
+                string projectJson = JsonConvert.SerializeObject(project, Formatting.Indented);
+                await _fileService.WriteFileAsync(buildProjectPath, projectJson);
+
+                // Lưu từng SourceFile vào buildFolder
+                foreach (var sourceFile in sourceFiles)
+                {
+                    if(sourceFile == null || string.IsNullOrEmpty(sourceFile.FileName))
+                        continue;
+
+                    string fileName = Path.GetFileNameWithoutExtension(sourceFile.FileName);
+                    string beforeDash = sourceFile.Id?.Split('-')[0]?.ToUpper();
+                    string ext = sourceFile.Extension.Replace(".", "")?.ToUpper();
+                    string buildSourceFilePath = Path.Combine(buildFolder, $"{fileName}_{beforeDash}_{ext}.json");
+                    string sourceFileJson = JsonConvert.SerializeObject(sourceFile, Formatting.Indented);
+                    await _fileService.WriteFileAsync(buildSourceFilePath, sourceFileJson);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving build files for project: {ProjectName}", project?.Name);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Đọc file build của dự án từ thư mục build.
+        /// </summary>
+        public async Task<(Project? project, List<SourceFile>? sourceFiles)> LoadBuildFilesAsync(string projectName, string projectDirectory)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(projectName) || string.IsNullOrEmpty(projectDirectory))
+                    throw new ArgumentException("Project name and directory are required");
+
+                string projectFolder = Path.Combine(projectDirectory, projectName);
+                string buildFolder = Path.Combine(projectFolder, "build");
+                string buildProjectPath = Path.Combine(buildFolder, $"{projectName}.ctproj");
+
+                if (!_fileService.FileExists(buildProjectPath))
+                    return (null, null);
+
+                // Đọc Project
+                string projectJson = await _fileService.ReadFileAsync(buildProjectPath);
+                var project = JsonConvert.DeserializeObject<Project>(projectJson);
+
+                // Đọc Project Chính
+                string projectGoc = await _fileService.ReadFileAsync(Path.Combine(projectDirectory, $"{projectName}.ctproj"));
+                var projectChinh = JsonConvert.DeserializeObject<Project>(projectGoc);
+
+                // So sánh và kiểm tra thay đổi.
+                // Nếu có thay đổi thì tiến hành Thông báo và build lại.
+                if(IsBuildOutdated(projectChinh!, project!))
+                {
+                    _logger.LogWarning("Build files are outdated for project: {ProjectName}", projectName);
+                    return (null, null);
+                }
+
+                // Đọc tất cả các file *.json (trừ file project) trong buildFolder
+                var sourceFiles = new List<SourceFile>();
+                var allJsonFiles = Directory.GetFiles(buildFolder, "*.json", SearchOption.TopDirectoryOnly)
+                    .Where(f => !f.EndsWith($"{projectName}.ctproj", StringComparison.OrdinalIgnoreCase));
+                foreach (var file in allJsonFiles)
+                {
+                    string json = await _fileService.ReadFileAsync(file);
+                    var sourceFile = JsonConvert.DeserializeObject<SourceFile>(json);
+                    if (sourceFile != null)
+                        sourceFiles.Add(sourceFile);
+                }
+
+                return (project, sourceFiles);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading build files for project: {ProjectName}", projectName);
+                return (null, null);
+            }
+        }
+
+        /// <summary>
+        /// So sánh file Project ngoài thư mục và trong thư mục build để kiểm tra thay đổi.
+        /// </summary>
+        public bool IsBuildOutdated(Project project, Project buildProject)
+        {
+            // Sử dụng hàm HasChanged đã có trong Project
+            return Project.HasChanged(project, buildProject);
+        }
+
+        #endregion
 
     }
 }

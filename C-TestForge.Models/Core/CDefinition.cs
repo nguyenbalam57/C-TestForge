@@ -97,4 +97,26 @@ namespace C_TestForge.Models.Core
             };
         }
     }
+
+    /// <summary>
+    /// Macro dependency information
+    /// </summary>
+    public class MacroDependency
+    {
+        public string MacroName { get; set; } = string.Empty;
+        public string DependsOn { get; set; } = string.Empty;
+        public MacroDependencyType DependencyType { get; set; }
+        public int LineNumber { get; set; }
+    }
+
+    /// <summary>
+    /// Macro constraint information
+    /// </summary>
+    public class MacroConstraint
+    {
+        public string MacroName { get; set; } = string.Empty;
+        public MacroConstraintType ConstraintType { get; set; }
+        public string Value { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+    }
 }

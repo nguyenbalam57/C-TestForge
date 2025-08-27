@@ -59,7 +59,7 @@ namespace C_TestForge.Models.Parse
         /// <summary>
         /// Tổng số tệp trong dự án
         /// </summary>
-        public int TotalFiles => DependencyGraph?.SourceFiles?.Count ?? 0;
+        public int TotalFiles { get; set; }
 
         /// <summary>
         /// Số tệp đã được xử lý thành công

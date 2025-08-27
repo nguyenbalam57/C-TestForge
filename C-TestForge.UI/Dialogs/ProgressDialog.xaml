@@ -1,0 +1,51 @@
+﻿<UserControl x:Class="C_TestForge.UI.Dialogs.ProgressDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:C_TestForge.UI.Dialogs"
+             mc:Ignorable="d" 
+             d:DesignHeight="180" d:DesignWidth="400">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+               Text="{Binding Title}"
+               FontWeight="Bold"
+               FontSize="18"
+               Margin="0,0,0,12"
+               />
+
+        <!-- Message -->
+        <TextBlock Grid.Row="1"
+               Text="{Binding Message}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,16"
+               />
+
+        <!-- ProgressBar and Cancel -->
+        <StackPanel Grid.Row="2" Orientation="Vertical">
+            <ProgressBar Height="22"
+                     Minimum="0"
+                     Maximum="100"
+                     Value="{Binding Progress}"
+                     IsIndeterminate="{Binding IsIndeterminate}"
+                     Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding ProgressText}"
+                   HorizontalAlignment="Right"
+                   FontSize="12"
+                   Foreground="Gray"
+                   Margin="0,0,0,8"/>
+            <Button Content="Hủy"
+                Width="80"
+                HorizontalAlignment="Right"
+                Command="{Binding CancelCommand}"
+                IsEnabled="{Binding CanCancel}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
