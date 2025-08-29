@@ -22,6 +22,7 @@ namespace C_TestForge.UI.ViewModels
         public string Theme { get; set; }
         public string DefaultProjectLocation { get; set; }
         public string LastSelectedProjectId { get; set; } // Lưu Id dự án gần nhất
+        public string LastSelectedConfigurationId { get; set; } // Lưu Id cấu hình dự án gần nhất
     }
 
     public class SettingsViewModel : ObservableObject
@@ -83,6 +84,13 @@ namespace C_TestForge.UI.ViewModels
             set => SetProperty(ref _lastSelectedProjectId, value);
         }
 
+        private string _lastSelectedConfigurationId;
+        public string LastSelectedConfigurationId
+        {
+            get => _lastSelectedConfigurationId;
+            set => SetProperty(ref _lastSelectedConfigurationId, value);
+        }
+
         public IRelayCommand BrowseFolderCommand { get; }
         public IRelayCommand SaveSettingsCommand { get; }
         public IRelayCommand ResetToDefaultCommand { get; }
@@ -140,6 +148,8 @@ namespace C_TestForge.UI.ViewModels
                 }
             }
         }
+
+
 
         private void OnSelectedProjectChanged()
         {
@@ -200,7 +210,8 @@ namespace C_TestForge.UI.ViewModels
                     FontSize = this.FontSize,
                     Theme = this.Theme,
                     DefaultProjectLocation = this.DefaultProjectLocation,
-                    LastSelectedProjectId = this.LastSelectedProjectId
+                    LastSelectedProjectId = this.LastSelectedProjectId,
+                    LastSelectedConfigurationId = this.LastSelectedConfigurationId
                 };
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(filePath, json);
@@ -235,6 +246,7 @@ namespace C_TestForge.UI.ViewModels
                         Theme = settings.Theme;
                         DefaultProjectLocation = settings.DefaultProjectLocation ?? "C:\\Projects";
                         LastSelectedProjectId = settings.LastSelectedProjectId;
+                        LastSelectedConfigurationId = settings.LastSelectedConfigurationId;
                     }
                 }
             }
